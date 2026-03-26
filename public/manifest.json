@@ -1,0 +1,50 @@
+{
+  "id": "/",
+  "name": "Qpixa - AI Image Generator",
+  "short_name": "Qpixa",
+  "description": "Create stunning AI-generated images with Qpixa",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#0d0e14",
+  "theme_color": "#e65c00",
+  "orientation": "portrait",
+  "categories": ["graphics", "photo", "utilities"],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "icons": [
+    {
+      "src": "/pwa-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Create Image",
+      "short_name": "Create",
+      "url": "/?screen=studio",
+      "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Marketplace",
+      "short_name": "Market",
+      "url": "/?screen=marketplace",
+      "icons": [{ "src": "/pwa-icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": []
+}

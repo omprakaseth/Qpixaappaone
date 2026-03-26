@@ -1,0 +1,508 @@
+import { ArrowLeft, User, Bell, Shield, Palette, Globe, CreditCard, HelpCircle, LogOut, ChevronRight, Info, FileText, Mail, Sun, Moon, Monitor, Save, Lock, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useAppState } from '@/context/AppContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+interface SettingsScreenProps {
+  onBack: () => void;
+}
+
+type ThemeMode = 'dark' | 'light' | 'system';
+
+function applyTheme(mode: ThemeMode) {
+  const root = document.documentElement;
+  let effectiveTheme: 'dark' | 'light' = 'dark';
+
+  if (mode === 'system') {
+    effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } else {
+    effectiveTheme = mode;
+  }
+
+  if (effectiveTheme === 'light') {
+    root.style.setProperty('--background', '0 0% 98%');
+    root.style.setProperty('--foreground', '240 10% 10%');
+    root.style.setProperty('--card', '0 0% 100%');
+    root.style.setProperty('--card-foreground', '240 10% 10%');
+    root.style.setProperty('--popover', '0 0% 100%');
+    root.style.setProperty('--popover-foreground', '240 10% 10%');
+    root.style.setProperty('--secondary', '240 5% 92%');
+    root.style.setProperty('--secondary-foreground', '240 6% 30%');
+    root.style.setProperty('--muted', '240 5% 88%');
+    root.style.setProperty('--muted-foreground', '240 4% 46%');
+    root.style.setProperty('--border', '240 6% 90%');
+    root.style.setProperty('--input', '240 5% 88%');
+    root.style.setProperty('--skeleton', '240 5% 90%');
+    root.classList.remove('dark');
+    root.classList.add('light');
+  } else {
+    root.style.setProperty('--background', '240 14% 5%');
+    root.style.setProperty('--foreground', '0 0% 95%');
+    root.style.setProperty('--card', '240 10% 8%');
+    root.style.setProperty('--card-foreground', '0 0% 95%');
+    root.style.setProperty('--popover', '240 10% 10%');
+    root.style.setProperty('--popover-foreground', '0 0% 95%');
+    root.style.setProperty('--secondary', '240 8% 14%');
+    root.style.setProperty('--secondary-foreground', '0 0% 85%');
+    root.style.setProperty('--muted', '240 6% 18%');
+    root.style.setProperty('--muted-foreground', '0 0% 55%');
+    root.style.setProperty('--border', '0 0% 100% / 0.08');
+    root.style.setProperty('--input', '240 6% 18%');
+    root.style.setProperty('--skeleton', '240 6% 15%');
+    root.classList.remove('light');
+    root.classList.add('dark');
+  }
+
+  localStorage.setItem('qpixa-theme', mode);
+}
+
+function getStoredTheme(): ThemeMode {
+  return (localStorage.getItem('qpixa-theme') as ThemeMode) || 'dark';
+}
+
+const sections = [
+  { id: 'account', label: 'Account', icon: User },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+  { id: 'privacy', label: 'Privacy & Security', icon: Shield },
+  { id: 'theme', label: 'Theme', icon: Palette },
+  { id: 'language', label: 'Language', icon: Globe },
+  { id: 'subscription', label: 'Subscription', icon: CreditCard },
+  { id: 'feedback', label: 'Send Feedback', icon: Mail },
+  { id: 'about', label: 'About', icon: Info },
+  { id: 'privacy_policy', label: 'Privacy Policy', icon: FileText },
+  { id: 'help', label: 'Help & Support', icon: HelpCircle },
+  { id: 'contact', label: 'Contact Us', icon: Mail },
+];
+
+const themeOptions: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
+  { id: 'dark', label: 'Dark', icon: Moon },
+  { id: 'light', label: 'Light', icon: Sun },
+  { id: 'system', label: 'System default', icon: Monitor },
+];
+
+export default function SettingsScreen({ onBack }: SettingsScreenProps) {
+  const { signOut, profile, refreshProfile, isLoggedIn } = useAppState();
+  const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
+  const [showTheme, setShowTheme] = useState(false);
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [notifEnabled, setNotifEnabled] = useState(true);
+  const [activityStatus, setActivityStatus] = useState(true);
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>('public');
+  const [language, setLanguage] = useState('en');
+  
+  // Account editing
+  const [editUsername, setEditUsername] = useState('');
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+  
+  // Password change
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [changingPw, setChangingPw] = useState(false);
+
+  // Load profile data into edit fields
+  useEffect(() => {
+    if (profile) {
+      setEditUsername(profile.username || '');
+      setEditDisplayName(profile.display_name || '');
+      setEditBio(profile.bio || '');
+    }
+  }, [profile]);
+
+  // Apply theme on mount and listen for system changes
+  useEffect(() => {
+    applyTheme(theme);
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => { if (theme === 'system') applyTheme('system'); };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [theme]);
+
+  const saveProfile = async () => {
+    if (!isLoggedIn) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          username: editUsername.trim() || null,
+          display_name: editDisplayName.trim() || null,
+          bio: editBio.trim() || null,
+        })
+        .eq('id', profile?.id);
+      if (error) throw error;
+      await refreshProfile();
+      toast.success('Profile updated!');
+    } catch {
+      toast.error('Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleThemeChange = (t: ThemeMode) => {
+    setTheme(t);
+    applyTheme(t);
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    onBack();
+  };
+
+  const handleSectionClick = (id: string) => {
+    if (id === 'theme') {
+      setShowTheme(!showTheme);
+      return;
+    }
+    setActiveSection(activeSection === id ? null : id);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button onClick={onBack}><ArrowLeft size={22} className="text-foreground" /></button>
+        <h1 className="text-base font-bold text-foreground">Settings</h1>
+      </div>
+
+      <div className="px-4 space-y-1 pb-8">
+        {sections.map(({ id, label, icon: Icon }) => (
+          <div key={id}>
+            <button
+              onClick={() => handleSectionClick(id)}
+              className="flex items-center justify-between w-full py-3.5 px-3 rounded-xl hover:bg-card transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Icon size={18} className="text-muted-foreground" />
+                <span className="text-sm font-medium text-foreground">{label}</span>
+              </div>
+              <ChevronRight size={16} className={`text-muted-foreground transition-transform ${(activeSection === id || (id === 'theme' && showTheme)) ? 'rotate-90' : ''}`} />
+            </button>
+
+            {/* Theme sub-section */}
+            {id === 'theme' && showTheme && (
+              <div className="ml-10 space-y-1 py-2">
+                {themeOptions.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleThemeChange(t.id)}
+                    className={`w-full text-left py-2.5 px-3 rounded-lg text-sm flex items-center gap-2.5 ${
+                      theme === t.id ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:bg-secondary'
+                    }`}
+                  >
+                    <t.icon size={16} />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Account section */}
+            {id === 'account' && activeSection === 'account' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                {isLoggedIn ? (
+                  <>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground font-medium">Username</label>
+                      <input
+                        value={editUsername}
+                        onChange={e => setEditUsername(e.target.value)}
+                        className="w-full mt-1 px-3 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground outline-none focus:border-primary transition-colors"
+                        placeholder="username"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground font-medium">Display Name</label>
+                      <input
+                        value={editDisplayName}
+                        onChange={e => setEditDisplayName(e.target.value)}
+                        className="w-full mt-1 px-3 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground outline-none focus:border-primary transition-colors"
+                        placeholder="Display Name"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground font-medium">Bio</label>
+                      <textarea
+                        value={editBio}
+                        onChange={e => setEditBio(e.target.value)}
+                        rows={2}
+                        className="w-full mt-1 px-3 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground outline-none focus:border-primary transition-colors resize-none"
+                        placeholder="Tell us about yourself..."
+                      />
+                    </div>
+                    <button
+                      onClick={saveProfile}
+                      disabled={saving}
+                      className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+                    </button>
+
+                    {/* Change Password */}
+                    <div className="border-t border-border pt-3 mt-3">
+                      <p className="text-[10px] text-muted-foreground font-medium mb-2">Change Password</p>
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                          <input
+                            type={showNewPw ? 'text' : 'password'}
+                            value={newPassword}
+                            onChange={e => setNewPassword(e.target.value)}
+                            placeholder="New password (min 6 chars)"
+                            className="w-full pl-9 pr-9 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground outline-none focus:border-primary transition-colors"
+                          />
+                          <button type="button" onClick={() => setShowNewPw(!showNewPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            {showNewPw ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
+                            setChangingPw(true);
+                            const { error } = await supabase.auth.updateUser({ password: newPassword });
+                            setChangingPw(false);
+                            if (error) { toast.error(error.message); return; }
+                            toast.success('Password updated!');
+                            setNewPassword('');
+                          }}
+                          disabled={changingPw || newPassword.length < 6}
+                          className="w-full py-2 rounded-lg bg-secondary text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50 hover:bg-muted transition-colors"
+                        >
+                          <Lock size={12} /> {changingPw ? 'Updating...' : 'Update Password'}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-2">Sign in to edit your account</p>
+                )}
+              </div>
+            )}
+
+            {/* Language section */}
+            {id === 'language' && activeSection === 'language' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-1">
+                {[
+                  { id: 'en', label: 'English' },
+                  { id: 'hi', label: 'हिन्दी (Hindi)' },
+                  { id: 'es', label: 'Español' },
+                  { id: 'ar', label: 'العربية (Arabic)' },
+                ].map(lang => (
+                  <button
+                    key={lang.id}
+                    onClick={() => { setLanguage(lang.id); toast.success(`Language set to ${lang.label}`); }}
+                    className={`w-full text-left py-2.5 px-3 rounded-lg text-sm ${
+                      language === lang.id ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:bg-secondary'
+                    }`}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Subscription section */}
+            {id === 'subscription' && activeSection === 'subscription' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-foreground">Current Plan</p>
+                  <span className="text-xs font-bold text-primary capitalize">{profile?.subscription_plan || 'Free'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-foreground">Credits</p>
+                  <span className="text-xs font-bold text-foreground">{profile?.credits ?? 0}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Upgrade to Pro for unlimited generations and no ads.</p>
+              </div>
+            )}
+
+            {id === 'notifications' && activeSection === 'notifications' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Push Notifications</p>
+                    <p className="text-[10px] text-muted-foreground">Receive push notifications</p>
+                  </div>
+                  <button
+                    onClick={() => setNotifEnabled(!notifEnabled)}
+                    className={`w-11 h-6 rounded-full relative transition-colors ${notifEnabled ? 'bg-primary' : 'bg-muted'}`}
+                  >
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${notifEnabled ? 'left-[22px]' : 'left-0.5'}`} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* About section */}
+            {id === 'about' && activeSection === 'about' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-lg font-bold text-primary">Q</span>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Qpixa</h3>
+                    <p className="text-[10px] text-muted-foreground">Version 1.0.0</p>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Qpixa is an AI-powered image generation and sharing platform where creators can generate, share, and sell AI art prompts.
+                </p>
+                <div className="border-t border-border pt-3">
+                  <p className="text-xs font-semibold text-foreground">Developer</p>
+                  <p className="text-xs text-muted-foreground mt-1">Om Prakash Seth</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Full-stack developer passionate about AI and creative tools.</p>
+                </div>
+                <p className="text-[10px] text-muted-foreground">© 2026 Qpixa. All rights reserved.</p>
+              </div>
+            )}
+
+            {/* Privacy Policy section */}
+            {id === 'privacy_policy' && activeSection === 'privacy_policy' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3 max-h-[400px] overflow-y-auto">
+                <h3 className="text-sm font-bold text-foreground">Privacy Policy</h3>
+                <p className="text-[10px] text-muted-foreground">Last updated: March 2026</p>
+                
+                <div className="space-y-3 text-xs text-muted-foreground leading-relaxed">
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">1. Information We Collect</h4>
+                    <p>We collect information you provide directly: account details (email, username, profile photo), content you create, and usage data to improve our services.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">2. How We Use Your Information</h4>
+                    <p>Your data is used to provide and improve Qpixa services, personalize your experience, process transactions, and send important updates.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">3. Data Storage & Security</h4>
+                    <p>Your data is securely stored using industry-standard encryption. We use secure cloud infrastructure to protect your information.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">4. Third-Party Services</h4>
+                    <p>We may use third-party services like Google AdSense for advertising. These services have their own privacy policies.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">5. Your Rights</h4>
+                    <p>You can access, update, or delete your personal data at any time through your profile settings. You can also request a full data export.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">6. Cookies & Ads</h4>
+                    <p>We use cookies for authentication and ads. Free users see ads via Google AdSense. Pro users enjoy an ad-free experience.</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">7. Contact</h4>
+                    <p>For privacy concerns, contact us at: <span className="text-primary">support@qpixa.com</span></p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Privacy & Security section */}
+            {id === 'privacy' && activeSection === 'privacy' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Profile Visibility</p>
+                    <p className="text-[10px] text-muted-foreground">Control who can see your profile</p>
+                  </div>
+                  <button
+                    onClick={() => setProfileVisibility(profileVisibility === 'public' ? 'private' : 'public')}
+                    className="text-[10px] text-primary font-semibold px-2 py-1 rounded bg-primary/10"
+                  >
+                    {profileVisibility === 'public' ? 'Public' : 'Private'}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">Show Activity Status</p>
+                    <p className="text-[10px] text-muted-foreground">Let others see when you're online</p>
+                  </div>
+                  <button
+                    onClick={() => setActivityStatus(!activityStatus)}
+                    className={`w-11 h-6 rounded-full relative transition-colors ${activityStatus ? 'bg-primary' : 'bg-muted'}`}
+                  >
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${activityStatus ? 'left-[22px]' : 'left-0.5'}`} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Help section */}
+            {id === 'help' && activeSection === 'help' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-2">
+                <p className="text-xs text-muted-foreground">Need help? Check our FAQ or reach out to us.</p>
+                <div className="space-y-2">
+                  <div className="p-2 bg-secondary rounded-lg">
+                    <p className="text-xs font-medium text-foreground">How to generate images?</p>
+                    <p className="text-[10px] text-muted-foreground">Go to Studio tab, enter a prompt and tap Generate.</p>
+                  </div>
+                  <div className="p-2 bg-secondary rounded-lg">
+                    <p className="text-xs font-medium text-foreground">How to earn credits?</p>
+                    <p className="text-[10px] text-muted-foreground">Watch rewarded ads or sell prompts in the marketplace.</p>
+                  </div>
+                  <div className="p-2 bg-secondary rounded-lg">
+                    <p className="text-xs font-medium text-foreground">How to sell prompts?</p>
+                    <p className="text-[10px] text-muted-foreground">Go to Marketplace, tap + to list your prompt for sale.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Feedback section */}
+            {id === 'feedback' && activeSection === 'feedback' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                <p className="text-xs text-muted-foreground">Tell us what you think. We read every message.</p>
+                <textarea
+                  value={feedbackText}
+                  onChange={e => setFeedbackText(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground outline-none resize-none"
+                  placeholder="Your feedback..."
+                />
+                <button
+                  onClick={async () => {
+                    if (!feedbackText.trim() || !profile) return;
+                    setSendingFeedback(true);
+                    const { error } = await supabase.from('feedback').insert({ user_id: profile.id, message: feedbackText.trim() });
+                    setSendingFeedback(false);
+                    if (error) { toast.error('Failed to send'); return; }
+                    toast.success('Feedback sent! Thank you 🙏');
+                    setFeedbackText('');
+                  }}
+                  disabled={sendingFeedback || !feedbackText.trim()}
+                  className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50"
+                >
+                  {sendingFeedback ? 'Sending...' : 'Send Feedback'}
+                </button>
+              </div>
+            )}
+
+            {/* Contact section */}
+            {id === 'contact' && activeSection === 'contact' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-2">
+                <p className="text-xs text-muted-foreground">Reach out to us for any queries or feedback.</p>
+                <div className="flex items-center gap-2">
+                  <Mail size={14} className="text-primary" />
+                  <span className="text-xs text-foreground">support@qpixa.com</span>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <div className="pt-4">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full py-3.5 px-3 rounded-xl hover:bg-card transition-colors"
+          >
+            <LogOut size={18} className="text-destructive" />
+            <span className="text-sm font-medium text-destructive">Logout</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
