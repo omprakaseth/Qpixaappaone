@@ -1,7 +1,7 @@
 import { ArrowLeft, Star, ShoppingBag, Grid3X3, Info, UserPlus, UserMinus, Sparkles, Coins, SlidersHorizontal, MapPin, Calendar, Share2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Post } from '@/data/mockData';
+import { Post } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';

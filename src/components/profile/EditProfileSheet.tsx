@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Camera, Loader2, ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -99,8 +99,13 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
       toast.success('Profile updated!');
       onSaved();
       onClose();
-    } catch {
-      toast.error('Failed to save');
+    } catch (err: any) {
+      console.error('Profile update error:', err);
+      if (err.code === '23505') {
+        toast.error('Username is already taken');
+      } else {
+        toast.error('Failed to save profile');
+      }
     } finally {
       setSaving(false);
     }

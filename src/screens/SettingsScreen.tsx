@@ -19,38 +19,10 @@ function applyTheme(mode: ThemeMode) {
     effectiveTheme = mode;
   }
 
-  if (effectiveTheme === 'light') {
-    root.style.setProperty('--background', '0 0% 98%');
-    root.style.setProperty('--foreground', '240 10% 10%');
-    root.style.setProperty('--card', '0 0% 100%');
-    root.style.setProperty('--card-foreground', '240 10% 10%');
-    root.style.setProperty('--popover', '0 0% 100%');
-    root.style.setProperty('--popover-foreground', '240 10% 10%');
-    root.style.setProperty('--secondary', '240 5% 92%');
-    root.style.setProperty('--secondary-foreground', '240 6% 30%');
-    root.style.setProperty('--muted', '240 5% 88%');
-    root.style.setProperty('--muted-foreground', '240 4% 46%');
-    root.style.setProperty('--border', '240 6% 90%');
-    root.style.setProperty('--input', '240 5% 88%');
-    root.style.setProperty('--skeleton', '240 5% 90%');
-    root.classList.remove('dark');
-    root.classList.add('light');
-  } else {
-    root.style.setProperty('--background', '240 14% 5%');
-    root.style.setProperty('--foreground', '0 0% 95%');
-    root.style.setProperty('--card', '240 10% 8%');
-    root.style.setProperty('--card-foreground', '0 0% 95%');
-    root.style.setProperty('--popover', '240 10% 10%');
-    root.style.setProperty('--popover-foreground', '0 0% 95%');
-    root.style.setProperty('--secondary', '240 8% 14%');
-    root.style.setProperty('--secondary-foreground', '0 0% 85%');
-    root.style.setProperty('--muted', '240 6% 18%');
-    root.style.setProperty('--muted-foreground', '0 0% 55%');
-    root.style.setProperty('--border', '0 0% 100% / 0.08');
-    root.style.setProperty('--input', '240 6% 18%');
-    root.style.setProperty('--skeleton', '240 6% 15%');
-    root.classList.remove('light');
+  if (effectiveTheme === 'dark') {
     root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
   }
 
   localStorage.setItem('qpixa-theme', mode);
@@ -63,7 +35,7 @@ function getStoredTheme(): ThemeMode {
 const sections = [
   { id: 'account', label: 'Account', icon: User },
   { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'privacy', label: 'Privacy & Security', icon: Shield },
+  { id: 'privacy', label: 'Privacy', icon: Lock },
   { id: 'theme', label: 'Theme', icon: Palette },
   { id: 'language', label: 'Language', icon: Globe },
   { id: 'subscription', label: 'Subscription', icon: CreditCard },
@@ -85,10 +57,10 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [showTheme, setShowTheme] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [notifEnabled, setNotifEnabled] = useState(true);
-  const [activityStatus, setActivityStatus] = useState(true);
-  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>('public');
-  const [language, setLanguage] = useState('en');
+  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem('qpixa-notif') !== 'false');
+  const [activityStatus, setActivityStatus] = useState(() => localStorage.getItem('qpixa-activity') !== 'false');
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => (localStorage.getItem('qpixa-visibility') as any) || 'public');
+  const [language, setLanguage] = useState(() => localStorage.getItem('qpixa-lang') || 'en');
   
   // Account editing
   const [editUsername, setEditUsername] = useState('');
@@ -137,8 +109,13 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       if (error) throw error;
       await refreshProfile();
       toast.success('Profile updated!');
-    } catch {
-      toast.error('Failed to update profile');
+    } catch (err: any) {
+      console.error('Profile update error:', err);
+      if (err.code === '23505') {
+        toast.error('Username is already taken');
+      } else {
+        toast.error('Failed to update profile');
+      }
     } finally {
       setSaving(false);
     }
@@ -147,6 +124,30 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const handleThemeChange = (t: ThemeMode) => {
     setTheme(t);
     applyTheme(t);
+  };
+
+  const toggleNotif = () => {
+    const val = !notifEnabled;
+    setNotifEnabled(val);
+    localStorage.setItem('qpixa-notif', val.toString());
+  };
+
+  const toggleActivity = () => {
+    const val = !activityStatus;
+    setActivityStatus(val);
+    localStorage.setItem('qpixa-activity', val.toString());
+  };
+
+  const toggleVisibility = () => {
+    const val = profileVisibility === 'public' ? 'private' : 'public';
+    setProfileVisibility(val);
+    localStorage.setItem('qpixa-visibility', val);
+  };
+
+  const changeLanguage = (langId: string, langLabel: string) => {
+    setLanguage(langId);
+    localStorage.setItem('qpixa-lang', langId);
+    toast.success(`Language set to ${langLabel}`);
   };
 
   const handleLogout = async () => {
@@ -294,7 +295,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 ].map(lang => (
                   <button
                     key={lang.id}
-                    onClick={() => { setLanguage(lang.id); toast.success(`Language set to ${lang.label}`); }}
+                    onClick={() => changeLanguage(lang.id, lang.label)}
                     className={`w-full text-left py-2.5 px-3 rounded-lg text-sm ${
                       language === lang.id ? 'bg-primary text-primary-foreground font-semibold' : 'text-muted-foreground hover:bg-secondary'
                     }`}
@@ -328,7 +329,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                     <p className="text-[10px] text-muted-foreground">Receive push notifications</p>
                   </div>
                   <button
-                    onClick={() => setNotifEnabled(!notifEnabled)}
+                    onClick={toggleNotif}
                     className={`w-11 h-6 rounded-full relative transition-colors ${notifEnabled ? 'bg-primary' : 'bg-muted'}`}
                   >
                     <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${notifEnabled ? 'left-[22px]' : 'left-0.5'}`} />
@@ -409,7 +410,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                     <p className="text-[10px] text-muted-foreground">Control who can see your profile</p>
                   </div>
                   <button
-                    onClick={() => setProfileVisibility(profileVisibility === 'public' ? 'private' : 'public')}
+                    onClick={toggleVisibility}
                     className="text-[10px] text-primary font-semibold px-2 py-1 rounded bg-primary/10"
                   >
                     {profileVisibility === 'public' ? 'Public' : 'Private'}
@@ -421,7 +422,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                     <p className="text-[10px] text-muted-foreground">Let others see when you're online</p>
                   </div>
                   <button
-                    onClick={() => setActivityStatus(!activityStatus)}
+                    onClick={toggleActivity}
                     className={`w-11 h-6 rounded-full relative transition-colors ${activityStatus ? 'bg-primary' : 'bg-muted'}`}
                   >
                     <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${activityStatus ? 'left-[22px]' : 'left-0.5'}`} />

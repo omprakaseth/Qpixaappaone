@@ -1,4 +1,6 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { AppProvider, useAppState } from '@/context/AppContext';
 import BottomNav from '@/components/BottomNav';
 import HomeScreen from '@/screens/HomeScreen';
@@ -17,13 +19,24 @@ import RewardButton from '@/components/ads/RewardButton';
 import RewardedAdModal from '@/components/ads/RewardedAdModal';
 import { useSmartScroll } from '@/hooks/useSmartScroll';
 import { useAdSettings } from '@/hooks/useAdSettings';
-import { Post } from '@/data/mockData';
+import { Post } from '@/context/AppContext';
 
 function AppShell() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const activeTab = useMemo(() => {
+    const path = location.pathname;
+    if (path === '/market') return 'discover';
+    if (path === '/studio') return 'studio';
+    if (path === '/favorites') return 'favorites';
+    if (path === '/profile') return 'profile';
+    return 'home';
+  }, [location.pathname]);
+
   const { posts, isPro, isLoggedIn } = useAppState();
   const { settings: adSettings } = useAdSettings();
   const [showRewardAd, setShowRewardAd] = useState(false);
-  const [activeTab, setActiveTab] = useState('home');
   const [upgradePopupShown, setUpgradePopupShown] = useState(false);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const upgradeTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -82,7 +95,7 @@ function AppShell() {
       if (showSettings) { setShowSettings(false); return; }
       if (showSubscription) { setShowSubscription(false); return; }
       // If on a non-home tab, go back to home
-      if (activeTab !== 'home') { setActiveTab('home'); return; }
+      if (activeTab !== 'home') { navigate('/'); return; }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -127,9 +140,15 @@ function AppShell() {
       scrollToTopRef.current();
       return;
     }
-    pushHistory(`tab-${tab}`);
-    setActiveTab(tab);
-  }, [activeTab, pushHistory]);
+    const paths: Record<string, string> = {
+      home: '/',
+      discover: '/market',
+      studio: '/studio',
+      favorites: '/favorites',
+      profile: '/profile'
+    };
+    navigate(paths[tab]);
+  }, [activeTab, navigate]);
 
   // Close helpers that go back in history
   const goBack = useCallback(() => {
@@ -149,58 +168,70 @@ function AppShell() {
   const handleUsePrompt = useCallback((prompt: string) => {
     setStudioPrompt(prompt);
     setSelectedPost(null);
-    setActiveTab('studio');
-  }, []);
+    navigate('/studio');
+  }, [navigate]);
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background">
-      <div className="h-full">
-        {activeTab === 'home' && (
-          <HomeScreen
-            scrollRef={scrollRef as React.RefObject<HTMLDivElement>}
-            onPostTap={openPost}
-            onCreatePost={openCreatePost}
-            onGetPro={openSubscription}
-            onCreatorTap={openCreator}
-            adSettings={adSettings}
-            isPro={isPro}
-          />
-        )}
-        {activeTab === 'discover' && (
-          <MarketplaceScreen
-            onUsePrompt={handleUsePrompt}
-            onOpenAuth={openAuth}
-            onCreatorTap={openCreator}
-          />
-        )}
-        {activeTab === 'studio' && (
-          isLoggedIn ? (
-            <StudioScreen
-              initialPrompt={studioPrompt}
-              onClearInitialPrompt={() => setStudioPrompt('')}
-              onPublish={(imageUrl, prompt) => {
-                setCreatePostData({ imageUrl, prompt });
-                openCreatePost();
-              }}
-            />
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-              </div>
-              <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
-              <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
-              <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                Sign In
-              </button>
-              <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
-                Create Account
-              </button>
-            </div>
-          )
-        )}
-        {activeTab === 'favorites' && <FavoritesScreen onOpenAuth={openAuth} />}
-        {activeTab === 'profile' && <ProfileScreen onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} />}
+    <div className="h-screen w-screen overflow-hidden bg-background flex flex-col">
+      <div className="flex-1 relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0"
+          >
+            {activeTab === 'home' && (
+              <HomeScreen
+                scrollRef={scrollRef as React.RefObject<HTMLDivElement>}
+                onPostTap={openPost}
+                onCreatePost={openCreatePost}
+                onGetPro={openSubscription}
+                onCreatorTap={openCreator}
+                adSettings={adSettings}
+                isPro={isPro}
+              />
+            )}
+            {activeTab === 'discover' && (
+              <MarketplaceScreen
+                scrollRef={scrollRef as React.RefObject<HTMLDivElement>}
+                onUsePrompt={handleUsePrompt}
+                onOpenAuth={openAuth}
+                onCreatorTap={openCreator}
+              />
+            )}
+            {activeTab === 'studio' && (
+              isLoggedIn ? (
+                <StudioScreen
+                  initialPrompt={studioPrompt}
+                  onClearInitialPrompt={() => setStudioPrompt('')}
+                  onPublish={(imageUrl, prompt) => {
+                    setCreatePostData({ imageUrl, prompt });
+                    openCreatePost();
+                  }}
+                />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  </div>
+                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
+                  <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
+                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                    Sign In
+                  </button>
+                  <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
+                    Create Account
+                  </button>
+                </div>
+              )
+            )}
+            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenAuth={openAuth} />}
+            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />

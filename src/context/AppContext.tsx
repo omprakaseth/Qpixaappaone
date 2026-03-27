@@ -1,7 +1,33 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Post, generatePosts } from '@/data/mockData';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
+import { toast } from 'sonner';
+
+// We redefine Post interface here to match Supabase schema
+export interface Post {
+  id: string;
+  title: string;
+  imageUrl: string;
+  creator: {
+    name: string;
+    username: string;
+    avatar: string;
+    initials: string;
+    isVerified?: boolean;
+  };
+  prompt: string;
+  tags: string[];
+  category: string;
+  style: string;
+  aspectRatio: string;
+  views: number;
+  likes: number;
+  saves: number;
+  comments: number;
+  createdAt: string;
+  isLiked: boolean;
+  isSaved: boolean;
+}
 
 interface Profile {
   id: string;
@@ -32,16 +58,69 @@ interface AppState {
   addPost: (post: Post) => void;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  fetchPosts: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [posts, setPosts] = useState<Post[]>(() => generatePosts(20));
+  const [posts, setPosts] = useState<Post[]>([]);
   const [credits, setCredits] = useState(40);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+
+  const fetchPosts = async () => {
+    try {
+      // Fetch posts with creator profile
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:creator_id (
+            username,
+            display_name,
+            avatar_url,
+            is_verified
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedPosts: Post[] = data.map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          imageUrl: p.image_url,
+          creator: {
+            name: p.profiles?.display_name || 'Unknown',
+            username: p.profiles?.username ? `@${p.profiles.username}` : '@user',
+            avatar: p.profiles?.avatar_url || '',
+            initials: (p.profiles?.display_name || 'U').substring(0, 2).toUpperCase(),
+            isVerified: p.profiles?.is_verified || false,
+          },
+          prompt: p.prompt,
+          tags: p.tags || [],
+          category: p.category || 'General',
+          style: p.style || 'Standard',
+          aspectRatio: p.aspect_ratio || '1:1',
+          views: p.views || 0,
+          likes: p.likes || 0,
+          saves: p.saves || 0,
+          comments: p.comments || 0,
+          createdAt: p.created_at,
+          isLiked: false, // Would need a separate query to check if current user liked
+          isSaved: false, // Would need a separate query to check if current user saved
+        }));
+        setPosts(formattedPosts);
+      }
+    } catch (err) {
+      console.error('Error fetching posts:', err);
+      toast.error('Failed to load posts');
+    }
+  };
 
   const fetchProfile = async (currentUser: User) => {
     const { data, error } = await supabase
@@ -69,6 +148,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    fetchPosts(); // Fetch posts on mount
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
@@ -83,16 +164,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const toggleLike = (id: string) => {
+  const toggleLike = async (id: string) => {
+    if (!user) return; // Must be logged in
+    
+    // Optimistic update
     setPosts(prev => prev.map(p =>
       p.id === id ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p
     ));
+
+    try {
+      const post = posts.find(p => p.id === id);
+      if (!post) return;
+
+      if (post.isLiked) {
+        // Unlike
+        await supabase.from('post_likes').delete().match({ post_id: id, user_id: user.id });
+        // We skip server-side increment/decrement for now as the RPC doesn't exist in types
+      } else {
+        // Like
+        await supabase.from('post_likes').insert({ post_id: id, user_id: user.id });
+      }
+    } catch (err) {
+      console.error('Error toggling like:', err);
+      toast.error('Failed to update like status');
+      // Revert on error
+      setPosts(prev => prev.map(p =>
+        p.id === id ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p
+      ));
+    }
   };
 
-  const toggleSave = (id: string) => {
+  const toggleSave = async (id: string) => {
+    if (!user) return; // Must be logged in
+    
+    // Optimistic update
     setPosts(prev => prev.map(p =>
       p.id === id ? { ...p, isSaved: !p.isSaved, saves: p.isSaved ? p.saves - 1 : p.saves + 1 } : p
     ));
+
+    try {
+      const post = posts.find(p => p.id === id);
+      if (!post) return;
+
+      if (post.isSaved) {
+        // Unsave
+        await supabase.from('favorites').delete().match({ image_url: post.imageUrl, user_id: user.id });
+      } else {
+        // Save
+        await supabase.from('favorites').insert({ image_url: post.imageUrl, prompt: post.prompt, user_id: user.id });
+      }
+    } catch (err) {
+      console.error('Error toggling save:', err);
+      toast.error('Failed to update save status');
+      // Revert on error
+      setPosts(prev => prev.map(p =>
+        p.id === id ? { ...p, isSaved: !p.isSaved, saves: p.isSaved ? p.saves - 1 : p.saves + 1 } : p
+      ));
+    }
   };
 
   const addPost = (post: Post) => {
@@ -116,7 +244,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       posts, setPosts, user, session, profile, isLoggedIn, isPro, credits, setCredits,
-      toggleLike, toggleSave, addPost, signOut, refreshProfile,
+      toggleLike, toggleSave, addPost, signOut, refreshProfile, fetchPosts
     }}>
       {children}
     </AppContext.Provider>

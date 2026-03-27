@@ -3,18 +3,35 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 export function useSmartScroll(enabled = true) {
   const [visible, setVisible] = useState(true);
   const lastScrollY = useRef(0);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [node, setNode] = useState<HTMLElement | null>(null);
   const lastToggleTime = useRef(0);
   const accumulatedDelta = useRef(0);
+  const refObject = useRef<HTMLElement | null>(null);
 
-  const handleScroll = useCallback(() => {
-    if (!enabled) return;
+  const scrollRef = useCallback((element: HTMLElement | null) => {
+    refObject.current = element;
+    setNode(element);
+  }, []);
+
+  // Attach .current to the callback ref so it can be used as a RefObject
+  if (!Object.prototype.hasOwnProperty.call(scrollRef, 'current')) {
+    Object.defineProperty(scrollRef, 'current', {
+      get: () => refObject.current,
+    });
+  }
+
+  const handleScroll = useCallback((e: Event) => {
+    if (!enabled || !node) return;
     
-    // Try scrollRef first, then find any active scrollable container
-    const el = scrollRef.current;
-    if (!el) return;
+    const target = e.target as HTMLElement;
+    const current = target.scrollTop;
     
-    const current = el.scrollTop;
+    // Initialize lastScrollY if it's 0 and we're already scrolled (e.g., restored scroll position)
+    if (lastScrollY.current === 0 && current > 50) {
+      lastScrollY.current = current;
+      return;
+    }
+
     const delta = current - lastScrollY.current;
     
     if (Math.abs(delta) < 3) return;
@@ -22,6 +39,13 @@ export function useSmartScroll(enabled = true) {
     if (current < 20) {
       setVisible(true);
       accumulatedDelta.current = 0;
+      lastScrollY.current = current;
+      return;
+    }
+
+    // Prevent flickering at the bottom (iOS rubber banding)
+    const maxScroll = node.scrollHeight - node.clientHeight;
+    if (current >= maxScroll - 10) {
       lastScrollY.current = current;
       return;
     }
@@ -43,14 +67,13 @@ export function useSmartScroll(enabled = true) {
     }
 
     lastScrollY.current = current;
-  }, [enabled]);
+  }, [enabled, node]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !enabled) return;
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [enabled, handleScroll]);
+    if (!node || !enabled) return;
+    node.addEventListener('scroll', handleScroll, { passive: true });
+    return () => node.removeEventListener('scroll', handleScroll);
+  }, [node, enabled, handleScroll]);
 
   // Reset visibility when tab changes (enabled toggles)
   useEffect(() => {
@@ -59,7 +82,7 @@ export function useSmartScroll(enabled = true) {
       accumulatedDelta.current = 0;
       lastScrollY.current = 0;
     }
-  }, [enabled]);
+  }, [enabled, node]);
 
   return { visible: enabled ? visible : true, scrollRef };
 }

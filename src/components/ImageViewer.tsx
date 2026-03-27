@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import { useAppState } from '@/context/AppContext';

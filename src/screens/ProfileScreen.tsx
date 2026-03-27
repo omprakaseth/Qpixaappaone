@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
@@ -8,6 +8,7 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
 
 interface ProfileScreenProps {
+  scrollRef?: React.RefObject<HTMLDivElement>;
   onOpenSettings: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onPostTap?: (post: any) => void;
@@ -24,7 +25,7 @@ interface UserPrompt {
   category: string;
 }
 
-export default function ProfileScreen({ onOpenSettings, onOpenAuth, onPostTap }: ProfileScreenProps) {
+export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, onPostTap }: ProfileScreenProps) {
   const { isLoggedIn, profile, user, refreshProfile } = useAppState();
   const { followingIds } = useFollows();
   const [activeTab, setActiveTab] = useState<'posts' | 'prompts' | 'about'>('posts');
@@ -45,30 +46,42 @@ export default function ProfileScreen({ onOpenSettings, onOpenAuth, onPostTap }:
 
   const fetchMyPosts = async () => {
     if (!user) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('posts')
       .select('*')
       .eq('creator_id', user.id)
       .order('created_at', { ascending: false });
-    if (data) setMyPosts(data);
+    if (error) {
+      console.error('Error fetching posts:', error);
+      toast.error('Failed to load your posts');
+    } else if (data) {
+      setMyPosts(data);
+    }
   };
 
   const fetchFollowerCount = async () => {
     if (!user) return;
-    const { count } = await supabase
+    const { count, error } = await supabase
       .from('follows')
       .select('*', { count: 'exact', head: true })
       .eq('following_id', user.id);
-    setFollowerCount(count || 0);
+    if (error) {
+      console.error('Error fetching followers:', error);
+    } else {
+      setFollowerCount(count || 0);
+    }
   };
 
   const fetchMyPrompts = async () => {
     if (!user) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('marketplace_prompts')
       .select('id, title, preview_image, price, rating, sales_count, model_type, category')
       .eq('creator_id', user.id);
-    if (data) {
+    if (error) {
+      console.error('Error fetching prompts:', error);
+      toast.error('Failed to load your prompts');
+    } else if (data) {
       setMyPrompts(data);
       const totalSales = data.reduce((s, p) => s + p.sales_count, 0);
       const totalEarnings = data.reduce((s, p) => s + p.sales_count * p.price, 0);
@@ -110,7 +123,7 @@ export default function ProfileScreen({ onOpenSettings, onOpenAuth, onPostTap }:
 
   return (
     <>
-      <div className="h-full overflow-y-auto scrollbar-hide">
+      <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
         {/* Header */}
         <div className="px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-bold text-foreground">@{username}</h1>
@@ -387,7 +400,7 @@ export default function ProfileScreen({ onOpenSettings, onOpenAuth, onPostTap }:
 }
 
 /* Compact prompt card for profile store */
-function PromptMiniCard({ prompt }: { prompt: { id: string; title: string; preview_image: string | null; price: number; rating: number; sales_count: number; model_type: string } }) {
+const PromptMiniCard: React.FC<{ prompt: { id: string; title: string; preview_image: string | null; price: number; rating: number; sales_count: number; model_type: string } }> = ({ prompt }) => {
   return (
     <div className="flex-shrink-0 w-[130px] rounded-xl overflow-hidden bg-card border border-border">
       <div className="relative aspect-[4/3] w-full overflow-hidden">

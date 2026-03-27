@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare } from 'lucide-react';
-import { Post, formatNumber } from '@/data/mockData';
+import { formatNumber } from '@/lib/utils';
+import { Post } from '@/context/AppContext';
 import { useAppState } from '@/context/AppContext';
 import { useFollows } from '@/hooks/useFollows';
 import VerifiedBadge from '@/components/VerifiedBadge';

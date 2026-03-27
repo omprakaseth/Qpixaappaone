@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { X, Clock, ShoppingCart, ArrowLeft, Trash2 } from 'lucide-react';
 import { Search, SlidersHorizontal, ChevronRight, Star, ChevronDown, Coins, Plus, Bell, Menu } from 'lucide-react';
@@ -37,121 +38,7 @@ const modelBadgeColors: Record<string, string> = {
   'FLUX': 'bg-orange-500/80',
 };
 
-const mockPrompts: MarketplacePrompt[] = [
-  {
-    id: 'mp-1', creator_id: '', title: 'Monochromatic Studio Portrait Pack',
-    description: 'Create stunning studio portraits with monochromatic lighting setups. Perfect for fashion and editorial photography prompts. Ideal for creating high-end portfolio shots with dramatic contrast and professional-quality results.',
-    prompt_text: 'A professional studio portrait with monochromatic lighting, soft shadows, high-end fashion photography, 8k resolution, shot on Phase One IQ4...',
-    preview_image: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop',
-    ],
-    category: 'Photo Prompts', model_type: 'Gemini Image', price: 5, rating: 5.0, sales_count: 234, is_featured: true, is_trending: true, created_at: new Date().toISOString(), creator_name: 'StudioPro'
-  },
-  {
-    id: 'mp-2', creator_id: '', title: 'Cinematic Lifestyle Portrait Collection',
-    description: 'Beautiful cinematic lifestyle portraits with golden hour lighting and natural bokeh.',
-    prompt_text: 'Cinematic lifestyle portrait, golden hour, natural light, shallow depth of field, warm tones, editorial quality...',
-    preview_image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=500&fit=crop',
-    ],
-    category: 'Photo Prompts', model_type: 'Gemini Image', price: 0, rating: 4.7, sales_count: 189, is_featured: false, is_trending: true, created_at: new Date().toISOString(), creator_name: 'CineLens'
-  },
-  {
-    id: 'mp-3', creator_id: '', title: 'Watercolor Islamic Art Collection',
-    description: 'Beautiful watercolor-style Islamic art with intricate patterns, lanterns, and spiritual themes.',
-    prompt_text: 'Watercolor illustration of Islamic art, ornate lanterns, crescent moon, intricate arabesque patterns, soft warm tones...',
-    preview_image: 'https://images.unsplash.com/photo-1564769625905-50e93615e769?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1564769625905-50e93615e769?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1542816417-0983c9c7ad02?w=400&h=500&fit=crop',
-    ],
-    category: 'Art Prompts', model_type: 'Gemini Image', price: 3, rating: 4.8, sales_count: 312, is_featured: true, is_trending: false, created_at: new Date().toISOString(), creator_name: 'ArtisanAI'
-  },
-  {
-    id: 'mp-4', creator_id: '', title: 'Family Lifestyle Illustrations',
-    description: 'Warm, inviting family lifestyle illustrations perfect for social media and marketing.',
-    prompt_text: 'Warm family lifestyle illustration, soft pastel colors, happy family moments, cozy interior setting...',
-    preview_image: 'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1559734840-f9509ee5677f?w=400&h=500&fit=crop',
-    ],
-    category: 'Art Prompts', model_type: 'Gemini Image', price: 3, rating: 4.5, sales_count: 145, is_featured: false, is_trending: false, created_at: new Date().toISOString(), creator_name: 'FamilyArt'
-  },
-  {
-    id: 'mp-5', creator_id: '', title: 'Cyberpunk City Neon Pack',
-    description: 'Epic cyberpunk cityscapes with neon lights, rain-soaked streets, and futuristic architecture.',
-    prompt_text: 'A sprawling cyberpunk metropolis at night, neon signs in Japanese, rain-soaked streets reflecting colorful lights...',
-    preview_image: 'https://images.unsplash.com/photo-1555448248-2571daf6344b?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1555448248-2571daf6344b?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=500&fit=crop',
-    ],
-    category: 'Sci-Fi Prompts', model_type: 'Midjourney', price: 8, rating: 4.9, sales_count: 567, is_featured: true, is_trending: true, created_at: new Date().toISOString(), creator_name: 'NeonArtist'
-  },
-  {
-    id: 'mp-6', creator_id: '', title: 'Fantasy Dragon Realm Collection',
-    description: 'Majestic dragons in fantasy landscapes with volumetric lighting and detailed scales.',
-    prompt_text: 'Majestic dragon perched on a mountain peak, aurora borealis in sky, fantasy art, volumetric lighting...',
-    preview_image: 'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&h=500&fit=crop',
-    ],
-    category: 'Sci-Fi Prompts', model_type: 'Midjourney', price: 6, rating: 4.6, sales_count: 289, is_featured: false, is_trending: true, created_at: new Date().toISOString(), creator_name: 'DragonLore'
-  },
-  {
-    id: 'mp-7', creator_id: '', title: 'Luxury Car Studio Shots',
-    description: 'Photorealistic luxury car renders with dramatic studio lighting and reflections.',
-    prompt_text: 'Ultra realistic luxury sports car in professional photo studio, dramatic rim lighting, reflective floor...',
-    preview_image: 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1542362567-b07e54358753?w=400&h=500&fit=crop',
-    ],
-    category: 'Car Prompts', model_type: 'DALL-E', price: 4, rating: 4.8, sales_count: 421, is_featured: true, is_trending: false, created_at: new Date().toISOString(), creator_name: 'SpeedDemon'
-  },
-  {
-    id: 'mp-8', creator_id: '', title: 'JDM Night Street Racing',
-    description: 'Japanese street racing scenes with neon-lit streets and modified JDM cars.',
-    prompt_text: 'Modified JDM car drifting through neon-lit Tokyo streets at night, smoke from tires, rain reflections...',
-    preview_image: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1542281286-9e0a16bb7366?w=400&h=500&fit=crop',
-    ],
-    category: 'Car Prompts', model_type: 'Stable Diff.', price: 0, rating: 4.3, sales_count: 198, is_featured: false, is_trending: true, created_at: new Date().toISOString(), creator_name: 'DriftKing'
-  },
-  {
-    id: 'mp-9', creator_id: '', title: 'Nature Landscape 4K Pack',
-    description: 'Breathtaking nature landscapes — mountains, forests, oceans — in ultra-high detail.',
-    prompt_text: 'Stunning 4K nature landscape, dramatic mountain range at sunrise, mist in valleys, golden light...',
-    preview_image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&h=500&fit=crop',
-    ],
-    category: 'Nature Prompts', model_type: 'DALL-E', price: 2, rating: 4.6, sales_count: 534, is_featured: false, is_trending: false, created_at: new Date().toISOString(), creator_name: 'NatureLens'
-  },
-  {
-    id: 'mp-10', creator_id: '', title: 'Cosmic Space Nebula Art',
-    description: 'Deep space nebulas, galaxies, and cosmic scenes with vivid colors.',
-    prompt_text: 'Deep space nebula, swirling cosmic gas clouds in vivid purple and blue, distant stars...',
-    preview_image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=300&h=400&fit=crop',
-    preview_images: [
-      'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=500&fit=crop',
-      'https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=400&h=500&fit=crop',
-    ],
-    category: 'Nature Prompts', model_type: 'Stable Diff.', price: 0, rating: 4.4, sales_count: 445, is_featured: true, is_trending: true, created_at: new Date().toISOString(), creator_name: 'CosmicArt'
-  },
-];
+
 
 function groupByCategory(prompts: MarketplacePrompt[]): Record<string, MarketplacePrompt[]> {
   const groups: Record<string, MarketplacePrompt[]> = {};
@@ -163,12 +50,13 @@ function groupByCategory(prompts: MarketplacePrompt[]): Record<string, Marketpla
 }
 
 interface MarketplaceScreenProps {
+  scrollRef?: React.RefObject<HTMLDivElement>;
   onUsePrompt?: (prompt: string) => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onCreatorTap?: (creatorName: string) => void;
 }
 
-export default function MarketplaceScreen({ onUsePrompt, onOpenAuth, onCreatorTap }: MarketplaceScreenProps) {
+export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap }: MarketplaceScreenProps) {
   const { isLoggedIn, credits, refreshProfile } = useAppState();
   const { items: cartItems, addToCart, removeFromCart, isInCart, count: cartCount } = useCart();
   const [search, setSearch] = useState('');
@@ -184,14 +72,64 @@ export default function MarketplaceScreen({ onUsePrompt, onOpenAuth, onCreatorTa
   const [notifications, setNotifications] = useState<{ id: string; title: string; message: string; created_at: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  const [prompts, setPrompts] = useState<MarketplacePrompt[]>([]);
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20)
       .then(({ data }) => { if (data) setNotifications(data); });
+
+    // Fetch marketplace prompts
+    const fetchPrompts = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('marketplace_prompts')
+          .select(`
+            *,
+            profiles:creator_id (
+              username,
+              display_name
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          const formattedPrompts: MarketplacePrompt[] = data.map((p: any) => ({
+            id: p.id,
+            creator_id: p.creator_id,
+            creator_name: p.profiles?.display_name || p.profiles?.username || 'Unknown',
+            title: p.title,
+            description: p.description || '',
+            prompt_text: p.prompt_text,
+            preview_image: p.preview_image,
+            preview_images: p.preview_images || [],
+            category: p.category || 'General',
+            model_type: p.model_type || 'Unknown',
+            price: p.price || 0,
+            rating: p.rating || 0,
+            sales_count: p.sales_count || 0,
+            is_featured: p.is_featured || false,
+            is_trending: p.is_trending || false,
+            created_at: p.created_at,
+          }));
+          setPrompts(formattedPrompts);
+        }
+      } catch (err) {
+        console.error('Error fetching prompts:', err);
+        toast.error('Failed to load marketplace items');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPrompts();
   }, []);
 
-
   // Filter
-  const filtered = mockPrompts.filter(p => {
+  const filtered = prompts.filter(p => {
     if (search) {
       const q = search.toLowerCase();
       if (!p.title.toLowerCase().includes(q) && !p.description.toLowerCase().includes(q) && !p.category.toLowerCase().includes(q)) return false;
@@ -226,14 +164,19 @@ export default function MarketplaceScreen({ onUsePrompt, onOpenAuth, onCreatorTa
       const { data, error } = await supabase.rpc('purchase_prompt', { p_prompt_id: prompt.id });
       if (error) {
         console.error('Purchase failed:', error.message);
+        toast.error('Purchase failed: ' + error.message);
         return;
       }
       if (data === true) {
         setPurchasedIds(prev => new Set(prev).add(prompt.id));
+        toast.success('Purchase successful!');
         await refreshProfile();
+      } else {
+        toast.error('Purchase failed');
       }
     } catch (err) {
-      console.error('Purchase error');
+      console.error('Purchase error', err);
+      toast.error('An unexpected error occurred during purchase');
     }
   };
 
@@ -248,7 +191,7 @@ export default function MarketplaceScreen({ onUsePrompt, onOpenAuth, onCreatorTa
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-3 pb-3 safe-top">
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-[max(env(safe-area-inset-top),2rem)] pb-3">
         {/* Top row: title + icons */}
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-lg font-bold text-foreground">Marketplace</h1>
@@ -352,7 +295,7 @@ export default function MarketplaceScreen({ onUsePrompt, onOpenAuth, onCreatorTa
       </div>
 
       {/* Categories with horizontal scroll */}
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-20">
         {/* Selected category view */}
         {selectedCategory ? (
           <div>
@@ -541,17 +484,17 @@ export default function MarketplaceScreen({ onUsePrompt, onOpenAuth, onCreatorTa
 }
 
 /* PromptBase-style card with multi-image grid preview */
-function PromptPackCard({
-  prompt,
-  isPurchased,
-  onTap,
-  onSellerTap,
-}: {
+const PromptPackCard: React.FC<{
   prompt: MarketplacePrompt;
   isPurchased: boolean;
   onTap: () => void;
   onSellerTap?: () => void;
-}) {
+}> = ({
+  prompt,
+  isPurchased,
+  onTap,
+  onSellerTap,
+}) => {
   const imgs = prompt.preview_images.length > 0 ? prompt.preview_images : [prompt.preview_image || '/placeholder.svg'];
   const badgeColor = modelBadgeColors[prompt.model_type] || 'bg-muted';
 

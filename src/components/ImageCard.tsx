@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Heart } from 'lucide-react';
-import { Post, formatNumber } from '@/data/mockData';
+import { formatNumber } from '@/lib/utils';
+import { Post } from '@/context/AppContext';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 
 interface ImageCardProps {

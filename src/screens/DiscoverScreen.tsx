@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Heart, MessageCircle, Share2, Bookmark, Eye, Search } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
-import { Post, formatNumber } from '@/data/mockData';
+import { formatNumber } from '@/lib/utils';
+import { Post } from '@/context/AppContext';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import QuickActions from '@/components/QuickActions';
 import ScrollToTop from '@/components/ScrollToTop';
@@ -11,7 +12,7 @@ interface DiscoverScreenProps {
   onPostTap: (post: Post) => void;
 }
 
-function DiscoverCard({ post, onPostTap }: { post: Post; onPostTap: () => void }) {
+const DiscoverCard: React.FC<{ post: Post; onPostTap: () => void }> = ({ post, onPostTap }) => {
   const { toggleLike, toggleSave } = useAppState();
   const [showHeart, setShowHeart] = useState(false);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -113,7 +114,7 @@ export default function DiscoverScreen({ scrollRef, onPostTap }: DiscoverScreenP
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm px-4 py-3 space-y-2">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm px-4 pb-3 space-y-2 pt-[max(env(safe-area-inset-top),2rem)]">
         <h1 className="text-lg font-bold text-foreground">Discover</h1>
         <div className="flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
           <Search size={16} className="text-muted-foreground mr-2" />

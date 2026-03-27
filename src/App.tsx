@@ -21,6 +21,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/market" element={<Index />} />
+          <Route path="/studio" element={<Index />} />
+          <Route path="/favorites" element={<Index />} />
+          <Route path="/profile" element={<Index />} />
           <Route path="/admin/qpixa-portal" element={<Admin />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />

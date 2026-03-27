@@ -10,7 +10,7 @@ import QuickActions from '@/components/QuickActions';
 import CategoryExplorer from '@/screens/CategoryExplorer';
 import FeedAdCard from '@/components/ads/FeedAdCard';
 import { useAppState } from '@/context/AppContext';
-import { generatePosts, Post } from '@/data/mockData';
+import { Post } from '@/context/AppContext';
 
 const categories = ['Trending', 'Following', 'Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature'];
 
@@ -31,7 +31,7 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro }: HomeScreenProps) {
-  const { posts, setPosts, toggleLike, toggleSave } = useAppState();
+  const { posts, setPosts, toggleLike, toggleSave, fetchPosts } = useAppState();
   const [activeCategory, setActiveCategory] = useState('Trending');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
@@ -69,6 +69,17 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         lastY = current;
         return;
       }
+      
+      // Prevent overscroll at bottom from triggering toggle
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return; // Not scrollable
+      
+      // If near bottom and scrolling down, don't collapse to prevent flicker
+      if (current >= maxScroll - 100 && delta > 0) {
+        accumulated = 0;
+        return;
+      }
+
       if ((delta > 0 && accumulated > 0) || (delta < 0 && accumulated < 0)) {
         accumulated += delta;
       } else {
@@ -91,11 +102,9 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && !loading) {
         setLoading(true);
-        setTimeout(() => {
-          const newPosts = generatePosts(10, posts.length);
-          setPosts(prev => [...prev, ...newPosts]);
-          setLoading(false);
-        }, 800);
+        // In a real app, fetch next page from Supabase
+        // For now, we just stop loading since we fetch all posts at once
+        setLoading(false);
       }
     }, { threshold: 0.1 });
     if (loadMoreRef.current) observer.observe(loadMoreRef.current);
@@ -105,15 +114,13 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   // Pull to refresh
   const touchStart = useRef(0);
   const handleTouchStart = (e: React.TouchEvent) => { touchStart.current = e.touches[0].clientY; };
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEnd = async (e: React.TouchEvent) => {
     if (!scrollRef.current || scrollRef.current.scrollTop > 0) return;
     const delta = e.changedTouches[0].clientY - touchStart.current;
     if (delta > 80) {
       setRefreshing(true);
-      setTimeout(() => {
-        setPosts(generatePosts(20));
-        setRefreshing(false);
-      }, 1000);
+      await fetchPosts();
+      setRefreshing(false);
     }
   };
 
@@ -125,15 +132,15 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       onTouchEnd={handleTouchEnd}
     >
       {/* Header - collapsible top section */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm pt-[max(env(safe-area-inset-top),2rem)]">
         <div
           className="overflow-hidden transition-all duration-300"
           style={{
-            maxHeight: headerCollapsed ? '0px' : '52px',
+            maxHeight: headerCollapsed ? '0px' : '56px',
             opacity: headerCollapsed ? 0 : 1,
           }}
         >
-          <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <div className="flex items-center justify-between px-4 pt-2 pb-3">
             <h1 className="text-xl font-bold">
               <span className="text-primary">Q</span>
               <span className="text-foreground">pixa</span>
@@ -161,7 +168,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         </div>
 
         {/* Search - always sticky */}
-        <div className="px-4 pb-2 flex gap-2">
+        <div className={`px-4 pb-3 flex gap-2 transition-all duration-300 ${headerCollapsed ? 'pt-4' : 'pt-1'}`}>
         <div className="flex-1 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
             <Search size={16} className="text-muted-foreground mr-2" />
             <input

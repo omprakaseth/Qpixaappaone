@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Heart, LogIn, UserPlus } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
 
 interface FavoritesScreenProps {
+  scrollRef?: React.RefObject<HTMLDivElement>;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
 }
 
-export default function FavoritesScreen({ onOpenAuth }: FavoritesScreenProps) {
+export default function FavoritesScreen({ scrollRef, onOpenAuth }: FavoritesScreenProps) {
   const { isLoggedIn, posts } = useAppState();
   const [activeTab, setActiveTab] = useState<'saved' | 'generated' | 'collections'>('saved');
 
@@ -42,7 +43,7 @@ export default function FavoritesScreen({ onOpenAuth }: FavoritesScreenProps) {
   ];
 
   return (
-    <div className="h-full overflow-y-auto scrollbar-hide">
+    <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
       <div className="px-4 py-3">
         <h1 className="text-lg font-bold text-foreground mb-3">Favorites</h1>
         <div className="flex gap-2 mb-4">
