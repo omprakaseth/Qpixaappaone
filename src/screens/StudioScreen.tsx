@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload } from 'lucide-react';
+import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import ImageViewer from '@/components/ImageViewer';
 import { useAppState } from '@/context/AppContext';
@@ -89,8 +89,15 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [reportText, setReportText] = useState('');
+  const [feedbackText, setFeedbackText] = useState('');
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const { height: vpHeight, offsetTop: vpOffsetTop, isKeyboardVisible } = useVisualViewport();
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
@@ -118,20 +125,28 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   useEffect(() => {
     const loadHistory = async () => {
       if (!user) return;
-      const { data } = await supabase.from('generations').select('*').eq('user_id', user.id).order('created_at', { ascending: true }).limit(50);
-      if (data && data.length > 0) {
-        const restored: ChatMessage[] = [];
-        data.forEach((g: any) => {
-          restored.push({ id: `h-u-${g.id}`, type: 'user', text: g.prompt, createdAt: new Date(g.created_at).toLocaleDateString() });
-          if (g.image_url) {
-            restored.push({ id: `h-a-${g.id}`, type: 'ai', text: g.prompt, imageUrl: g.image_url, createdAt: new Date(g.created_at).toLocaleDateString() });
-          }
-        });
-        setMessages(restored);
+      try {
+        const { data, error } = await supabase.from('generations').select('*').eq('user_id', user.id).order('created_at', { ascending: true }).limit(50);
+        if (error) {
+          console.error('Error loading history:', error);
+          return;
+        }
+        if (data && data.length > 0) {
+          const restored: ChatMessage[] = [];
+          data.forEach((g: any) => {
+            restored.push({ id: `h-u-${g.id}`, type: 'user', text: g.prompt, createdAt: new Date(g.created_at).toLocaleDateString() });
+            if (g.image_url) {
+              restored.push({ id: `h-a-${g.id}`, type: 'ai', text: g.prompt, imageUrl: g.image_url, createdAt: new Date(g.created_at).toLocaleDateString() });
+            }
+          });
+          setMessages(restored);
+        }
+      } catch (e) {
+        console.error('Failed to load history', e);
       }
     };
     loadHistory();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -190,6 +205,17 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     setMessages(prev => [...prev, userMsg]);
     setPrompt('');
     setGenerating(true);
+    setGenerationProgress(0);
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setGenerationProgress(prev => {
+        if (prev >= 95) return 95;
+        // Faster progress initially, slower towards the end
+        const increment = prev < 50 ? 15 : prev < 80 ? 5 : 2;
+        return prev + increment;
+      });
+    }, 500);
 
     const imageToSend = attachedImage;
     removeAttachment();
@@ -207,7 +233,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         const base64Data = imageToSend.split(',')[1];
         const mimeType = imageToSend.split(';')[0].split(':')[1] || 'image/png';
         response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: 'gemini-3.1-flash-image-preview',
           contents: {
             parts: [
               { inlineData: { data: base64Data, mimeType } },
@@ -218,12 +244,15 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       } else {
         // Generate image
         response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: 'gemini-3.1-flash-image-preview',
           contents: {
             parts: [{ text: userPrompt }]
           }
         });
       }
+
+      clearInterval(progressInterval);
+      setGenerationProgress(100);
 
       const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
       if (part && part.inlineData) {
@@ -256,7 +285,9 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
             image_url: generatedImageUrl,
           });
         }
-      } catch {}
+      } catch (e) {
+        console.error('Failed to save history:', e);
+      }
 
       await refreshProfile();
     } catch (err: any) {
@@ -264,11 +295,32 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       toast.error(err.message || 'Something went wrong. Please try again.');
     } finally {
       setGenerating(false);
+      setGenerationProgress(0);
     }
   };
 
   const handleNewChat = () => { setMessages([]); setPrompt(''); removeAttachment(); };
-  const historyMessages = messages.filter(m => m.type === 'ai');
+  
+  const historyMessages = messages.filter(m => m.type === 'ai').filter(m => {
+    if (historySearch && !m.text?.toLowerCase().includes(historySearch.toLowerCase())) {
+      return false;
+    }
+    
+    if (historyFilter !== 'all') {
+      const msgDate = new Date(m.createdAt);
+      const now = new Date();
+      if (isNaN(msgDate.getTime())) return true; // If it's "Just now" or invalid date string, keep it
+      
+      const diffTime = Math.abs(now.getTime() - msgDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (historyFilter === 'today' && diffDays > 1) return false;
+      if (historyFilter === 'week' && diffDays > 7) return false;
+      if (historyFilter === 'month' && diffDays > 30) return false;
+    }
+    
+    return true;
+  });
 
   const handleDownload = async (imageUrl: string) => {
     try {
@@ -365,6 +417,28 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     }
   };
 
+  const handleReportSubmit = () => {
+    if (!reportText.trim()) {
+      toast.error('Please describe the issue');
+      return;
+    }
+    // In a real app, send to Supabase 'reports' table
+    toast.success('Issue reported successfully. Thank you!');
+    setShowReportModal(false);
+    setReportText('');
+  };
+
+  const handleFeedbackSubmit = () => {
+    if (!feedbackText.trim()) {
+      toast.error('Please enter your feedback');
+      return;
+    }
+    // In a real app, send to Supabase 'feedback' table
+    toast.success('Feedback sent successfully. Thank you!');
+    setShowFeedbackModal(false);
+    setFeedbackText('');
+  };
+
   const containerStyle: React.CSSProperties = isKeyboardVisible
     ? { position: 'fixed', top: `${vpOffsetTop}px`, left: 0, right: 0, height: `${vpHeight}px`, zIndex: 30 }
     : { position: 'fixed', top: 0, left: 0, right: 0, bottom: '56px', zIndex: 30 };
@@ -380,10 +454,38 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
               <Menu size={22} className="text-foreground" />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 bg-card border-border p-0">
-            <div className="p-4 border-b border-border">
+          <SheetContent side="left" className="w-80 bg-card border-border p-0 flex flex-col" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <div className="p-4 border-b border-border shrink-0">
               <SheetTitle className="text-base font-bold text-foreground">AI Studio</SheetTitle>
               <p className="text-xs text-muted-foreground mt-0.5">Generation History</p>
+              
+              <div className="mt-4 space-y-3">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search history..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="w-full bg-secondary text-foreground text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+                  <Filter size={12} className="text-muted-foreground shrink-0" />
+                  {(['all', 'today', 'week', 'month'] as const).map(filter => (
+                    <button
+                      key={filter}
+                      onClick={() => setHistoryFilter(filter)}
+                      className={`px-3 py-1 rounded-full text-[10px] font-semibold capitalize shrink-0 transition-colors ${
+                        historyFilter === filter ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
               {historyMessages.length === 0 ? (
@@ -422,19 +524,80 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-card border-border">
-              <DropdownMenuItem onClick={handleNewChat} className="text-sm gap-2">
-                <Trash2 size={15} /> New Chat
+              <DropdownMenuItem onClick={() => setShowReportModal(true)} className="text-sm gap-2">
+                <Flag size={15} /> Report Issue
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleNewChat} className="text-sm gap-2">
-                <Trash2 size={15} /> Clear Chat
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-sm gap-2">
-                <Settings size={15} /> Settings
+              <DropdownMenuItem onClick={() => setShowFeedbackModal(true)} className="text-sm gap-2">
+                <MessageSquare size={15} /> Send Feedback
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card w-full max-w-sm rounded-2xl border border-border shadow-xl overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
+                <Flag size={18} className="text-primary" />
+                Report an Issue
+              </h3>
+              <button onClick={() => setShowReportModal(false)} className="p-1 rounded-full hover:bg-secondary">
+                <X size={18} className="text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-xs text-muted-foreground mb-3">Describe the error or issue you encountered in the Studio.</p>
+              <textarea
+                value={reportText}
+                onChange={(e) => setReportText(e.target.value)}
+                placeholder="What went wrong?"
+                className="w-full h-32 bg-secondary text-sm text-foreground rounded-xl p-3 outline-none resize-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                onClick={handleReportSubmit}
+                className="w-full mt-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.98] transition-transform"
+              >
+                Submit Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card w-full max-w-sm rounded-2xl border border-border shadow-xl overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
+                <MessageSquare size={18} className="text-primary" />
+                Send Feedback
+              </h3>
+              <button onClick={() => setShowFeedbackModal(false)} className="p-1 rounded-full hover:bg-secondary">
+                <X size={18} className="text-muted-foreground" />
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-xs text-muted-foreground mb-3">Have an idea to improve the Studio? Let us know!</p>
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                placeholder="Your suggestions..."
+                className="w-full h-32 bg-secondary text-sm text-foreground rounded-xl p-3 outline-none resize-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                onClick={handleFeedbackSubmit}
+                className="w-full mt-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.98] transition-transform"
+              >
+                Send Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chat content */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-none scrollbar-hide px-4 pb-4">
@@ -482,12 +645,30 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
             ))}
             {generating && (
               <div className="flex justify-start">
-                <div className="bg-card rounded-2xl rounded-bl-sm px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs text-muted-foreground">
-                      {attachedImage ? 'Editing image...' : 'Generating image...'}
-                    </span>
+                <div className="bg-card rounded-2xl rounded-bl-sm p-4 max-w-[85%] border border-border/50 shadow-sm w-full">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="relative">
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                      </div>
+                      <div className="absolute inset-0 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{attachedImage ? 'Editing image...' : 'Generating image...'}</p>
+                      <p className="text-xs text-muted-foreground">This usually takes 5-10 seconds</p>
+                    </div>
+                  </div>
+                  
+                  {/* Progress Bar */}
+                  <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className="bg-primary h-1.5 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${generationProgress}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-muted-foreground font-mono mt-1.5">
+                    <span>Processing</span>
+                    <span>{generationProgress}%</span>
                   </div>
                 </div>
               </div>

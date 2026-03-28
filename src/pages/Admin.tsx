@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, Flag, Coins, ArrowLeft, Shield, BarChart3, Bell, Settings, Megaphone, Zap, Menu, X, ShieldCheck } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, FileText, Flag, Coins, ArrowLeft, Shield, BarChart3, Bell, Settings, Megaphone, Zap, Menu, X, ShieldCheck, ChevronLeft } from 'lucide-react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { supabase } from '@/integrations/supabase/client';
 import AdminLogin from '@/components/admin/AdminLogin';
@@ -35,10 +35,52 @@ const ALL_TABS = [
 export default function Admin() {
   const { isAdmin, isSuperAdmin, loading, user, recheck } = useAdminAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash.replace('#', '');
+    return hash || 'dashboard';
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [allowedTabs, setAllowedTabs] = useState<string[]>(ALL_TABS.map(t => t.id));
   const [permsLoaded, setPermsLoaded] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const scrollPositions = useRef<Record<string, number>>({});
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleHashChange = (e: HashChangeEvent) => {
+      if (hasUnsavedChanges) {
+        // Revert URL temporarily
+        const oldURL = new URL(e.oldURL);
+        window.history.replaceState(null, '', oldURL.hash || '#dashboard');
+        
+        const newHash = new URL(e.newURL).hash.replace('#', '');
+        setPendingTab(newHash || 'dashboard');
+        setShowConfirmDialog(true);
+        return;
+      }
+      
+      // Save scroll position for current tab before switching
+      if (contentRef.current) {
+        scrollPositions.current[activeTab] = contentRef.current.scrollTop;
+      }
+
+      const hash = window.location.hash.replace('#', '');
+      const nextTab = hash || 'dashboard';
+      setActiveTab(nextTab);
+      
+      // Restore scroll position
+      setTimeout(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollTop = scrollPositions.current[nextTab] || 0;
+        }
+      }, 0);
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [hasUnsavedChanges, activeTab]);
 
   useEffect(() => {
     const loadPerms = async () => {
@@ -80,9 +122,36 @@ export default function Admin() {
   }
 
   const handleNavigate = (tab: string) => {
-    if (isSuperAdmin || allowedTabs.includes(tab)) {
-      setActiveTab(tab);
+    if (hasUnsavedChanges) {
+      setPendingTab(tab);
+      setShowConfirmDialog(true);
+      return;
     }
+    if (isSuperAdmin || allowedTabs.includes(tab)) {
+      window.location.hash = tab;
+    }
+  };
+
+  const handleBack = () => {
+    if (window.history.length > 2) {
+      window.history.back();
+    } else {
+      handleNavigate('dashboard');
+    }
+  };
+
+  const confirmNavigation = () => {
+    setHasUnsavedChanges(false);
+    setShowConfirmDialog(false);
+    if (pendingTab) {
+      window.location.hash = pendingTab;
+      setPendingTab(null);
+    }
+  };
+
+  const cancelNavigation = () => {
+    setShowConfirmDialog(false);
+    setPendingTab(null);
   };
 
   const renderContent = () => {
@@ -96,19 +165,21 @@ export default function Admin() {
       );
     }
 
+    const commonProps = { setHasUnsavedChanges };
+
     switch (activeTab) {
       case 'dashboard': return <AdminDashboard onNavigate={handleNavigate} />;
-      case 'users': return <AdminUsers />;
-      case 'content': return <AdminContent />;
-      case 'prompts': return <AdminPrompts />;
-      case 'reports': return <AdminReports />;
-      case 'analytics': return <AdminAnalytics />;
-      case 'notifications': return <AdminNotifications />;
-      case 'studio-api': return <AdminStudioAPI />;
-      case 'ads': return <AdminAdsManager />;
-      case 'credits': return <AdminCredits />;
-      case 'settings': return <AdminSettings />;
-      case 'admin-mgmt': return isSuperAdmin ? <AdminManagement /> : <AdminDashboard onNavigate={handleNavigate} />;
+      case 'users': return <AdminUsers {...commonProps} />;
+      case 'content': return <AdminContent {...commonProps} />;
+      case 'prompts': return <AdminPrompts {...commonProps} />;
+      case 'reports': return <AdminReports {...commonProps} />;
+      case 'analytics': return <AdminAnalytics {...commonProps} />;
+      case 'notifications': return <AdminNotifications {...commonProps} />;
+      case 'studio-api': return <AdminStudioAPI {...commonProps} />;
+      case 'ads': return <AdminAdsManager {...commonProps} />;
+      case 'credits': return <AdminCredits {...commonProps} />;
+      case 'settings': return <AdminSettings {...commonProps} />;
+      case 'admin-mgmt': return isSuperAdmin ? <AdminManagement {...commonProps} /> : <AdminDashboard onNavigate={handleNavigate} />;
       default: return <AdminDashboard onNavigate={handleNavigate} />;
     }
   };
@@ -128,7 +199,7 @@ export default function Admin() {
         {tabs.map(t => (
           <button
             key={t.id}
-            onClick={() => { setActiveTab(t.id); setMobileMenuOpen(false); }}
+            onClick={() => { handleNavigate(t.id); setMobileMenuOpen(false); }}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === t.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
             }`}
@@ -151,30 +222,75 @@ export default function Admin() {
   );
 
   return (
-    <div className="h-screen bg-background flex">
-      <div className="hidden md:flex w-56 border-r border-border bg-card flex-col">
+    <div className="h-screen bg-background flex overflow-hidden">
+      <div className="hidden md:flex w-56 border-r border-border bg-card flex-col z-20">
         <SidebarContent />
       </div>
 
+      {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b border-border px-4 py-3 flex items-center justify-between">
-        <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary">
-          {mobileMenuOpen ? <X size={20} className="text-foreground" /> : <Menu size={20} className="text-foreground" />}
-        </button>
-        <span className="text-sm font-bold text-foreground">{tabs.find(t => t.id === activeTab)?.label}</span>
-        <div className="w-9" />
+        <div className="flex items-center gap-3">
+          {activeTab !== 'dashboard' && (
+            <button onClick={handleBack} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary active:scale-95 transition-all">
+              <ChevronLeft size={22} className="text-foreground" />
+            </button>
+          )}
+          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary">
+            {mobileMenuOpen ? <X size={20} className="text-foreground" /> : <Menu size={20} className="text-foreground" />}
+          </button>
+        </div>
+        <span className="text-sm font-bold text-foreground truncate">{tabs.find(t => t.id === activeTab)?.label}</span>
+        <div className="w-12" /> {/* Spacer for centering */}
+      </div>
+
+      {/* Desktop Header with Back Button */}
+      <div className="hidden md:flex fixed top-0 left-56 right-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-4 items-center gap-4">
+        {activeTab !== 'dashboard' && (
+          <button onClick={handleBack} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-secondary active:scale-95 transition-all">
+            <ChevronLeft size={20} className="text-foreground" />
+          </button>
+        )}
+        <h1 className="text-xl font-bold text-foreground">{tabs.find(t => t.id === activeTab)?.label}</h1>
       </div>
 
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-40 bg-black/60" onClick={() => setMobileMenuOpen(false)}>
-          <div className="w-64 h-full bg-card flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="w-64 h-full bg-card flex flex-col animate-in slide-in-from-left-4 duration-200" onClick={e => e.stopPropagation()}>
             <SidebarContent />
           </div>
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 md:pt-6 pt-16">
+      <div 
+        ref={contentRef}
+        className="flex-1 overflow-y-auto p-4 md:p-6 md:pt-24 pt-20 relative animate-in fade-in duration-300"
+      >
         {renderContent()}
       </div>
+
+      {/* Unsaved Changes Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-foreground mb-2">Unsaved Changes</h3>
+            <p className="text-sm text-muted-foreground mb-6">You have unsaved changes. Are you sure you want to go back?</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={cancelNavigation}
+                className="flex-1 py-2.5 rounded-xl bg-secondary text-secondary-foreground font-semibold"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmNavigation}
+                className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

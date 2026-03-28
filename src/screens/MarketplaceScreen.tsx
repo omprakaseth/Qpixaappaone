@@ -53,7 +53,7 @@ interface MarketplaceScreenProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
   onUsePrompt?: (prompt: string) => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
-  onCreatorTap?: (creatorName: string) => void;
+  onCreatorTap?: (creatorName: string, creatorId?: string) => void;
 }
 
 export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap }: MarketplaceScreenProps) {
@@ -115,11 +115,16 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
             is_trending: p.is_trending || false,
             created_at: p.created_at,
           }));
-          setPrompts(formattedPrompts);
+          
+          if (formattedPrompts.length === 0) {
+            setPrompts(getMockPrompts());
+          } else {
+            setPrompts(formattedPrompts);
+          }
         }
       } catch (err) {
         console.error('Error fetching prompts:', err);
-        toast.error('Failed to load marketplace items');
+        setPrompts(getMockPrompts());
       } finally {
         setLoading(false);
       }
@@ -127,6 +132,45 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
 
     fetchPrompts();
   }, []);
+
+  const getMockPrompts = (): MarketplacePrompt[] => [
+    {
+      id: 'mock-1',
+      creator_id: '1',
+      creator_name: 'Neon Dreams',
+      title: 'Cyberpunk Cityscape Generator',
+      description: 'Generate stunning cyberpunk cities with neon lights and flying cars.',
+      prompt_text: 'A futuristic cyberpunk city at night with neon lights and flying cars, highly detailed, 8k resolution, unreal engine 5 render',
+      preview_image: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=600&h=800&fit=crop',
+      preview_images: [],
+      category: 'Environment',
+      model_type: 'Midjourney v6',
+      price: 15,
+      rating: 4.8,
+      sales_count: 1240,
+      is_featured: true,
+      is_trending: true,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'mock-2',
+      creator_id: '2',
+      creator_name: 'Artistic Soul',
+      title: 'Ethereal Portrait Style',
+      description: 'Create beautiful, ethereal portraits with glowing elements.',
+      prompt_text: 'Ethereal portrait of a woman with glowing flowers in her hair, soft lighting, fantasy art style, masterpiece',
+      preview_image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop',
+      preview_images: [],
+      category: 'Portrait',
+      model_type: 'DALL-E 3',
+      price: 0,
+      rating: 4.9,
+      sales_count: 3500,
+      is_featured: false,
+      is_trending: true,
+      created_at: new Date().toISOString(),
+    }
+  ];
 
   // Filter
   const filtered = prompts.filter(p => {
@@ -158,7 +202,16 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       return;
     }
     if (purchasedIds.has(prompt.id)) return;
-    if (prompt.price > 0 && credits < prompt.price) return;
+    if (prompt.price > 0 && credits < prompt.price) {
+      toast.error('Insufficient credits');
+      return;
+    }
+
+    if (prompt.id.startsWith('mock-')) {
+      setPurchasedIds(prev => new Set(prev).add(prompt.id));
+      toast.success('Mock purchase successful!');
+      return;
+    }
 
     try {
       const { data, error } = await supabase.rpc('purchase_prompt', { p_prompt_id: prompt.id });
@@ -181,8 +234,17 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   };
 
   const handleUsePrompt = async (prompt: MarketplacePrompt) => {
+    if (prompt.id.startsWith('mock-')) {
+      onUsePrompt?.(prompt.prompt_text);
+      return;
+    }
     // Fetch prompt text securely via RPC
-    const { data } = await supabase.rpc('get_marketplace_prompt_text', { p_prompt_id: prompt.id });
+    const { data, error } = await supabase.rpc('get_marketplace_prompt_text', { p_prompt_id: prompt.id });
+    if (error) {
+       console.error('Failed to fetch prompt text:', error);
+       toast.error('Failed to fetch prompt text');
+       return;
+    }
     if (data) {
       onUsePrompt?.(data);
     }
@@ -313,7 +375,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
                     prompt={prompt}
                     isPurchased={purchasedIds.has(prompt.id)}
                     onTap={() => setSelectedPrompt(prompt)}
-                    onSellerTap={() => onCreatorTap?.(prompt.creator_name || '')}
+                    onSellerTap={() => onCreatorTap?.(prompt.creator_name || '', prompt.creator_id)}
                   />
                 </div>
               ))}
@@ -325,28 +387,53 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
             <p className="text-sm">No prompts found</p>
           </div>
         ) : (
-          Object.entries(grouped).map(([category, prompts]) => (
-            <div key={category} className="mb-6">
-              {/* Category header */}
-              <button onClick={() => setSelectedCategory(category)} className="flex items-center gap-1 px-4 pt-4 pb-2">
-                <h2 className="text-base font-bold text-foreground">{category}</h2>
-                <ChevronRight size={18} className="text-muted-foreground" />
-              </button>
-
-              {/* Horizontal scroll */}
-              <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4">
-                {prompts.map(prompt => (
-                  <PromptPackCard
-                    key={prompt.id}
-                    prompt={prompt}
-                    isPurchased={purchasedIds.has(prompt.id)}
-                    onTap={() => setSelectedPrompt(prompt)}
-                    onSellerTap={() => onCreatorTap?.(prompt.creator_name || '')}
-                  />
-                ))}
+          <>
+            {/* Top This Month Section */}
+            {sorted.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center gap-1 px-4 pt-4 pb-2">
+                  <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                    <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                    Top This Month
+                  </h2>
+                </div>
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4">
+                  {[...sorted].sort((a, b) => b.sales_count - a.sales_count).slice(0, 5).map(prompt => (
+                    <PromptPackCard
+                      key={`top-${prompt.id}`}
+                      prompt={prompt}
+                      isPurchased={purchasedIds.has(prompt.id)}
+                      onTap={() => setSelectedPrompt(prompt)}
+                      onSellerTap={() => onCreatorTap?.(prompt.creator_name || '', prompt.creator_id)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
+            )}
+            
+            {Object.entries(grouped).map(([category, prompts]) => (
+              <div key={category} className="mb-6">
+                {/* Category header */}
+                <button onClick={() => setSelectedCategory(category)} className="flex items-center gap-1 px-4 pt-4 pb-2">
+                  <h2 className="text-base font-bold text-foreground">{category}</h2>
+                  <ChevronRight size={18} className="text-muted-foreground" />
+                </button>
+
+                {/* Horizontal scroll */}
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4">
+                  {prompts.map(prompt => (
+                    <PromptPackCard
+                      key={prompt.id}
+                      prompt={prompt}
+                      isPurchased={purchasedIds.has(prompt.id)}
+                      onTap={() => setSelectedPrompt(prompt)}
+                      onSellerTap={() => onCreatorTap?.(prompt.creator_name || '', prompt.creator_id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </>
         )}
       </div>
 
@@ -383,7 +470,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
           isInCart={isInCart(selectedPrompt.id)}
           credits={credits}
           isLoggedIn={isLoggedIn}
-          onViewSeller={(name) => { setSelectedPrompt(null); onCreatorTap?.(name); }}
+          onViewSeller={(name) => { setSelectedPrompt(null); onCreatorTap?.(name, selectedPrompt.creator_id); }}
         />
       )}
 
@@ -504,12 +591,12 @@ const PromptPackCard: React.FC<{
       className="flex-shrink-0 w-[280px] rounded-xl overflow-hidden bg-card border border-border text-left transition-transform active:scale-[0.97]"
     >
       {/* Multi-image grid preview */}
-      <div className="relative h-[180px] w-full overflow-hidden">
+      <div className="relative h-[180px] w-full overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
         {imgs.length >= 3 ? (
           <div className="grid grid-cols-3 h-full gap-[1px]">
             {imgs.slice(0, 3).map((img, i) => (
               <div key={i} className="overflow-hidden">
-                <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
               </div>
             ))}
           </div>
@@ -517,12 +604,12 @@ const PromptPackCard: React.FC<{
           <div className="grid grid-cols-2 h-full gap-[1px]">
             {imgs.map((img, i) => (
               <div key={i} className="overflow-hidden">
-                <img src={img} alt="" className="w-full h-full object-cover" loading="lazy" />
+                <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
               </div>
             ))}
           </div>
         ) : (
-          <img src={imgs[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
+          <img src={imgs[0]} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
         )}
 
         {/* Model badge */}

@@ -5,6 +5,7 @@ import { Post } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
+import { useAppState } from '@/context/AppContext';
 
 interface CreatorProfileOverlayProps {
   creatorName: string;
@@ -31,11 +32,13 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
   const [isVerified, setIsVerified] = useState(false);
   const [creatorUserId, setCreatorUserId] = useState<string | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
+  const { user } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
   const initial = creatorName.charAt(0).toUpperCase();
   const isMockVerified = creatorName === 'Qpixa';
   const creatorPosts = posts.filter(p => p.creator.name === creatorName);
   const totalLikes = creatorPosts.reduce((sum, p) => sum + p.likes, 0);
+  const isOwner = user?.id === creatorUserId;
 
   const totalSales = creatorPrompts.reduce((s, p) => s + p.sales_count, 0);
   const avgRating = creatorPrompts.length > 0 ? creatorPrompts.reduce((s, p) => s + p.rating, 0) / creatorPrompts.length : 0;
@@ -148,24 +151,26 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
           </div>
 
           <div className="flex gap-2 mt-3">
-            <button
-              onClick={async () => {
-                if (!creatorUserId) return;
-                const wasFollowing = isFollowing(creatorUserId);
-                await toggleFollow(creatorUserId);
-                setFollowerCount(prev => wasFollowing ? Math.max(0, prev - 1) : prev + 1);
-                toast.success(wasFollowing ? 'Unfollowed' : 'Following!');
-              }}
-              disabled={followLoading || !creatorUserId}
-              className={`flex-1 py-[7px] rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all ${
-                creatorUserId && isFollowing(creatorUserId)
-                  ? 'bg-secondary text-secondary-foreground'
-                  : 'bg-primary text-primary-foreground'
-              }`}
-            >
-              {creatorUserId && isFollowing(creatorUserId) ? <UserMinus size={13} /> : <UserPlus size={13} />}
-              {creatorUserId && isFollowing(creatorUserId) ? 'Following' : 'Follow'}
-            </button>
+            {!isOwner && (
+              <button
+                onClick={async () => {
+                  if (!creatorUserId) return;
+                  const wasFollowing = isFollowing(creatorUserId);
+                  await toggleFollow(creatorUserId);
+                  setFollowerCount(prev => wasFollowing ? Math.max(0, prev - 1) : prev + 1);
+                  toast.success(wasFollowing ? 'Unfollowed' : 'Following!');
+                }}
+                disabled={followLoading || !creatorUserId}
+                className={`flex-1 py-[7px] rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.97] transition-all ${
+                  creatorUserId && isFollowing(creatorUserId)
+                    ? 'bg-secondary text-secondary-foreground'
+                    : 'bg-primary text-primary-foreground'
+                }`}
+              >
+                {creatorUserId && isFollowing(creatorUserId) ? <UserMinus size={13} /> : <UserPlus size={13} />}
+                {creatorUserId && isFollowing(creatorUserId) ? 'Following' : 'Follow'}
+              </button>
+            )}
             <button
               onClick={() => {
                 const url = `${window.location.origin}?profile=${creatorName.toLowerCase().replace(/\s+/g, '')}`;

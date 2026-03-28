@@ -79,6 +79,23 @@ CREATE TABLE IF NOT EXISTS public.purchases (
   UNIQUE(user_id, prompt_id)
 );
 
+-- 7. Generations Table (For Studio History)
+CREATE TABLE IF NOT EXISTS public.generations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  prompt TEXT NOT NULL,
+  image_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 8. Follows Table
+CREATE TABLE IF NOT EXISTS public.follows (
+  follower_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  following_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  PRIMARY KEY (follower_id, following_id)
+);
+
 -- Enable RLS (Row Level Security)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
@@ -86,6 +103,8 @@ ALTER TABLE public.post_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.marketplace_prompts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.generations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
@@ -119,6 +138,16 @@ CREATE POLICY "Users can delete own marketplace prompts." ON public.marketplace_
 -- Purchases: Users can read their own purchases, system handles inserts (via RPC or backend)
 CREATE POLICY "Users can view their own purchases." ON public.purchases FOR SELECT USING (auth.uid() = user_id);
 -- Insert policy for purchases can be restricted or handled via a secure RPC function
+
+-- Generations: Users can read, insert, and delete their own generations
+CREATE POLICY "Users can view their own generations." ON public.generations FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own generations." ON public.generations FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own generations." ON public.generations FOR DELETE USING (auth.uid() = user_id);
+
+-- Follows: Anyone can read, users can insert/delete their own follows
+CREATE POLICY "Follows are viewable by everyone." ON public.follows FOR SELECT USING (true);
+CREATE POLICY "Users can insert their own follows." ON public.follows FOR INSERT WITH CHECK (auth.uid() = follower_id);
+CREATE POLICY "Users can delete their own follows." ON public.follows FOR DELETE USING (auth.uid() = follower_id);
 
 -- RPC Function to safely purchase a prompt
 CREATE OR REPLACE FUNCTION purchase_prompt(p_prompt_id UUID)

@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Save } from 'lucide-react';
 
-export default function AdminAdsManager() {
+export default function AdminAdsManager({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -32,6 +32,11 @@ export default function AdminAdsManager() {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleChange = (key: string, value: string) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+    setHasUnsavedChanges?.(true);
+  };
+
   const toggleSetting = (key: string) => {
     const newVal = settings[key] === 'true' ? 'false' : 'true';
     updateSetting(key, newVal);
@@ -48,6 +53,7 @@ export default function AdminAdsManager() {
         }
       }
       toast.success('All ads settings saved successfully!');
+      setHasUnsavedChanges?.(false);
     } catch {
       toast.error('Failed to save settings');
     } finally {
@@ -99,7 +105,7 @@ export default function AdminAdsManager() {
           <input
             type="number"
             value={settings.ad_frequency || '5'}
-            onChange={e => setSettings(prev => ({ ...prev, ad_frequency: e.target.value }))}
+            onChange={e => handleChange('ad_frequency', e.target.value)}
             className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2.5 outline-none"
           />
         </div>
@@ -108,7 +114,7 @@ export default function AdminAdsManager() {
           <input
             type="number"
             value={settings.ad_reward_credits || '3'}
-            onChange={e => setSettings(prev => ({ ...prev, ad_reward_credits: e.target.value }))}
+            onChange={e => handleChange('ad_reward_credits', e.target.value)}
             className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2.5 outline-none"
           />
         </div>
@@ -121,7 +127,7 @@ export default function AdminAdsManager() {
           <label className="text-xs text-muted-foreground mb-1 block">Publisher ID (ca-pub-xxxxx)</label>
           <input
             value={settings.adsense_publisher_id || ''}
-            onChange={e => setSettings(p => ({ ...p, adsense_publisher_id: e.target.value }))}
+            onChange={e => handleChange('adsense_publisher_id', e.target.value)}
             placeholder="ca-pub-1234567890"
             className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2.5 outline-none placeholder:text-muted-foreground"
           />
@@ -130,7 +136,7 @@ export default function AdminAdsManager() {
           <label className="text-xs text-muted-foreground mb-1 block">Feed Ad Slot ID</label>
           <input
             value={settings.adsense_feed_slot || ''}
-            onChange={e => setSettings(p => ({ ...p, adsense_feed_slot: e.target.value }))}
+            onChange={e => handleChange('adsense_feed_slot', e.target.value)}
             placeholder="1234567890"
             className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2.5 outline-none placeholder:text-muted-foreground"
           />
@@ -139,7 +145,7 @@ export default function AdminAdsManager() {
           <label className="text-xs text-muted-foreground mb-1 block">Banner Ad Slot ID</label>
           <input
             value={settings.adsense_banner_slot || ''}
-            onChange={e => setSettings(p => ({ ...p, adsense_banner_slot: e.target.value }))}
+            onChange={e => handleChange('adsense_banner_slot', e.target.value)}
             placeholder="0987654321"
             className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2.5 outline-none placeholder:text-muted-foreground"
           />

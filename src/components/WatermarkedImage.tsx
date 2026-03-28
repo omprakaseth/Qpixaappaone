@@ -55,7 +55,7 @@ export default function WatermarkedImage({ src, alt, className, isPro = false }:
   }, [src, watermark.enabled, watermark.text, isPro]);
 
   if (!watermark.enabled || isPro) {
-    return <img src={src} alt={alt} className={className} draggable={false} />;
+    return <img src={src} alt={alt} className={className} draggable={false} onContextMenu={(e) => e.preventDefault()} />;
   }
 
   return (

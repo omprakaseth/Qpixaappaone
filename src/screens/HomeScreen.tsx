@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Users } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Users, Search, SlidersHorizontal, Plus, TrendingUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Search, SlidersHorizontal, Plus } from 'lucide-react';
 import ScrollToTop from '@/components/ScrollToTop';
+import { toast } from 'sonner';
 import ImageCard from '@/components/ImageCard';
 import SkeletonCard from '@/components/SkeletonCard';
 import FilterPanel, { FilterState } from '@/components/FilterPanel';
@@ -11,6 +11,7 @@ import CategoryExplorer from '@/screens/CategoryExplorer';
 import FeedAdCard from '@/components/ads/FeedAdCard';
 import { useAppState } from '@/context/AppContext';
 import { Post } from '@/context/AppContext';
+import { useFollows } from '@/hooks/useFollows';
 
 const categories = ['Trending', 'Following', 'Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature'];
 
@@ -19,7 +20,7 @@ interface HomeScreenProps {
   onPostTap: (post: Post) => void;
   onCreatePost: () => void;
   onGetPro: () => void;
-  onCreatorTap?: (creatorName: string) => void;
+  onCreatorTap?: (creatorName: string, creatorId?: string) => void;
   adSettings?: {
     enabled: boolean;
     frequency: number;
@@ -31,7 +32,8 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro }: HomeScreenProps) {
-  const { posts, setPosts, toggleLike, toggleSave, fetchPosts } = useAppState();
+  const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user } = useAppState();
+  const { followingIds } = useFollows();
   const [activeCategory, setActiveCategory] = useState('Trending');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
@@ -45,12 +47,27 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   const lastScrollY = useRef(0);
 
   // Filter posts
-  const filteredPosts = posts.filter(p => {
-    if (activeCategory !== 'Trending' && p.category !== activeCategory) return false;
-    if (searchQuery && !p.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (filters.style !== 'All' && p.style !== filters.style) return false;
-    return true;
-  });
+  const filteredPosts = useMemo(() => {
+    return posts.filter(p => {
+      if (activeCategory === 'Following') {
+        // Show posts from followed users, or user's own posts
+        const creatorId = (p as any).creator_id;
+        if (!creatorId || (!followingIds.includes(creatorId) && creatorId !== user?.id)) return false;
+      } else if (activeCategory !== 'Trending' && p.category !== activeCategory) {
+        return false;
+      }
+      if (searchQuery && !p.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (filters.style !== 'All' && p.style !== filters.style) return false;
+      return true;
+    });
+  }, [posts, activeCategory, searchQuery, filters, followingIds, user?.id]);
+
+  // Top this month
+  const topThisMonth = useMemo(() => {
+    return [...posts]
+      .sort((a, b) => (b.likes + b.views) - (a.likes + a.views))
+      .slice(0, 5);
+  }, [posts]);
 
   // Header collapse on scroll
   useEffect(() => {
@@ -119,7 +136,11 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     const delta = e.changedTouches[0].clientY - touchStart.current;
     if (delta > 80) {
       setRefreshing(true);
-      await fetchPosts();
+      try {
+        await fetchPosts();
+      } catch (err) {
+        toast.error('Failed to load posts');
+      }
       setRefreshing(false);
     }
   };
@@ -225,7 +246,29 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
 
       {/* Grid */}
       <div className="px-4 pb-20">
-        {activeCategory === 'Following' ? (
+        {activeCategory === 'Trending' && topThisMonth.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp size={18} className="text-primary" />
+              <h2 className="text-sm font-bold">Top This Month</h2>
+            </div>
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
+              {topThisMonth.map(post => (
+                <div key={post.id} className="w-40 flex-shrink-0">
+                  <ImageCard
+                    post={post}
+                    onTap={() => onPostTap(post)}
+                    onDoubleTap={() => toggleLike(post.id)}
+                    onLongPress={() => setQuickActionsPost(post)}
+                    onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeCategory === 'Following' && filteredPosts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
             <Users size={40} className="mb-3 opacity-40" />
             <p className="text-sm font-semibold text-foreground">Following Feed</p>
@@ -241,7 +284,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
                     onTap={() => onPostTap(post)}
                     onDoubleTap={() => toggleLike(post.id)}
                     onLongPress={() => setQuickActionsPost(post)}
-                    onCreatorTap={() => onCreatorTap?.(post.creator.name)}
+                    onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
                   />
                   {adSettings?.enabled && adSettings.placementFeed && !isPro &&
                     (index + 1) % (adSettings.frequency * 2) === 0 && (

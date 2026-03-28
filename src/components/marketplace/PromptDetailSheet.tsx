@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from 'react';
 import type { MarketplacePrompt } from '@/screens/MarketplaceScreen';
 import { useSwipeDismiss } from '@/hooks/useSwipeDismiss';
 import { supabase } from '@/integrations/supabase/client';
+import { useAppState } from '@/context/AppContext';
 
 interface PromptDetailSheetProps {
   prompt: MarketplacePrompt;
@@ -36,9 +37,11 @@ export default function PromptDetailSheet({
   const heroRef = useRef<HTMLDivElement>(null);
   const { dragHandleProps, style: swipeStyle, opacity: backdropOpacity } = useSwipeDismiss({ onDismiss: onClose });
 
+  const { user } = useAppState();
   const canAfford = credits >= prompt.price;
   const isFree = prompt.price === 0;
-  const owned = isPurchased || isFree;
+  const isOwner = user?.id === prompt.creator_id;
+  const owned = isPurchased || isFree || isOwner;
   const imgs = prompt.preview_images?.length > 0 ? prompt.preview_images : [prompt.preview_image || '/placeholder.svg'];
 
   // Fetch prompt text securely via RPC
@@ -102,6 +105,7 @@ export default function PromptDetailSheet({
             ref={heroRef}
             onScroll={handleHeroScroll}
             className="flex gap-2 overflow-x-auto scrollbar-hide px-4 snap-x snap-mandatory"
+            onContextMenu={(e) => e.preventDefault()}
           >
             {imgs.map((img, i) => (
               <div
@@ -109,14 +113,14 @@ export default function PromptDetailSheet({
                 className="flex-shrink-0 snap-center rounded-xl overflow-hidden"
                 style={{ width: '85%', aspectRatio: '3/4' }}
               >
-                <img src={img} alt="" className="w-full h-full object-cover" />
+                <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" />
               </div>
             ))}
           </div>
 
           {/* Thumbnail strip */}
           {imgs.length > 1 && (
-            <div className="flex gap-2 px-4 mt-3 overflow-x-auto scrollbar-hide">
+            <div className="flex gap-2 px-4 mt-3 overflow-x-auto scrollbar-hide" onContextMenu={(e) => e.preventDefault()}>
               {imgs.map((img, i) => (
                 <button
                   key={i}
@@ -125,7 +129,7 @@ export default function PromptDetailSheet({
                     activeImg === i ? 'border-primary' : 'border-transparent opacity-60'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" />
                 </button>
               ))}
             </div>
@@ -195,7 +199,18 @@ export default function PromptDetailSheet({
             </p>
 
             {/* CTA Button */}
-            {owned ? (
+            {isOwner ? (
+              <div className="flex gap-3 mb-4">
+                <Button onClick={handleCopy} variant="secondary" className="flex-1 h-12 rounded-xl font-semibold">
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                  {copied ? 'Copied!' : 'Copy Prompt'}
+                </Button>
+                <Button onClick={() => { onUsePrompt(); onClose(); }} className="flex-1 h-12 rounded-xl font-semibold">
+                  <Sparkles size={16} />
+                  Use in Studio
+                </Button>
+              </div>
+            ) : owned ? (
               <div className="flex gap-3 mb-4">
                 <Button onClick={handleCopy} variant="secondary" className="flex-1 h-12 rounded-xl font-semibold">
                   {copied ? <Check size={16} /> : <Copy size={16} />}

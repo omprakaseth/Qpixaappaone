@@ -18,6 +18,7 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
   const [tags, setTags] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl || null);
   const [publishing, setPublishing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -40,11 +41,23 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
   const handlePost = async () => {
     if (!title.trim() || !prompt.trim()) return;
     setPublishing(true);
+    setUploadProgress(0);
 
     try {
       let finalImageUrl = imagePreview;
 
       if (user && selectedFile) {
+        // Simulate upload progress
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return 90;
+            }
+            return prev + 10;
+          });
+        }, 200);
+
         const fileExt = selectedFile.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `${user.id}/${fileName}`;
@@ -53,10 +66,15 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
           .from('prompt-images')
           .upload(filePath, selectedFile);
           
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        
         if (uploadError) throw uploadError;
         
         const { data } = supabase.storage.from('prompt-images').getPublicUrl(filePath);
         finalImageUrl = data.publicUrl;
+      } else {
+        setUploadProgress(100);
       }
 
       if (user) {
@@ -73,7 +91,7 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
           id: `post-${Date.now()}`,
           title: title.trim(),
           imageUrl: imagePreview || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600&h=600&fit=crop',
-          creator: { name: 'You', username: '@you', avatar: '', initials: 'YO' },
+          creator: { id: user?.id || 'mock-id', name: 'You', username: '@you', avatar: '', initials: 'YO' },
           prompt: prompt.trim(),
           tags: tags.split(',').map(t => t.trim()).filter(Boolean),
           category: 'Trending',
@@ -107,9 +125,17 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
         <button
           onClick={handlePost}
           disabled={!title.trim() || !prompt.trim() || publishing}
-          className="ml-auto px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
+          className="ml-auto px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 relative overflow-hidden"
         >
-          {publishing ? 'Publishing...' : 'Post'}
+          {publishing && (
+            <div 
+              className="absolute inset-y-0 left-0 bg-white/20 transition-all duration-200" 
+              style={{ width: `${uploadProgress}%` }} 
+            />
+          )}
+          <span className="relative z-10">
+            {publishing ? `Publishing ${uploadProgress}%` : 'Post'}
+          </span>
         </button>
       </div>
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert } from 'lucide-react';
 import { formatNumber } from '@/lib/utils';
 import { Post } from '@/context/AppContext';
 import { useAppState } from '@/context/AppContext';
@@ -12,20 +12,34 @@ interface PostDetailProps {
   post: Post;
   onBack: () => void;
   onUsePrompt?: (prompt: string) => void;
-  onCreatorTap?: (creatorName: string) => void;
+  onCreatorTap?: (creatorName: string, creatorId?: string) => void;
 }
 
 export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: PostDetailProps) {
-  const { toggleLike, toggleSave, isPro, isLoggedIn } = useAppState();
+  const { toggleLike, toggleSave, isPro, isLoggedIn, user, deletePost } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
   const [zoomed, setZoomed] = useState(false);
   const [reviewText, setReviewText] = useState('');
   const [rating, setRating] = useState(0);
   const [reviews, setReviews] = useState<{rating: number, text: string, user: string}[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showReportConfirm, setShowReportConfirm] = useState(false);
+
+  if (!post || !post.creator) {
+    return (
+      <div className="fixed inset-0 z-[70] bg-background flex flex-col items-center justify-center">
+        <p className="text-muted-foreground mb-4">Post not found or malformed.</p>
+        <button onClick={onBack} className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-bold">
+          Go Back
+        </button>
+      </div>
+    );
+  }
 
   // Use creator id if available, fallback
-  const creatorId = (post as any).creator_id || '';
+  const creatorId = post.creator.id || '';
   const following = isFollowing(creatorId);
+  const isOwner = Boolean(user?.id && creatorId && user.id === creatorId);
 
   const handleFollow = async () => {
     if (!isLoggedIn) {
@@ -86,6 +100,16 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
     toast.success('Review submitted!');
   };
 
+  const handleDelete = async () => {
+    await deletePost(post.id);
+    onBack();
+  };
+
+  const handleReport = () => {
+    setShowReportConfirm(false);
+    toast.success('Report submitted. Our team will review this content.');
+  };
+
   return (
     <div className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide animate-in slide-in-from-bottom-4 fade-in duration-300">
       {/* Header */}
@@ -94,7 +118,62 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
           <ArrowLeft size={22} className="text-foreground" />
         </button>
         <h1 className="text-base font-bold text-foreground flex-1 truncate">{post.title}</h1>
+        {isOwner ? (
+          <button onClick={() => setShowDeleteConfirm(true)} className="active:scale-95 transition-transform text-destructive">
+            <Trash2 size={20} />
+          </button>
+        ) : (
+          <button onClick={() => setShowReportConfirm(true)} className="active:scale-95 transition-transform text-muted-foreground hover:text-destructive">
+            <ShieldAlert size={20} />
+          </button>
+        )}
       </div>
+
+      {showReportConfirm && (
+        <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-foreground mb-2">Report Copyright Violation?</h3>
+            <p className="text-sm text-muted-foreground mb-6">If you believe this content violates copyright or community guidelines, please report it. False reports may lead to account suspension.</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowReportConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-secondary text-secondary-foreground font-semibold"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleReport}
+                className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold"
+              >
+                Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-bold text-foreground mb-2">Delete Post?</h3>
+            <p className="text-sm text-muted-foreground mb-6">This action cannot be undone. Are you sure you want to delete this post?</p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-secondary text-secondary-foreground font-semibold"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Image */}
       <div className="relative cursor-pointer" onClick={() => setZoomed(!zoomed)}>
@@ -112,7 +191,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       {/* Creator - tappable */}
       <div className="flex items-center justify-between px-4 py-3">
         <button
-          onClick={() => onCreatorTap?.(post.creator.name)}
+          onClick={() => onCreatorTap?.(post.creator.name, post.creator.id)}
           className="flex items-center gap-2.5 active:opacity-70 transition-opacity"
         >
           <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
@@ -127,12 +206,12 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
         </button>
         <button
           onClick={handleFollow}
-          disabled={followLoading}
+          disabled={followLoading || isOwner}
           className={`px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all ${
             following
               ? 'bg-secondary text-secondary-foreground'
               : 'bg-primary text-primary-foreground'
-          }`}
+          } ${isOwner ? 'opacity-50 cursor-not-allowed hidden' : ''}`}
         >
           {following ? <UserMinus size={14} /> : <UserPlus size={14} />}
           {following ? 'Following' : 'Follow'}

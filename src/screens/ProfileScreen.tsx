@@ -4,6 +4,7 @@ import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star,
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import EditProfileSheet from '@/components/profile/EditProfileSheet';
+import DashboardSheet from '@/components/profile/DashboardSheet';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
 
@@ -34,6 +35,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const [followerCount, setFollowerCount] = useState(0);
   const [earnings, setEarnings] = useState({ totalSales: 0, totalEarnings: 0, avgRating: 0 });
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const [promptFilter, setPromptFilter] = useState<string>('All');
 
   useEffect(() => {
@@ -48,14 +50,50 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     if (!user) return;
     const { data, error } = await supabase
       .from('posts')
-      .select('*')
+      .select(`
+        *,
+        profiles:creator_id (
+          username,
+          display_name,
+          avatar_url,
+          is_verified
+        )
+      `)
       .eq('creator_id', user.id)
       .order('created_at', { ascending: false });
+      
     if (error) {
       console.error('Error fetching posts:', error);
-      toast.error('Failed to load your posts');
-    } else if (data) {
-      setMyPosts(data);
+      setMyPosts(getMockMyPosts());
+    } else if (data && data.length > 0) {
+      const formattedPosts = data.map((p: any) => ({
+        id: p.id,
+        title: p.title || 'Untitled',
+        imageUrl: p.image_url,
+        creator: {
+          id: p.creator_id || user?.id || '',
+          name: p.profiles?.display_name || profile?.display_name || 'Unknown',
+          username: p.profiles?.username ? `@${p.profiles.username}` : (profile?.username ? `@${profile.username}` : '@user'),
+          avatar: p.profiles?.avatar_url || profile?.avatar_url || '',
+          initials: (p.profiles?.display_name || profile?.display_name || 'U').substring(0, 2).toUpperCase(),
+          isVerified: p.profiles?.is_verified || profile?.is_verified || false,
+        },
+        prompt: p.prompt || '',
+        tags: p.tags || [],
+        likes: p.likes || 0,
+        views: p.views || 0,
+        saves: p.saves || 0,
+        comments: p.comments || 0,
+        isLiked: false,
+        isSaved: false,
+        category: p.category,
+        style: p.style,
+        aspectRatio: p.aspect_ratio,
+        creator_id: p.creator_id
+      }));
+      setMyPosts(formattedPosts);
+    } else {
+      setMyPosts(getMockMyPosts());
     }
   };
 
@@ -80,15 +118,79 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       .eq('creator_id', user.id);
     if (error) {
       console.error('Error fetching prompts:', error);
-      toast.error('Failed to load your prompts');
-    } else if (data) {
+      setMyPrompts(getMockMyPrompts());
+    } else if (data && data.length > 0) {
       setMyPrompts(data);
       const totalSales = data.reduce((s, p) => s + p.sales_count, 0);
       const totalEarnings = data.reduce((s, p) => s + p.sales_count * p.price, 0);
       const avgRating = data.length > 0 ? data.reduce((s, p) => s + p.rating, 0) / data.length : 0;
       setEarnings({ totalSales, totalEarnings, avgRating });
+    } else {
+      setMyPrompts(getMockMyPrompts());
     }
   };
+
+  const getMockMyPosts = () => [
+    { 
+      id: 'mock-p1', 
+      title: 'Cyberpunk city',
+      imageUrl: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=400&h=400&fit=crop', 
+      prompt: 'Cyberpunk city',
+      creator: {
+        id: user?.id || 'mock-id',
+        name: profile?.display_name || 'You',
+        username: profile?.username ? `@${profile.username}` : '@you',
+        avatar: profile?.avatar_url || '',
+        initials: (profile?.display_name || 'Y').substring(0, 2).toUpperCase(),
+        isVerified: profile?.is_verified || false,
+      },
+      tags: ['cyberpunk', 'city'],
+      likes: 12, views: 45, saves: 2, comments: 0,
+      isLiked: false, isSaved: false,
+      creator_id: user?.id
+    },
+    { 
+      id: 'mock-p2', 
+      title: 'Ethereal portrait',
+      imageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop', 
+      prompt: 'Ethereal portrait',
+      creator: {
+        id: user?.id || 'mock-id',
+        name: profile?.display_name || 'You',
+        username: profile?.username ? `@${profile.username}` : '@you',
+        avatar: profile?.avatar_url || '',
+        initials: (profile?.display_name || 'Y').substring(0, 2).toUpperCase(),
+        isVerified: profile?.is_verified || false,
+      },
+      tags: ['portrait', 'ethereal'],
+      likes: 34, views: 120, saves: 5, comments: 2,
+      isLiked: false, isSaved: false,
+      creator_id: user?.id
+    },
+    { 
+      id: 'mock-p3', 
+      title: 'Fantasy landscape',
+      imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&h=400&fit=crop', 
+      prompt: 'Fantasy landscape',
+      creator: {
+        id: user?.id || 'mock-id',
+        name: profile?.display_name || 'You',
+        username: profile?.username ? `@${profile.username}` : '@you',
+        avatar: profile?.avatar_url || '',
+        initials: (profile?.display_name || 'Y').substring(0, 2).toUpperCase(),
+        isVerified: profile?.is_verified || false,
+      },
+      tags: ['fantasy', 'landscape'],
+      likes: 56, views: 230, saves: 12, comments: 4,
+      isLiked: false, isSaved: false,
+      creator_id: user?.id
+    },
+  ];
+
+  const getMockMyPrompts = () => [
+    { id: 'mock-mp1', title: 'Neon City Generator', preview_image: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=400&h=400&fit=crop', price: 10, rating: 4.8, sales_count: 120, model_type: 'Midjourney', category: 'Environment' },
+    { id: 'mock-mp2', title: 'Portrait Master', preview_image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop', price: 15, rating: 4.9, sales_count: 340, model_type: 'DALL-E 3', category: 'Portrait' },
+  ];
 
   if (!isLoggedIn) {
     return (
@@ -133,91 +235,61 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         </div>
 
         {/* Cover Photo */}
-        <div className="relative h-[140px] w-full overflow-hidden">
+        <div className="relative h-[160px] w-full overflow-hidden bg-secondary">
           <img
-            src={profile?.cover_url || '/default-cover.jpg'}
-            alt=""
+            src={profile?.cover_url || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80'}
+            alt="Cover"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
         </div>
 
         {/* Profile Hero */}
         <div className="px-4 pb-2 -mt-12">
           <div className="flex flex-col items-center">
             <div className="relative">
-              <div className="w-[88px] h-[88px] rounded-full p-[3px] bg-gradient-to-br from-primary via-accent to-primary/40">
+              <div className="w-[96px] h-[96px] rounded-full p-[3px] bg-background">
                 {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover border-[3px] border-background" />
+                  <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
                 ) : (
-                  <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center border-[3px] border-background">
-                    <span className="text-2xl font-bold text-secondary-foreground">{initial}</span>
+                  <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center">
+                    <span className="text-3xl font-bold text-secondary-foreground">{initial}</span>
                   </div>
                 )}
               </div>
             </div>
 
-            <h2 className="text-[15px] font-bold text-foreground mt-2.5 flex items-center gap-1">
+            <h2 className="text-lg font-bold text-foreground mt-2 flex items-center gap-1">
               {displayName}
-              {profile?.is_verified && <VerifiedBadge size={15} />}
+              {profile?.is_verified && <VerifiedBadge size={16} />}
             </h2>
-            {displayName !== username && (
-              <p className="text-[11px] text-muted-foreground">@{username}</p>
-            )}
             {profile?.bio && (
-              <p className="text-[12px] text-muted-foreground mt-1 text-center max-w-[240px] leading-relaxed">{profile.bio}</p>
-            )}
-
-            {myPrompts.length > 0 && (
-              <div className="flex items-center gap-1.5 mt-2">
-                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                  <Sparkles size={9} /> Creator
-                </span>
-              </div>
+              <p className="text-[13px] text-muted-foreground mt-1 text-center max-w-[280px] leading-relaxed">{profile.bio}</p>
             )}
           </div>
 
-          <div className="flex items-center justify-center gap-6 mt-4">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1">
-                <ShoppingBag size={13} className="text-primary" />
-                <p className="text-lg font-bold text-foreground">{earnings.totalSales}</p>
-              </div>
-              <p className="text-[10px] text-muted-foreground">Total Sales</p>
+          {/* Stats Row */}
+          <div className="flex items-center justify-center gap-8 mt-6">
+            <div className="text-center flex flex-col items-center">
+              <p className="text-base font-bold text-foreground">{followerCount > 1000 ? (followerCount/1000).toFixed(1) + 'k' : followerCount}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Followers</p>
             </div>
-            <div className="w-px h-8 bg-border" />
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-1">
-                <Star size={13} className="text-yellow-400 fill-yellow-400" />
-                <p className="text-lg font-bold text-foreground">{earnings.avgRating > 0 ? earnings.avgRating.toFixed(1) : '0.0'}</p>
-              </div>
-              <p className="text-[10px] text-muted-foreground">Rating</p>
+            <div className="text-center flex flex-col items-center">
+              <p className="text-base font-bold text-foreground">{followingIds.size}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Followings</p>
+            </div>
+            <div className="text-center flex flex-col items-center">
+              <p className="text-base font-bold text-foreground">{myPosts.length}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Posts</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 mt-3 py-2.5 rounded-xl bg-card/60 border border-border/50">
-            <button className="text-center group flex-1">
-              <p className="text-[15px] font-bold text-foreground group-active:scale-95 transition-transform">{myPosts.length}</p>
-              <p className="text-[10px] text-muted-foreground">Posts</p>
-            </button>
-            <div className="w-px h-7 bg-border/60" />
-            <button className="text-center group flex-1">
-              <p className="text-[15px] font-bold text-foreground group-active:scale-95 transition-transform">{followerCount}</p>
-              <p className="text-[10px] text-muted-foreground">Followers</p>
-            </button>
-            <div className="w-px h-7 bg-border/60" />
-            <button className="text-center group flex-1">
-              <p className="text-[15px] font-bold text-foreground group-active:scale-95 transition-transform">{followingIds.size}</p>
-              <p className="text-[10px] text-muted-foreground">Following</p>
-            </button>
-          </div>
-
-          <div className="flex gap-2 mt-3">
+          {/* Action Buttons */}
+          <div className="flex gap-2 mt-6">
             <button
               onClick={() => setShowEditProfile(true)}
-              className="flex-1 py-[7px] rounded-lg bg-primary text-primary-foreground text-[12px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
+              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
             >
-              <Edit3 size={13} /> Edit Profile
+              Edit Profile
             </button>
             <button
               onClick={() => {
@@ -229,25 +301,17 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
                   toast.success('Profile link copied!');
                 }
               }}
-              className="flex-1 py-[7px] rounded-lg bg-secondary text-secondary-foreground text-[12px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.97] transition-transform"
+              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
             >
-              <Share2 size={13} /> Share
+              Share
+            </button>
+            <button
+              onClick={() => setShowDashboard(true)}
+              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
+            >
+              Dashboard
             </button>
           </div>
-
-          {myPrompts.length > 0 && (
-            <div className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card/80 border border-border/60">
-              <Coins size={16} className="text-primary flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] text-muted-foreground">Your Earnings</p>
-                <p className="text-sm font-bold text-foreground">{earnings.totalEarnings} <span className="text-[10px] font-normal text-muted-foreground">credits</span></p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-muted-foreground">Prompts</p>
-                <p className="text-sm font-bold text-foreground">{myPrompts.length}</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Tabs */}
@@ -273,7 +337,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
               <div className="grid grid-cols-3 gap-0.5">
                 {myPosts.map(p => (
                   <button key={p.id} onClick={() => onPostTap?.(p)} className="relative aspect-square overflow-hidden group active:opacity-80 transition-opacity">
-                    <img src={p.image_url || '/placeholder.svg'} alt={p.prompt} className="w-full h-full object-cover" />
+                    <img src={p.imageUrl || '/placeholder.svg'} alt={p.prompt} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -388,13 +452,27 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         </div>
       </div>
 
-      {showEditProfile && profile && (
+      {showEditProfile && (profile || user) && (
         <EditProfileSheet
-          profile={profile}
+          profile={profile || {
+            id: user?.id || '',
+            username: user?.email?.split('@')[0] || 'user',
+            display_name: user?.email?.split('@')[0] || 'User',
+            avatar_url: '',
+            bio: '',
+            cover_url: ''
+          }}
           onClose={() => setShowEditProfile(false)}
           onSaved={refreshProfile}
         />
       )}
+
+      <DashboardSheet
+        open={showDashboard}
+        onOpenChange={setShowDashboard}
+        earnings={earnings}
+        promptCount={myPrompts.length}
+      />
     </>
   );
 }

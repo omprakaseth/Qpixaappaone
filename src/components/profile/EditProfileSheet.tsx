@@ -25,7 +25,9 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
   const [coverUrl, setCoverUrl] = useState(profile.cover_url || '');
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverProgress, setCoverProgress] = useState(0);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const coverFileRef = useRef<HTMLInputElement>(null);
@@ -40,10 +42,19 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
       return;
     }
     setUploading(true);
+    setUploadProgress(0);
     try {
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => prev >= 90 ? 90 : prev + 10);
+      }, 200);
+
       const ext = file.name.split('.').pop();
       const path = `${profile.id}/avatar-${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
       if (error) throw error;
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
       setAvatarUrl(data.publicUrl);
@@ -52,6 +63,7 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
       toast.error('Upload failed');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -63,10 +75,19 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
       return;
     }
     setUploadingCover(true);
+    setCoverProgress(0);
     try {
+      const progressInterval = setInterval(() => {
+        setCoverProgress(prev => prev >= 90 ? 90 : prev + 10);
+      }, 200);
+
       const ext = file.name.split('.').pop();
       const path = `${profile.id}/cover-${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      
+      clearInterval(progressInterval);
+      setCoverProgress(100);
+
       if (error) throw error;
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
       setCoverUrl(data.publicUrl);
@@ -75,6 +96,7 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
       toast.error('Upload failed');
     } finally {
       setUploadingCover(false);
+      setCoverProgress(0);
     }
   };
 
@@ -141,11 +163,16 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/80 text-foreground text-[11px] font-semibold"
             >
               {uploadingCover ? (
-                <Loader2 size={13} className="animate-spin" />
+                <div className="flex items-center gap-1.5">
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>{coverProgress}%</span>
+                </div>
               ) : (
-                <ImageIcon size={13} />
+                <>
+                  <ImageIcon size={13} />
+                  Change Cover
+                </>
               )}
-              Change Cover
             </button>
           </div>
           <input
@@ -175,7 +202,9 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
               className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-lg"
             >
               {uploading ? (
-                <Loader2 size={13} className="text-primary-foreground animate-spin" />
+                <div className="flex items-center justify-center w-full h-full bg-black/50 rounded-full">
+                  <span className="text-[10px] text-white font-bold">{uploadProgress}%</span>
+                </div>
               ) : (
                 <Camera size={13} className="text-primary-foreground" />
               )}

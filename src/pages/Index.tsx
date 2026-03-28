@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { AppProvider, useAppState } from '@/context/AppContext';
+import { useAppState } from '@/context/AppContext';
 import BottomNav from '@/components/BottomNav';
 import HomeScreen from '@/screens/HomeScreen';
 import MarketplaceScreen from '@/screens/MarketplaceScreen';
@@ -34,7 +34,7 @@ function AppShell() {
     return 'home';
   }, [location.pathname]);
 
-  const { posts, isPro, isLoggedIn } = useAppState();
+  const { posts, isPro, isLoggedIn, user, profile } = useAppState();
   const { settings: adSettings } = useAdSettings();
   const [showRewardAd, setShowRewardAd] = useState(false);
   const [upgradePopupShown, setUpgradePopupShown] = useState(false);
@@ -128,12 +128,6 @@ function AppShell() {
     setShowAuth(true);
   }, [pushHistory]);
 
-  const openCreator = useCallback((creatorName: string) => {
-    pushHistory('creator');
-    setSelectedPost(null);
-    setViewingCreator(creatorName);
-  }, [pushHistory]);
-
   const scrollToTopRef = useRef<() => void>(() => {});
   const handleTabChange = useCallback((tab: string) => {
     if (tab === activeTab) {
@@ -149,6 +143,24 @@ function AppShell() {
     };
     navigate(paths[tab]);
   }, [activeTab, navigate]);
+
+  const openCreator = useCallback((creatorName: string, creatorId?: string) => {
+    if (user && creatorId === user.id) {
+      if (selectedPost) setSelectedPost(null);
+      if (viewingCreator) setViewingCreator(null);
+      handleTabChange('profile');
+      return;
+    }
+    if (profile && !creatorId && (creatorName === profile.display_name || creatorName === profile.username)) {
+      if (selectedPost) setSelectedPost(null);
+      if (viewingCreator) setViewingCreator(null);
+      handleTabChange('profile');
+      return;
+    }
+    pushHistory('creator');
+    setSelectedPost(null);
+    setViewingCreator(creatorName);
+  }, [pushHistory, user, profile, handleTabChange, selectedPost, viewingCreator]);
 
   // Close helpers that go back in history
   const goBack = useCallback(() => {
@@ -333,9 +345,5 @@ function AppShell() {
 }
 
 export default function Index() {
-  return (
-    <AppProvider>
-      <AppShell />
-    </AppProvider>
-  );
+  return <AppShell />;
 }
