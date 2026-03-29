@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { useAppState } from '@/context/AppContext';
+import { AppProvider, useAppState } from '@/context/AppContext';
 import BottomNav from '@/components/BottomNav';
 import HomeScreen from '@/screens/HomeScreen';
 import MarketplaceScreen from '@/screens/MarketplaceScreen';
@@ -20,10 +20,43 @@ import RewardedAdModal from '@/components/ads/RewardedAdModal';
 import { useSmartScroll } from '@/hooks/useSmartScroll';
 import { useAdSettings } from '@/hooks/useAdSettings';
 import { Post } from '@/context/AppContext';
+import { Loader2, Sparkles, Key } from 'lucide-react';
 
 function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkApiKey = async () => {
+      if (window.aistudio && window.aistudio.hasSelectedApiKey) {
+        try {
+          const hasKey = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(hasKey);
+        } catch (e) {
+          console.error("Error checking API key:", e);
+          setHasApiKey(false);
+        }
+      } else {
+        // Fallback if not in aistudio environment
+        setHasApiKey(true);
+      }
+    };
+    checkApiKey();
+  }, []);
+
+  const handleSelectKey = async () => {
+    if (window.aistudio && window.aistudio.openSelectKey) {
+      try {
+        await window.aistudio.openSelectKey();
+        // Assume success to mitigate race condition
+        setHasApiKey(true);
+      } catch (e) {
+        console.error("Error opening key selector:", e);
+      }
+    }
+  };
 
   const activeTab = useMemo(() => {
     const path = location.pathname;
@@ -182,6 +215,38 @@ function AppShell() {
     setSelectedPost(null);
     navigate('/studio');
   }, [navigate]);
+
+  if (hasApiKey === null) {
+    return <div className="h-screen w-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  }
+
+  if (hasApiKey === false) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-background p-6 text-center">
+        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+          <Key className="w-10 h-10 text-primary" />
+        </div>
+        <h1 className="text-2xl font-bold mb-4">API Key Required</h1>
+        <p className="text-muted-foreground mb-8 max-w-md">
+          To generate high-quality images with Gemini 3.1 Flash Image Preview, you need to provide your own Google Cloud API key.
+        </p>
+        <button
+          onClick={handleSelectKey}
+          className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold text-lg active:scale-95 transition-transform shadow-lg shadow-primary/25"
+        >
+          Select API Key
+        </button>
+        <a 
+          href="https://ai.google.dev/gemini-api/docs/billing" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="mt-6 text-sm text-primary underline opacity-80 hover:opacity-100 transition-opacity"
+        >
+          Learn more about billing
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-background flex flex-col">
@@ -345,5 +410,9 @@ function AppShell() {
 }
 
 export default function Index() {
-  return <AppShell />;
+  return (
+    <AppProvider>
+      <AppShell />
+    </AppProvider>
+  );
 }

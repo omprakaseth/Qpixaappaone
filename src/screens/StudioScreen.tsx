@@ -225,7 +225,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       
       // Use Gemini directly instead of Edge Function
       const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
       let response;
       if (imageToSend) {
@@ -292,7 +292,20 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       await refreshProfile();
     } catch (err: any) {
       console.error('Generation error:', err);
-      toast.error(err.message || 'Something went wrong. Please try again.');
+      const errorMsg = err.message || 'Something went wrong. Please try again.';
+      
+      if (errorMsg.includes('Requested entity was not found') || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('403')) {
+        toast.error('API Key error. Please select a valid Google Cloud API key with Gemini API enabled.');
+        if (window.aistudio && window.aistudio.openSelectKey) {
+          try {
+            await window.aistudio.openSelectKey();
+          } catch (e) {
+            console.error('Failed to open key selector', e);
+          }
+        }
+      } else {
+        toast.error(errorMsg);
+      }
     } finally {
       setGenerating(false);
       setGenerationProgress(0);
