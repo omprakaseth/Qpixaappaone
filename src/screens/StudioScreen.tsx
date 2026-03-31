@@ -233,7 +233,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         const base64Data = imageToSend.split(',')[1];
         const mimeType = imageToSend.split(';')[0].split(':')[1] || 'image/png';
         response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-image-preview',
+          model: 'gemini-2.5-flash-image',
           contents: {
             parts: [
               { inlineData: { data: base64Data, mimeType } },
@@ -244,7 +244,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       } else {
         // Generate image
         response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-image-preview',
+          model: 'gemini-2.5-flash-image',
           contents: {
             parts: [{ text: userPrompt }]
           }
@@ -460,7 +460,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     <>
     <div style={containerStyle} className="flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 py-3 bg-background/95 backdrop-blur-sm border-b border-border z-20">
+      <div className="flex-shrink-0 flex items-center justify-between px-3 pt-2 pb-3 bg-background/95 backdrop-blur-sm border-b border-border z-20" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
             <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors">

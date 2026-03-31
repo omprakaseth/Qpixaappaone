@@ -9,19 +9,17 @@ interface FilterPanelProps {
 
 export interface FilterState {
   style: string;
-  aspectRatio: string;
   popularity: string;
   time: string;
 }
 
 const styleOptions = ['All', 'Cinematic', 'Photorealistic', 'Digital Art', 'Oil Painting', 'Watercolor', 'Pixel Art'];
-const aspectOptions = ['All', '1:1', '4:3', '16:9', '9:16', '3:2'];
 const popularityOptions = ['All', 'Most Liked', 'Most Viewed', 'Most Saved'];
 const timeOptions = ['All Time', 'Today', 'This Week', 'This Month'];
 
 export default function FilterPanel({ open, onClose, onApply }: FilterPanelProps) {
   const [filters, setFilters] = useState<FilterState>({
-    style: 'All', aspectRatio: 'All', popularity: 'All', time: 'All Time',
+    style: 'All', popularity: 'All', time: 'All Time',
   });
 
   if (!open) return null;
@@ -58,12 +56,11 @@ export default function FilterPanel({ open, onClose, onApply }: FilterPanelProps
           <button onClick={onClose} className="text-muted-foreground"><X size={20} /></button>
         </div>
         <FilterSection label="Style" options={styleOptions} value={filters.style} field="style" />
-        <FilterSection label="Aspect Ratio" options={aspectOptions} value={filters.aspectRatio} field="aspectRatio" />
         <FilterSection label="Popularity" options={popularityOptions} value={filters.popularity} field="popularity" />
         <FilterSection label="Time" options={timeOptions} value={filters.time} field="time" />
         <div className="flex gap-3 mt-4">
           <button
-            onClick={() => setFilters({ style: 'All', aspectRatio: 'All', popularity: 'All', time: 'All Time' })}
+            onClick={() => setFilters({ style: 'All', popularity: 'All', time: 'All Time' })}
             className="flex-1 py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold"
           >
             Reset

@@ -118,90 +118,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           isSaved: false, // Would need a separate query to check if current user saved
         }));
         if (formattedPosts.length === 0) {
-          // Fallback mock data for demonstration purposes
-          setPosts([
-            {
-              id: 'mock-1',
-              title: 'Cyberpunk City',
-              imageUrl: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=600&h=800&fit=crop',
-              creator: { id: 'mock-user-1', name: 'Neon Dreams', username: '@neon', avatar: '', initials: 'ND', isVerified: true },
-              prompt: 'A futuristic cyberpunk city at night with neon lights and flying cars',
-              tags: ['cyberpunk', 'city', 'neon'],
-              category: 'Trending',
-              style: 'Digital Art',
-              aspectRatio: '3:4',
-              views: 1200,
-              likes: 340,
-              saves: 45,
-              comments: 12,
-              createdAt: new Date().toISOString(),
-              isLiked: false,
-              isSaved: false,
-            },
-            {
-              id: 'mock-2',
-              title: 'Ethereal Portrait',
-              imageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop',
-              creator: { id: 'mock-user-2', name: 'Artistic Soul', username: '@artsoul', avatar: '', initials: 'AS' },
-              prompt: 'Ethereal portrait of a woman with glowing flowers in her hair',
-              tags: ['portrait', 'ethereal', 'flowers'],
-              category: 'Portraits',
-              style: 'Photography',
-              aspectRatio: '3:4',
-              views: 850,
-              likes: 210,
-              saves: 30,
-              comments: 8,
-              createdAt: new Date().toISOString(),
-              isLiked: false,
-              isSaved: false,
-            }
-          ]);
+          setPosts([]);
         } else {
           setPosts(formattedPosts);
         }
       }
     } catch (err) {
       console.error('Error fetching posts:', err);
-      // Fallback mock data on error
-      setPosts([
-        {
-          id: 'mock-1',
-          title: 'Cyberpunk City',
-          imageUrl: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=600&h=800&fit=crop',
-          creator: { id: 'mock-user-1', name: 'Neon Dreams', username: '@neon', avatar: '', initials: 'ND', isVerified: true },
-          prompt: 'A futuristic cyberpunk city at night with neon lights and flying cars',
-          tags: ['cyberpunk', 'city', 'neon'],
-          category: 'Trending',
-          style: 'Digital Art',
-          aspectRatio: '3:4',
-          views: 1200,
-          likes: 340,
-          saves: 45,
-          comments: 12,
-          createdAt: new Date().toISOString(),
-          isLiked: false,
-          isSaved: false,
-        },
-        {
-          id: 'mock-2',
-          title: 'Ethereal Portrait',
-          imageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop',
-          creator: { id: 'mock-user-2', name: 'Artistic Soul', username: '@artsoul', avatar: '', initials: 'AS' },
-          prompt: 'Ethereal portrait of a woman with glowing flowers in her hair',
-          tags: ['portrait', 'ethereal', 'flowers'],
-          category: 'Portraits',
-          style: 'Photography',
-          aspectRatio: '3:4',
-          views: 850,
-          likes: 210,
-          saves: 30,
-          comments: 8,
-          createdAt: new Date().toISOString(),
-          isLiked: false,
-          isSaved: false,
-        }
-      ]);
+      setPosts([]);
       throw err;
     }
   };

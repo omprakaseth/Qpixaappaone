@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Store, Sparkles, Heart, User } from 'lucide-react';
+import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
 
 interface BottomNavProps {
   activeTab: string;
@@ -9,7 +9,7 @@ interface BottomNavProps {
 
 const tabs = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'discover', label: 'Market', icon: Store },
+  { id: 'shorts', label: 'Shorts', icon: PlaySquare },
   { id: 'studio', label: 'Studio', icon: Sparkles },
   { id: 'favorites', label: 'Favorites', icon: Heart },
   { id: 'profile', label: 'Profile', icon: User },
@@ -22,15 +22,17 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
         ref={ref}
         className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
         style={{
-          backgroundColor: 'hsl(var(--background))',
-          borderTop: '1px solid hsl(var(--border))',
+          backgroundColor: activeTab === 'shorts' ? 'rgba(0,0,0,0.8)' : 'hsl(var(--background))',
+          backdropFilter: activeTab === 'shorts' ? 'blur(10px)' : 'none',
+          borderTop: activeTab === 'shorts' ? 'none' : '1px solid hsl(var(--border))',
           transform: visible ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s',
         }}
       >
         <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
+            const isShortsTab = activeTab === 'shorts';
             return (
               <button
                 key={id}
@@ -41,14 +43,20 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
                   size={22}
                   className="transition-all duration-200"
                   style={{
-                    color: isActive ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+                    color: isActive 
+                      ? (isShortsTab ? '#fff' : 'hsl(var(--primary))') 
+                      : (isShortsTab ? 'rgba(255,255,255,0.6)' : 'hsl(var(--muted-foreground))'),
                     transform: isActive ? 'scale(1.1)' : 'scale(1)',
                   }}
                   strokeWidth={isActive ? 2.5 : 1.8}
                 />
                 <span
                   className="text-[10px] font-medium transition-colors"
-                  style={{ color: isActive ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))' }}
+                  style={{ 
+                    color: isActive 
+                      ? (isShortsTab ? '#fff' : 'hsl(var(--primary))') 
+                      : (isShortsTab ? 'rgba(255,255,255,0.6)' : 'hsl(var(--muted-foreground))')
+                  }}
                 >
                   {label}
                 </span>

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Users, Search, SlidersHorizontal, Plus, TrendingUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import ScrollToTop from '@/components/ScrollToTop';
 import { toast } from 'sonner';
 import ImageCard from '@/components/ImageCard';
@@ -29,9 +29,10 @@ interface HomeScreenProps {
     adsenseFeedSlot: string;
   };
   isPro?: boolean;
+  navVisible?: boolean;
 }
 
-export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro }: HomeScreenProps) {
+export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro, navVisible = true }: HomeScreenProps) {
   const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user } = useAppState();
   const { followingIds } = useFollows();
   const [activeCategory, setActiveCategory] = useState('Trending');
@@ -41,16 +42,15 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   const [quickActionsPost, setQuickActionsPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [headerCollapsed, setHeaderCollapsed] = useState(false);
-  const [filters, setFilters] = useState<FilterState>({ style: 'All', aspectRatio: 'All', popularity: 'All', time: 'All Time' });
+  const [filters, setFilters] = useState<FilterState>({ style: 'All', popularity: 'All', time: 'All Time' });
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
+  const navigate = useNavigate();
 
   // Filter posts
   const filteredPosts = useMemo(() => {
     return posts.filter(p => {
       if (activeCategory === 'Following') {
-        // Show posts from followed users, or user's own posts
         const creatorId = (p as any).creator_id;
         if (!creatorId || (!followingIds.includes(creatorId) && creatorId !== user?.id)) return false;
       } else if (activeCategory !== 'Trending' && p.category !== activeCategory) {
@@ -62,65 +62,16 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     });
   }, [posts, activeCategory, searchQuery, filters, followingIds, user?.id]);
 
-  // Top this month
   const topThisMonth = useMemo(() => {
     return [...posts]
       .sort((a, b) => (b.likes + b.views) - (a.likes + a.views))
       .slice(0, 5);
   }, [posts]);
 
-  // Header collapse on scroll
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    let accumulated = 0;
-    let lastY = el.scrollTop;
-    let lastToggle = 0;
-    const handleScroll = () => {
-      const current = el.scrollTop;
-      const delta = current - lastY;
-      if (Math.abs(delta) < 3) return;
-      if (current < 20) {
-        setHeaderCollapsed(false);
-        accumulated = 0;
-        lastY = current;
-        return;
-      }
-      
-      // Prevent overscroll at bottom from triggering toggle
-      const maxScroll = el.scrollHeight - el.clientHeight;
-      if (maxScroll <= 0) return; // Not scrollable
-      
-      // If near bottom and scrolling down, don't collapse to prevent flicker
-      if (current >= maxScroll - 100 && delta > 0) {
-        accumulated = 0;
-        return;
-      }
-
-      if ((delta > 0 && accumulated > 0) || (delta < 0 && accumulated < 0)) {
-        accumulated += delta;
-      } else {
-        accumulated = delta;
-      }
-      const now = Date.now();
-      if (now - lastToggle > 300 && Math.abs(accumulated) > 30) {
-        setHeaderCollapsed(accumulated > 0);
-        lastToggle = now;
-        accumulated = 0;
-      }
-      lastY = current;
-    };
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [scrollRef]);
-
-  // Infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && !loading) {
         setLoading(true);
-        // In a real app, fetch next page from Supabase
-        // For now, we just stop loading since we fetch all posts at once
         setLoading(false);
       }
     }, { threshold: 0.1 });
@@ -128,7 +79,6 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     return () => observer.disconnect();
   }, [loading, posts.length]);
 
-  // Pull to refresh
   const touchStart = useRef(0);
   const handleTouchStart = (e: React.TouchEvent) => { touchStart.current = e.touches[0].clientY; };
   const handleTouchEnd = async (e: React.TouchEvent) => {
@@ -152,31 +102,25 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Header - collapsible top section */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm pt-[max(env(safe-area-inset-top),2rem)]">
-        <div
-          className="overflow-hidden transition-all duration-300"
-          style={{
-            maxHeight: headerCollapsed ? '0px' : '56px',
-            opacity: headerCollapsed ? 0 : 1,
-          }}
-        >
-          <div className="flex items-center justify-between px-4 pt-2 pb-3">
+      <div 
+        className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm transition-transform duration-300" 
+        style={{ 
+          paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
+          transform: navVisible ? 'translateY(0)' : 'translateY(-100%)'
+        }}
+      >
+        <div>
+          <div className="flex items-center justify-between px-4 pb-3">
             <h1 className="text-xl font-bold">
               <span className="text-primary">Q</span>
               <span className="text-foreground">pixa</span>
             </h1>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setExplorerOpen(true)}
-                className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center"
+                onClick={() => navigate('/market')}
+                className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center transition-colors hover:bg-secondary/80"
               >
-                <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-                  <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground" />
-                  <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground" />
-                  <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground" />
-                  <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" className="text-muted-foreground" />
-                </svg>
+                <Store size={18} className="text-muted-foreground" />
               </button>
               <button
                 onClick={onGetPro}
@@ -188,9 +132,8 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           </div>
         </div>
 
-        {/* Search - always sticky */}
-        <div className={`px-4 pb-3 flex gap-2 transition-all duration-300 ${headerCollapsed ? 'pt-4' : 'pt-1'}`}>
-        <div className="flex-1 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
+        <div className="px-4 pb-3 flex gap-2 pt-1">
+          <div className="flex-1 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
             <Search size={16} className="text-muted-foreground mr-2" />
             <input
               type="search"
@@ -211,14 +154,29 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           </button>
         </div>
 
-        {/* Categories - always sticky */}
         <div className="flex items-center gap-2 px-4 pb-3">
           <button
-            onClick={() => setFilterOpen(true)}
-            className="flex-shrink-0 w-9 h-9 rounded-full bg-secondary flex items-center justify-center"
+            onClick={() => setExplorerOpen(true)}
+            className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary text-foreground flex items-center justify-center transition-colors hover:bg-secondary/80"
           >
-            <SlidersHorizontal size={16} className="text-muted-foreground" />
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
           </button>
+          <button
+            onClick={() => setFilterOpen(true)}
+            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+              Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-foreground'
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+          </button>
+          <div className="w-[1px] h-4 bg-border mx-1 flex-shrink-0" />
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
             {categories.map(cat => (
               <button
@@ -237,15 +195,13 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         </div>
       </div>
 
-      {/* Refresh indicator */}
       {refreshing && (
         <div className="flex justify-center py-4">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {/* Grid */}
-      <div className="px-4 pb-20">
+      <div className="px-4 pb-safe-nav">
         {activeCategory === 'Trending' && topThisMonth.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
@@ -254,7 +210,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
             </div>
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
               {topThisMonth.map(post => (
-                <div key={post.id} className="w-40 flex-shrink-0">
+                <div key={post.id} className="w-[170px] flex-shrink-0">
                   <ImageCard
                     post={post}
                     onTap={() => onPostTap(post)}
@@ -276,7 +232,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
               {filteredPosts.map((post, index) => (
                 <React.Fragment key={post.id}>
                   <ImageCard
@@ -299,7 +255,6 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
             </div>
             <div ref={loadMoreRef} className="h-4" />
 
-            {/* Footer Links */}
             <div className="flex flex-wrap items-center justify-center gap-3 py-6 mt-4 border-t border-border">
               <Link to="/about" className="text-xs text-muted-foreground hover:text-primary transition-colors">About</Link>
               <span className="text-muted-foreground/30 text-xs">•</span>

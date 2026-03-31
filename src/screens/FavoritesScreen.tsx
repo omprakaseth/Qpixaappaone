@@ -5,9 +5,10 @@ import { useAppState } from '@/context/AppContext';
 interface FavoritesScreenProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
+  navVisible?: boolean;
 }
 
-export default function FavoritesScreen({ scrollRef, onOpenAuth }: FavoritesScreenProps) {
+export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = true }: FavoritesScreenProps) {
   const { isLoggedIn, posts } = useAppState();
   const [activeTab, setActiveTab] = useState<'saved' | 'generated' | 'collections'>('saved');
 
@@ -44,7 +45,10 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth }: FavoritesScre
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
-      <div className="px-4 py-3">
+      <div 
+        className={`sticky top-0 z-20 bg-background/95 backdrop-blur-md px-4 pt-2 pb-3 transition-transform duration-300 ${!navVisible ? '-translate-y-full' : 'translate-y-0'}`} 
+        style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+      >
         <h1 className="text-lg font-bold text-foreground mb-3">Favorites</h1>
         <div className="flex gap-2 mb-4">
           {tabs.map(t => (
@@ -60,7 +64,7 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth }: FavoritesScre
           ))}
         </div>
       </div>
-      <div className="px-3 pb-20">
+      <div className="px-3 pb-safe-nav">
         {activeTab === 'saved' && (
           savedPosts.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-12">No saved items yet</p>

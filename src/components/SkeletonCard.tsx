@@ -1,7 +1,7 @@
 export default function SkeletonCard() {
   return (
     <div className="relative rounded-2xl overflow-hidden bg-card border border-border/50">
-      <div className="aspect-[3/4] relative overflow-hidden bg-secondary/50 animate-pulse">
+      <div className="aspect-square relative overflow-hidden bg-secondary/50 animate-pulse">
         {/* Top Badge Placeholder */}
         <div className="absolute top-2 left-2 w-6 h-4 bg-secondary-foreground/10 rounded-md" />
         

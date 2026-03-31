@@ -8,6 +8,7 @@ import MarketplaceScreen from '@/screens/MarketplaceScreen';
 import StudioScreen from '@/screens/StudioScreen';
 import FavoritesScreen from '@/screens/FavoritesScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
+import ShortsScreen from '@/screens/ShortsScreen';
 import PostDetail from '@/screens/PostDetail';
 import CreatePost from '@/screens/CreatePost';
 import SettingsScreen from '@/screens/SettingsScreen';
@@ -26,41 +27,10 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [hasApiKey, setHasApiKey] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const checkApiKey = async () => {
-      if (window.aistudio && window.aistudio.hasSelectedApiKey) {
-        try {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
-          setHasApiKey(hasKey);
-        } catch (e) {
-          console.error("Error checking API key:", e);
-          setHasApiKey(false);
-        }
-      } else {
-        // Fallback if not in aistudio environment
-        setHasApiKey(true);
-      }
-    };
-    checkApiKey();
-  }, []);
-
-  const handleSelectKey = async () => {
-    if (window.aistudio && window.aistudio.openSelectKey) {
-      try {
-        await window.aistudio.openSelectKey();
-        // Assume success to mitigate race condition
-        setHasApiKey(true);
-      } catch (e) {
-        console.error("Error opening key selector:", e);
-      }
-    }
-  };
-
   const activeTab = useMemo(() => {
     const path = location.pathname;
     if (path === '/market') return 'discover';
+    if (path === '/shorts') return 'shorts';
     if (path === '/studio') return 'studio';
     if (path === '/favorites') return 'favorites';
     if (path === '/profile') return 'profile';
@@ -170,6 +140,7 @@ function AppShell() {
     const paths: Record<string, string> = {
       home: '/',
       discover: '/market',
+      shorts: '/shorts',
       studio: '/studio',
       favorites: '/favorites',
       profile: '/profile'
@@ -216,40 +187,8 @@ function AppShell() {
     navigate('/studio');
   }, [navigate]);
 
-  if (hasApiKey === null) {
-    return <div className="h-screen w-screen flex items-center justify-center bg-background"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
-  }
-
-  if (hasApiKey === false) {
-    return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-background p-6 text-center">
-        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-          <Key className="w-10 h-10 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold mb-4">API Key Required</h1>
-        <p className="text-muted-foreground mb-8 max-w-md">
-          To generate high-quality images with Gemini 3.1 Flash Image Preview, you need to provide your own Google Cloud API key.
-        </p>
-        <button
-          onClick={handleSelectKey}
-          className="bg-primary text-primary-foreground px-8 py-3 rounded-full font-semibold text-lg active:scale-95 transition-transform shadow-lg shadow-primary/25"
-        >
-          Select API Key
-        </button>
-        <a 
-          href="https://ai.google.dev/gemini-api/docs/billing" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="mt-6 text-sm text-primary underline opacity-80 hover:opacity-100 transition-opacity"
-        >
-          Learn more about billing
-        </a>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-screen w-screen overflow-hidden bg-background flex flex-col">
+    <div className="h-[100dvh] w-screen overflow-hidden bg-background flex flex-col">
       <div className="flex-1 relative overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
@@ -269,6 +208,7 @@ function AppShell() {
                 onCreatorTap={openCreator}
                 adSettings={adSettings}
                 isPro={isPro}
+                navVisible={navVisible}
               />
             )}
             {activeTab === 'discover' && (
@@ -277,7 +217,11 @@ function AppShell() {
                 onUsePrompt={handleUsePrompt}
                 onOpenAuth={openAuth}
                 onCreatorTap={openCreator}
+                navVisible={navVisible}
               />
+            )}
+            {activeTab === 'shorts' && (
+              <ShortsScreen />
             )}
             {activeTab === 'studio' && (
               isLoggedIn ? (
@@ -305,8 +249,8 @@ function AppShell() {
                 </div>
               )
             )}
-            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenAuth={openAuth} />}
-            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} />}
+            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenAuth={openAuth} navVisible={navVisible} />}
+            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
           </motion.div>
         </AnimatePresence>
       </div>

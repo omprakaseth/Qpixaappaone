@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal } from 'lucide-react';
+import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import EditProfileSheet from '@/components/profile/EditProfileSheet';
@@ -13,6 +13,7 @@ interface ProfileScreenProps {
   onOpenSettings: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onPostTap?: (post: any) => void;
+  navVisible?: boolean;
 }
 
 interface UserPrompt {
@@ -26,10 +27,10 @@ interface UserPrompt {
   category: string;
 }
 
-export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, onPostTap }: ProfileScreenProps) {
+export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, onPostTap, navVisible = true }: ProfileScreenProps) {
   const { isLoggedIn, profile, user, refreshProfile } = useAppState();
   const { followingIds } = useFollows();
-  const [activeTab, setActiveTab] = useState<'posts' | 'prompts' | 'about'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'shorts' | 'prompts' | 'about'>('posts');
   const [myPrompts, setMyPrompts] = useState<UserPrompt[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
@@ -64,7 +65,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       
     if (error) {
       console.error('Error fetching posts:', error);
-      setMyPosts(getMockMyPosts());
+      setMyPosts([]);
     } else if (data && data.length > 0) {
       const formattedPosts = data.map((p: any) => ({
         id: p.id,
@@ -93,7 +94,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       }));
       setMyPosts(formattedPosts);
     } else {
-      setMyPosts(getMockMyPosts());
+      setMyPosts([]);
     }
   };
 
@@ -118,7 +119,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       .eq('creator_id', user.id);
     if (error) {
       console.error('Error fetching prompts:', error);
-      setMyPrompts(getMockMyPrompts());
+      setMyPrompts([]);
     } else if (data && data.length > 0) {
       setMyPrompts(data);
       const totalSales = data.reduce((s, p) => s + p.sales_count, 0);
@@ -126,71 +127,9 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       const avgRating = data.length > 0 ? data.reduce((s, p) => s + p.rating, 0) / data.length : 0;
       setEarnings({ totalSales, totalEarnings, avgRating });
     } else {
-      setMyPrompts(getMockMyPrompts());
+      setMyPrompts([]);
     }
   };
-
-  const getMockMyPosts = () => [
-    { 
-      id: 'mock-p1', 
-      title: 'Cyberpunk city',
-      imageUrl: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=400&h=400&fit=crop', 
-      prompt: 'Cyberpunk city',
-      creator: {
-        id: user?.id || 'mock-id',
-        name: profile?.display_name || 'You',
-        username: profile?.username ? `@${profile.username}` : '@you',
-        avatar: profile?.avatar_url || '',
-        initials: (profile?.display_name || 'Y').substring(0, 2).toUpperCase(),
-        isVerified: profile?.is_verified || false,
-      },
-      tags: ['cyberpunk', 'city'],
-      likes: 12, views: 45, saves: 2, comments: 0,
-      isLiked: false, isSaved: false,
-      creator_id: user?.id
-    },
-    { 
-      id: 'mock-p2', 
-      title: 'Ethereal portrait',
-      imageUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop', 
-      prompt: 'Ethereal portrait',
-      creator: {
-        id: user?.id || 'mock-id',
-        name: profile?.display_name || 'You',
-        username: profile?.username ? `@${profile.username}` : '@you',
-        avatar: profile?.avatar_url || '',
-        initials: (profile?.display_name || 'Y').substring(0, 2).toUpperCase(),
-        isVerified: profile?.is_verified || false,
-      },
-      tags: ['portrait', 'ethereal'],
-      likes: 34, views: 120, saves: 5, comments: 2,
-      isLiked: false, isSaved: false,
-      creator_id: user?.id
-    },
-    { 
-      id: 'mock-p3', 
-      title: 'Fantasy landscape',
-      imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&h=400&fit=crop', 
-      prompt: 'Fantasy landscape',
-      creator: {
-        id: user?.id || 'mock-id',
-        name: profile?.display_name || 'You',
-        username: profile?.username ? `@${profile.username}` : '@you',
-        avatar: profile?.avatar_url || '',
-        initials: (profile?.display_name || 'Y').substring(0, 2).toUpperCase(),
-        isVerified: profile?.is_verified || false,
-      },
-      tags: ['fantasy', 'landscape'],
-      likes: 56, views: 230, saves: 12, comments: 4,
-      isLiked: false, isSaved: false,
-      creator_id: user?.id
-    },
-  ];
-
-  const getMockMyPrompts = () => [
-    { id: 'mock-mp1', title: 'Neon City Generator', preview_image: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=400&h=400&fit=crop', price: 10, rating: 4.8, sales_count: 120, model_type: 'Midjourney', category: 'Environment' },
-    { id: 'mock-mp2', title: 'Portrait Master', preview_image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=400&fit=crop', price: 15, rating: 4.9, sales_count: 340, model_type: 'DALL-E 3', category: 'Portrait' },
-  ];
 
   if (!isLoggedIn) {
     return (
@@ -219,6 +158,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
 
   const tabs = [
     { id: 'posts' as const, icon: Grid3X3, label: 'Posts' },
+    { id: 'shorts' as const, icon: PlaySquare, label: 'Shorts' },
     { id: 'prompts' as const, icon: ShoppingBag, label: 'Prompt Store' },
     { id: 'about' as const, icon: Info, label: 'About' },
   ];
@@ -227,7 +167,10 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     <>
       <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
         {/* Header */}
-        <div className="px-4 py-3 flex items-center justify-between">
+        <div 
+          className={`sticky top-0 z-20 bg-background/95 backdrop-blur-md px-4 pt-2 pb-3 flex items-center justify-between transition-transform duration-300 ${!navVisible ? '-translate-y-full' : 'translate-y-0'}`} 
+          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+        >
           <h1 className="text-lg font-bold text-foreground">@{username}</h1>
           <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
             <Settings size={20} className="text-muted-foreground" />
@@ -331,7 +274,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         </div>
 
         {/* Tab Content */}
-        <div className="pb-20">
+        <div className="pb-safe-nav">
           {activeTab === 'posts' && (
             myPosts.length > 0 ? (
               <div className="grid grid-cols-3 gap-0.5">
@@ -350,6 +293,16 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
                 <p className="text-xs text-muted-foreground mt-1">Your creations will appear here</p>
               </div>
             )
+          )}
+
+          {activeTab === 'shorts' && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-3">
+                <PlaySquare size={28} className="text-muted-foreground/40" />
+              </div>
+              <p className="text-sm font-semibold text-foreground">No Shorts Yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Your short videos will appear here</p>
+            </div>
           )}
 
           {activeTab === 'prompts' && (
@@ -481,7 +434,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
 const PromptMiniCard: React.FC<{ prompt: { id: string; title: string; preview_image: string | null; price: number; rating: number; sales_count: number; model_type: string } }> = ({ prompt }) => {
   return (
     <div className="flex-shrink-0 w-[130px] rounded-xl overflow-hidden bg-card border border-border">
-      <div className="relative aspect-[4/3] w-full overflow-hidden">
+      <div className="relative aspect-square w-full overflow-hidden">
         <img src={prompt.preview_image || '/placeholder.svg'} alt="" className="w-full h-full object-cover" />
         <div className="absolute top-1 left-1">
           <span className="bg-primary/80 text-primary-foreground text-[7px] font-semibold px-1.5 py-0.5 rounded-full">

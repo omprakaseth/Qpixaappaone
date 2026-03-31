@@ -35,7 +35,7 @@ export default function SellerProfileScreen({ sellerName, sellerPrompts, onBack,
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-right duration-200">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-3 pb-3 safe-top">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-2 pb-3" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="p-1.5 rounded-full hover:bg-secondary">
             <ArrowLeft size={20} className="text-foreground" />
@@ -125,7 +125,7 @@ export default function SellerProfileScreen({ sellerName, sellerPrompts, onBack,
         </div>
 
         {/* Content */}
-        <div className="pb-20">
+        <div className="pb-safe-nav">
           {activeTab === 'prompts' && (
             <div className="grid grid-cols-2 gap-3 p-3">
               {sellerPrompts.map(prompt => {

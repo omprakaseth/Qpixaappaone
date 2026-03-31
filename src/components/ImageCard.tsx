@@ -58,7 +58,7 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden bg-card cursor-pointer"
+      className="relative rounded-[20px] overflow-hidden bg-card cursor-pointer h-[220px] w-full"
       onClick={() => {
         if (longPressTriggered.current) return;
         handleTap();
@@ -68,7 +68,7 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
       onTouchEnd={handleTouchEnd}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="aspect-[3/4] relative overflow-hidden">
+      <div className="w-full h-full relative overflow-hidden">
         {/* Skeleton placeholder */}
         {!imgLoaded && (
           <div className="absolute inset-0 skeleton-shimmer" />

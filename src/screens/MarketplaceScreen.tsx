@@ -54,9 +54,10 @@ interface MarketplaceScreenProps {
   onUsePrompt?: (prompt: string) => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onCreatorTap?: (creatorName: string, creatorId?: string) => void;
+  navVisible?: boolean;
 }
 
-export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap }: MarketplaceScreenProps) {
+export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true }: MarketplaceScreenProps) {
   const { isLoggedIn, credits, refreshProfile } = useAppState();
   const { items: cartItems, addToCart, removeFromCart, isInCart, count: cartCount } = useCart();
   const [search, setSearch] = useState('');
@@ -117,14 +118,14 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
           }));
           
           if (formattedPrompts.length === 0) {
-            setPrompts(getMockPrompts());
+            setPrompts([]);
           } else {
             setPrompts(formattedPrompts);
           }
         }
       } catch (err) {
         console.error('Error fetching prompts:', err);
-        setPrompts(getMockPrompts());
+        setPrompts([]);
       } finally {
         setLoading(false);
       }
@@ -132,45 +133,6 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
 
     fetchPrompts();
   }, []);
-
-  const getMockPrompts = (): MarketplacePrompt[] => [
-    {
-      id: 'mock-1',
-      creator_id: '1',
-      creator_name: 'Neon Dreams',
-      title: 'Cyberpunk Cityscape Generator',
-      description: 'Generate stunning cyberpunk cities with neon lights and flying cars.',
-      prompt_text: 'A futuristic cyberpunk city at night with neon lights and flying cars, highly detailed, 8k resolution, unreal engine 5 render',
-      preview_image: 'https://images.unsplash.com/photo-1605806616949-1e87b487cb2a?w=600&h=800&fit=crop',
-      preview_images: [],
-      category: 'Environment',
-      model_type: 'Midjourney v6',
-      price: 15,
-      rating: 4.8,
-      sales_count: 1240,
-      is_featured: true,
-      is_trending: true,
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 'mock-2',
-      creator_id: '2',
-      creator_name: 'Artistic Soul',
-      title: 'Ethereal Portrait Style',
-      description: 'Create beautiful, ethereal portraits with glowing elements.',
-      prompt_text: 'Ethereal portrait of a woman with glowing flowers in her hair, soft lighting, fantasy art style, masterpiece',
-      preview_image: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&h=800&fit=crop',
-      preview_images: [],
-      category: 'Portrait',
-      model_type: 'DALL-E 3',
-      price: 0,
-      rating: 4.9,
-      sales_count: 3500,
-      is_featured: false,
-      is_trending: true,
-      created_at: new Date().toISOString(),
-    }
-  ];
 
   // Filter
   const filtered = prompts.filter(p => {
@@ -207,12 +169,6 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       return;
     }
 
-    if (prompt.id.startsWith('mock-')) {
-      setPurchasedIds(prev => new Set(prev).add(prompt.id));
-      toast.success('Mock purchase successful!');
-      return;
-    }
-
     try {
       const { data, error } = await supabase.rpc('purchase_prompt', { p_prompt_id: prompt.id });
       if (error) {
@@ -234,10 +190,6 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   };
 
   const handleUsePrompt = async (prompt: MarketplacePrompt) => {
-    if (prompt.id.startsWith('mock-')) {
-      onUsePrompt?.(prompt.prompt_text);
-      return;
-    }
     // Fetch prompt text securely via RPC
     const { data, error } = await supabase.rpc('get_marketplace_prompt_text', { p_prompt_id: prompt.id });
     if (error) {
@@ -253,7 +205,10 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-[max(env(safe-area-inset-top),2rem)] pb-3">
+      <div 
+        className={`sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-2 pb-3 transition-transform duration-300 ${!navVisible ? '-translate-y-full' : 'translate-y-0'}`} 
+        style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+      >
         {/* Top row: title + icons */}
         <div className="flex items-center justify-between mb-3">
           <h1 className="text-lg font-bold text-foreground">Marketplace</h1>
@@ -357,7 +312,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       </div>
 
       {/* Categories with horizontal scroll */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-20">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-safe-nav">
         {/* Selected category view */}
         {selectedCategory ? (
           <div>
@@ -368,7 +323,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
               <h2 className="text-base font-bold text-foreground">{selectedCategory}</h2>
               <span className="text-xs text-muted-foreground">({sorted.filter(p => p.category === selectedCategory).length})</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 px-4">
+            <div className="flex flex-col gap-4 px-4">
               {sorted.filter(p => p.category === selectedCategory).map(prompt => (
                 <div key={prompt.id} onClick={() => setSelectedPrompt(prompt)} className="cursor-pointer">
                   <PromptPackCard
@@ -397,15 +352,16 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
                     Top This Month
                   </h2>
                 </div>
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4">
+                <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 snap-x snap-mandatory">
                   {[...sorted].sort((a, b) => b.sales_count - a.sales_count).slice(0, 5).map(prompt => (
-                    <PromptPackCard
-                      key={`top-${prompt.id}`}
-                      prompt={prompt}
-                      isPurchased={purchasedIds.has(prompt.id)}
-                      onTap={() => setSelectedPrompt(prompt)}
-                      onSellerTap={() => onCreatorTap?.(prompt.creator_name || '', prompt.creator_id)}
-                    />
+                    <div key={`top-${prompt.id}`} className="snap-center shrink-0">
+                      <PromptPackCard
+                        prompt={prompt}
+                        isPurchased={purchasedIds.has(prompt.id)}
+                        onTap={() => setSelectedPrompt(prompt)}
+                        onSellerTap={() => onCreatorTap?.(prompt.creator_name || '', prompt.creator_id)}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -420,15 +376,16 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
                 </button>
 
                 {/* Horizontal scroll */}
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4">
+                <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 snap-x snap-mandatory">
                   {prompts.map(prompt => (
-                    <PromptPackCard
-                      key={prompt.id}
-                      prompt={prompt}
-                      isPurchased={purchasedIds.has(prompt.id)}
-                      onTap={() => setSelectedPrompt(prompt)}
-                      onSellerTap={() => onCreatorTap?.(prompt.creator_name || '', prompt.creator_id)}
-                    />
+                    <div key={prompt.id} className="snap-center shrink-0">
+                      <PromptPackCard
+                        prompt={prompt}
+                        isPurchased={purchasedIds.has(prompt.id)}
+                        onTap={() => setSelectedPrompt(prompt)}
+                        onSellerTap={() => onCreatorTap?.(prompt.creator_name || '', prompt.creator_id)}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -582,55 +539,44 @@ const PromptPackCard: React.FC<{
   onTap,
   onSellerTap,
 }) => {
-  const imgs = prompt.preview_images.length > 0 ? prompt.preview_images : [prompt.preview_image || '/placeholder.svg'];
+  const baseImg = prompt.preview_image || '/placeholder.svg';
+  const imgs = (prompt.preview_images && prompt.preview_images.length >= 3) 
+    ? prompt.preview_images.slice(0, 3) 
+    : [baseImg, baseImg, baseImg];
   const badgeColor = modelBadgeColors[prompt.model_type] || 'bg-muted';
 
   return (
     <button
       onClick={onTap}
-      className="flex-shrink-0 w-[280px] rounded-xl overflow-hidden bg-card border border-border text-left transition-transform active:scale-[0.97]"
+      className="flex-shrink-0 w-[85vw] max-w-[340px] h-[220px] rounded-[20px] overflow-hidden bg-[#0f0f0f] border border-border text-left transition-transform active:scale-[0.97] flex flex-col"
     >
       {/* Multi-image grid preview */}
-      <div className="relative h-[180px] w-full overflow-hidden" onContextMenu={(e) => e.preventDefault()}>
-        {imgs.length >= 3 ? (
-          <div className="grid grid-cols-3 h-full gap-[1px]">
-            {imgs.slice(0, 3).map((img, i) => (
-              <div key={i} className="overflow-hidden">
-                <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
-              </div>
-            ))}
+      <div className="relative h-[70%] w-full overflow-hidden flex flex-row rounded-t-[20px]" onContextMenu={(e) => e.preventDefault()}>
+        {imgs.map((img, i) => (
+          <div key={i} className="flex-1 overflow-hidden border-r border-background/20 last:border-r-0">
+            <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
           </div>
-        ) : imgs.length === 2 ? (
-          <div className="grid grid-cols-2 h-full gap-[1px]">
-            {imgs.map((img, i) => (
-              <div key={i} className="overflow-hidden">
-                <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <img src={imgs[0]} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
-        )}
+        ))}
 
         {/* Model badge */}
         <div className="absolute top-2 left-2">
-          <span className={`flex items-center gap-1 ${badgeColor} text-white text-[9px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm`}>
+          <span className={`flex items-center gap-1 ${badgeColor} text-white text-[10px] font-semibold px-2.5 py-1 rounded-full backdrop-blur-sm shadow-sm`}>
             🔥 {prompt.model_type}
           </span>
         </div>
 
         {/* Rating badge */}
         {prompt.rating > 0 && (
-          <div className="absolute top-2 right-2 flex items-center gap-0.5 bg-background/70 backdrop-blur-sm rounded-full px-1.5 py-0.5">
-            <span className="text-[10px] font-bold text-foreground">{prompt.rating}</span>
-            <Star size={9} className="text-yellow-400 fill-yellow-400" />
+          <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 backdrop-blur-sm rounded-full px-2 py-1 shadow-sm">
+            <span className="text-[11px] font-bold text-white">{prompt.rating}</span>
+            <Star size={10} className="text-yellow-400 fill-yellow-400" />
           </div>
         )}
 
         {/* Purchased badge */}
         {isPurchased && (
           <div className="absolute bottom-2 right-2">
-            <span className="bg-primary text-primary-foreground text-[9px] font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
               OWNED
             </span>
           </div>
@@ -638,18 +584,18 @@ const PromptPackCard: React.FC<{
       </div>
 
       {/* Info section */}
-      <div className="px-3 py-2.5">
-        <h3 className="text-xs font-semibold text-foreground truncate mb-1">{prompt.title}</h3>
+      <div className="flex-1 px-4 py-3 flex flex-col justify-center">
+        <h3 className="text-sm font-semibold text-white truncate mb-1">{prompt.title}</h3>
         <div className="flex items-center justify-between">
           <span
             onClick={(e) => { e.stopPropagation(); onSellerTap?.(); }}
-            className="text-[10px] text-muted-foreground active:text-primary"
+            className="text-xs text-muted-foreground active:text-primary truncate mr-2"
           >@{prompt.creator_name || 'unknown'} · {prompt.sales_count} sales</span>
           {prompt.price === 0 ? (
-            <span className="text-[11px] font-bold text-green-400">FREE</span>
+            <span className="text-xs font-bold text-green-400">FREE</span>
           ) : (
-            <span className="flex items-center gap-0.5 text-[11px] font-bold text-primary">
-              <Coins size={11} />
+            <span className="flex items-center gap-1 text-xs font-bold text-primary">
+              <Coins size={12} />
               {prompt.price}
             </span>
           )}

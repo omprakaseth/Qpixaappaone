@@ -114,7 +114,7 @@ export default function DiscoverScreen({ scrollRef, onPostTap }: DiscoverScreenP
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm px-4 pb-3 space-y-2 pt-[max(env(safe-area-inset-top),2rem)]">
+      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm px-4 pt-2 pb-3 space-y-2" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
         <h1 className="text-lg font-bold text-foreground">Discover</h1>
         <div className="flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
           <Search size={16} className="text-muted-foreground mr-2" />
@@ -130,7 +130,7 @@ export default function DiscoverScreen({ scrollRef, onPostTap }: DiscoverScreenP
           />
         </div>
       </div>
-      <div className="px-3 pb-20">
+      <div className="px-3 pb-safe-nav">
         {filteredPosts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Search size={40} className="mb-3 opacity-40" />
