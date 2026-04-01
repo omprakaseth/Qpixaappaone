@@ -1,5 +1,6 @@
 import React from 'react';
 import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface BottomNavProps {
   activeTab: string;
@@ -22,14 +23,17 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
         ref={ref}
         className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
         style={{
-          backgroundColor: activeTab === 'shorts' ? 'rgba(0,0,0,0.8)' : 'hsl(var(--background))',
-          backdropFilter: activeTab === 'shorts' ? 'blur(10px)' : 'none',
+          backgroundColor: activeTab === 'shorts' ? 'transparent' : 'hsl(var(--background))',
+          backdropFilter: activeTab === 'shorts' ? 'none' : 'none',
           borderTop: activeTab === 'shorts' ? 'none' : '1px solid hsl(var(--border))',
           transform: visible ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s',
         }}
       >
-        <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
+        <div className={cn(
+          "flex items-center justify-around h-14 max-w-lg mx-auto transition-all duration-300",
+          activeTab === 'shorts' ? "bg-gradient-to-t from-black/60 to-transparent" : ""
+        )}>
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
             const isShortsTab = activeTab === 'shorts';

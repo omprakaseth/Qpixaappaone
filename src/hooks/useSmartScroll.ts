@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 export function useSmartScroll(enabled = true) {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisibleState] = useState(true);
+  const visibleRef = useRef(true);
+
+  const setVisible = useCallback((v: boolean) => {
+    visibleRef.current = v;
+    setVisibleState(v);
+  }, []);
+
   const lastScrollY = useRef(0);
   const [node, setNode] = useState<HTMLElement | null>(null);
   const lastToggleTime = useRef(0);
@@ -34,11 +41,20 @@ export function useSmartScroll(enabled = true) {
 
     const delta = current - lastScrollY.current;
     
-    if (Math.abs(delta) < 3) return;
+    // Ignore micro-scrolls
+    if (Math.abs(delta) < 5) return;
     
-    if (current < 20) {
+    // Reset at top of page
+    if (current <= 0) {
       setVisible(true);
       accumulatedDelta.current = 0;
+      lastScrollY.current = 0;
+      return;
+    }
+
+    // Threshold for meaningful scroll
+    if (current < 20) {
+      setVisible(true);
       lastScrollY.current = current;
       return;
     }
@@ -59,11 +75,20 @@ export function useSmartScroll(enabled = true) {
     const now = Date.now();
     const timeSinceLastToggle = now - lastToggleTime.current;
 
-    if (timeSinceLastToggle > 300 && Math.abs(accumulatedDelta.current) > 30) {
-      const shouldShow = accumulatedDelta.current < 0;
-      setVisible(shouldShow);
-      lastToggleTime.current = now;
-      accumulatedDelta.current = 0;
+    // Small debounce for smoothness
+    if (timeSinceLastToggle > 100) {
+      const showThreshold = 15; // More sensitive for showing
+      const hideThreshold = 30; // Less sensitive for hiding
+      
+      if (accumulatedDelta.current < -showThreshold && !visibleRef.current) {
+        setVisible(true);
+        lastToggleTime.current = now;
+        accumulatedDelta.current = 0;
+      } else if (accumulatedDelta.current > hideThreshold && visibleRef.current) {
+        setVisible(false);
+        lastToggleTime.current = now;
+        accumulatedDelta.current = 0;
+      }
     }
 
     lastScrollY.current = current;

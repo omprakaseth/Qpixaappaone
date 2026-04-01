@@ -221,7 +221,10 @@ function AppShell() {
               />
             )}
             {activeTab === 'shorts' && (
-              <ShortsScreen />
+              <ShortsScreen 
+                onBack={() => handleTabChange('home')} 
+                onCreatorTap={openCreator}
+              />
             )}
             {activeTab === 'studio' && (
               isLoggedIn ? (
@@ -255,7 +258,7 @@ function AppShell() {
         </AnimatePresence>
       </div>
 
-      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible && activeTab !== 'shorts'} />
 
       {/* Banner Ad - free users only */}
       {adSettings.enabled && adSettings.placementBanner && !isPro && navVisible && (

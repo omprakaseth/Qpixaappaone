@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { X, Clock, ShoppingCart, ArrowLeft, Trash2 } from 'lucide-react';
@@ -57,7 +57,56 @@ interface MarketplaceScreenProps {
   navVisible?: boolean;
 }
 
+const MOCK_MARKETPLACE_PROMPTS: MarketplacePrompt[] = [
+  {
+    id: 'mock-prompt-1',
+    creator_id: 'system',
+    creator_name: 'Qpixa Official',
+    title: 'Hyper-Realistic Portrait Master',
+    description: 'The ultimate prompt for generating hyper-realistic human portraits with perfect lighting.',
+    prompt_text: 'Hyper-realistic portrait of a person, 8k resolution, cinematic lighting, detailed skin texture, professional photography',
+    preview_image: 'https://picsum.photos/seed/portrait1/400/400',
+    preview_images: [
+      'https://picsum.photos/seed/portrait1/400/400',
+      'https://picsum.photos/seed/portrait2/400/400',
+      'https://picsum.photos/seed/portrait3/400/400'
+    ],
+    category: 'Portrait',
+    model_type: 'Gemini Image',
+    price: 150,
+    rating: 4.9,
+    sales_count: 1240,
+    is_featured: true,
+    is_trending: true,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'mock-prompt-2',
+    creator_id: 'system',
+    creator_name: 'Anime Studio',
+    title: 'Ghibli Style Landscape',
+    description: 'Generate beautiful landscapes in the iconic Studio Ghibli art style.',
+    prompt_text: 'Studio Ghibli style landscape, lush green hills, fluffy white clouds, peaceful atmosphere, vibrant colors',
+    preview_image: 'https://picsum.photos/seed/ghibli1/400/400',
+    preview_images: [
+      'https://picsum.photos/seed/ghibli1/400/400',
+      'https://picsum.photos/seed/ghibli2/400/400',
+      'https://picsum.photos/seed/ghibli3/400/400'
+    ],
+    category: 'Anime',
+    model_type: 'DALL-E',
+    price: 80,
+    rating: 4.7,
+    sales_count: 850,
+    is_featured: false,
+    is_trending: true,
+    created_at: new Date().toISOString(),
+  }
+];
+
 export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true }: MarketplaceScreenProps) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const { isLoggedIn, credits, refreshProfile } = useAppState();
   const { items: cartItems, addToCart, removeFromCart, isInCart, count: cartCount } = useCart();
   const [search, setSearch] = useState('');
@@ -118,20 +167,33 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
           }));
           
           if (formattedPrompts.length === 0) {
-            setPrompts([]);
+            setPrompts(MOCK_MARKETPLACE_PROMPTS);
           } else {
             setPrompts(formattedPrompts);
           }
         }
       } catch (err) {
         console.error('Error fetching prompts:', err);
-        setPrompts([]);
+        setPrompts(MOCK_MARKETPLACE_PROMPTS);
       } finally {
         setLoading(false);
       }
     };
 
     fetchPrompts();
+  }, []);
+
+  useEffect(() => {
+    if (!headerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        if (entry.target instanceof HTMLElement) {
+          setHeaderHeight(entry.target.offsetHeight);
+        }
+      }
+    });
+    observer.observe(headerRef.current);
+    return () => observer.disconnect();
   }, []);
 
   // Filter
@@ -190,6 +252,12 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   };
 
   const handleUsePrompt = async (prompt: MarketplacePrompt) => {
+    // If it's a mock prompt, just return a mock text
+    if (prompt.id.startsWith('mock-') || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !import.meta.env.VITE_SUPABASE_URL) {
+      onUsePrompt?.(`A detailed prompt for ${prompt.title}, featuring high quality elements and cinematic lighting.`);
+      return;
+    }
+
     // Fetch prompt text securely via RPC
     const { data, error } = await supabase.rpc('get_marketplace_prompt_text', { p_prompt_id: prompt.id });
     if (error) {
@@ -206,8 +274,13 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
       <div 
-        className={`sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-2 pb-3 transition-transform duration-300 ${!navVisible ? '-translate-y-full' : 'translate-y-0'}`} 
-        style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+        ref={headerRef}
+        className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-2 pb-3 transition-all duration-300 ease-in-out" 
+        style={{ 
+          paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
+          transform: !navVisible ? `translateY(-${headerHeight}px)` : 'translateY(0)',
+          marginBottom: !navVisible ? `-${headerHeight}px` : '0px'
+        }}
       >
         {/* Top row: title + icons */}
         <div className="flex items-center justify-between mb-3">

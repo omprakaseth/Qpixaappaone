@@ -95,6 +95,94 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     }
   };
 
+  const topHeaderRef = useRef<HTMLDivElement>(null);
+  const stickySectionRef = useRef<HTMLDivElement>(null);
+  const [topHeaderHeight, setTopHeaderHeight] = useState(0);
+  const [stickySectionHeight, setStickySectionHeight] = useState(0);
+
+  useEffect(() => {
+    if (!topHeaderRef.current || !stickySectionRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        if (entry.target === topHeaderRef.current) {
+          setTopHeaderHeight(topHeaderRef.current.offsetHeight);
+        } else if (entry.target === stickySectionRef.current) {
+          setStickySectionHeight(stickySectionRef.current.offsetHeight);
+        }
+      }
+    });
+    observer.observe(topHeaderRef.current);
+    observer.observe(stickySectionRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const lastScrollTop = useRef(0);
+  const accumulatedDelta = useRef(0);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+
+    const handleScroll = () => {
+      const currentScroll = scrollEl.scrollTop;
+      const delta = currentScroll - lastScrollTop.current;
+
+      // Reset at top
+      if (currentScroll <= 0) {
+        setIsHeaderHidden(false);
+        accumulatedDelta.current = 0;
+        lastScrollTop.current = 0;
+        return;
+      }
+
+      // Ignore micro scrolls
+      if (Math.abs(delta) < 5) return;
+
+      // Threshold: only start hiding after 20px
+      if (currentScroll < 20) {
+        setIsHeaderHidden(false);
+        return;
+      }
+
+      if ((delta > 0 && accumulatedDelta.current > 0) || (delta < 0 && accumulatedDelta.current < 0)) {
+        accumulatedDelta.current += delta;
+      } else {
+        accumulatedDelta.current = delta;
+      }
+
+      // Debounce logic for smoothness
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+      scrollTimeout.current = setTimeout(() => {
+        const showThreshold = 15;
+        const hideThreshold = 30;
+
+        if (delta > 0 && !isHeaderHidden) {
+          // Meaningful scroll down
+          if (Math.abs(accumulatedDelta.current) > hideThreshold) {
+            setIsHeaderHidden(true);
+            accumulatedDelta.current = 0;
+          }
+        } else if (delta < 0 && isHeaderHidden) {
+          // Meaningful scroll up
+          if (Math.abs(accumulatedDelta.current) > showThreshold) {
+            setIsHeaderHidden(false);
+            accumulatedDelta.current = 0;
+          }
+        }
+      }, 50);
+
+      lastScrollTop.current = currentScroll;
+    };
+
+    scrollEl.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      scrollEl.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    };
+  }, [scrollRef, isHeaderHidden]);
+
   return (
     <div
       ref={scrollRef}
@@ -103,14 +191,23 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       onTouchEnd={handleTouchEnd}
     >
       <div 
-        className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm transition-transform duration-300" 
+        className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm transition-transform duration-300 ease-in-out" 
         style={{ 
-          paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
-          transform: navVisible ? 'translateY(0)' : 'translateY(-100%)'
+          transform: isHeaderHidden ? `translateY(-${topHeaderHeight}px)` : 'translateY(0)',
+          marginBottom: isHeaderHidden ? `-${topHeaderHeight}px` : '0px'
         }}
       >
-        <div>
-          <div className="flex items-center justify-between px-4 pb-3">
+        {/* Top Header: Hides on scroll */}
+        <div 
+          ref={topHeaderRef}
+          className="transition-opacity duration-200"
+          style={{ 
+            opacity: isHeaderHidden ? 0 : 1,
+            paddingTop: 'max(env(safe-area-inset-top), 0.5rem)'
+          }}
+        >
+          {/* R1: Logo & Actions */}
+          <div className="flex items-center justify-between px-4 pb-3 h-[52px]">
             <h1 className="text-xl font-bold">
               <span className="text-primary">Q</span>
               <span className="text-foreground">pixa</span>
@@ -132,65 +229,70 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           </div>
         </div>
 
-        <div className="px-4 pb-3 flex gap-2 pt-1">
-          <div className="flex-1 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
-            <Search size={16} className="text-muted-foreground mr-2" />
-            <input
-              type="search"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-              placeholder="Search prompts..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
-            />
+        {/* Sticky Section: Always visible */}
+        <div ref={stickySectionRef}>
+          {/* R2: Search Bar */}
+          <div className="px-4 pb-3 flex gap-2 pt-1 h-[56px]">
+            <div className="flex-1 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
+              <Search size={16} className="text-muted-foreground mr-2" />
+              <input
+                type="search"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Search prompts..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
+              />
+            </div>
+            <button
+              onClick={onCreatePost}
+              className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center"
+            >
+              <Plus size={20} />
+            </button>
           </div>
-          <button
-            onClick={onCreatePost}
-            className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center"
-          >
-            <Plus size={20} />
-          </button>
-        </div>
 
-        <div className="flex items-center gap-2 px-4 pb-3">
-          <button
-            onClick={() => setExplorerOpen(true)}
-            className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary text-foreground flex items-center justify-center transition-colors hover:bg-secondary/80"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-              <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-              <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-              <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setFilterOpen(true)}
-            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-              Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-foreground'
-            }`}
-          >
-            <SlidersHorizontal size={14} />
-          </button>
-          <div className="w-[1px] h-4 bg-border mx-1 flex-shrink-0" />
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
-                  activeCategory === cat
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          {/* R3: Categories */}
+          <div className="flex items-center gap-2 px-4 pb-2 h-[40px]">
+            <button
+              onClick={() => setExplorerOpen(true)}
+              className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary text-foreground flex items-center justify-center transition-colors hover:bg-secondary/80"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+                <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setFilterOpen(true)}
+              className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-foreground'
+              }`}
+            >
+              <SlidersHorizontal size={14} />
+            </button>
+            <div className="w-[1px] h-4 bg-border mx-1 flex-shrink-0" />
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
+                    activeCategory === cat
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary text-secondary-foreground'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -201,12 +303,12 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         </div>
       )}
 
-      <div className="px-4 pb-safe-nav">
+      <div className="px-4 pb-safe-nav transition-all duration-300 ease-in-out">
         {activeCategory === 'Trending' && topThisMonth.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp size={18} className="text-primary" />
-              <h2 className="text-sm font-bold">Top This Month</h2>
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp size={16} className="text-primary" />
+              <h2 className="text-xs font-bold">Top This Month</h2>
             </div>
             <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
               {topThisMonth.map(post => (

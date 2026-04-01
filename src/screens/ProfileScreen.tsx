@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
@@ -28,11 +28,14 @@ interface UserPrompt {
 }
 
 export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, onPostTap, navVisible = true }: ProfileScreenProps) {
+  const headerRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const { isLoggedIn, profile, user, refreshProfile } = useAppState();
   const { followingIds } = useFollows();
   const [activeTab, setActiveTab] = useState<'posts' | 'shorts' | 'prompts' | 'about'>('posts');
   const [myPrompts, setMyPrompts] = useState<UserPrompt[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [myShorts, setMyShorts] = useState<any[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
   const [earnings, setEarnings] = useState({ totalSales: 0, totalEarnings: 0, avgRating: 0 });
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -43,9 +46,39 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     if (user) {
       fetchMyPrompts();
       fetchMyPosts();
+      fetchMyShorts();
       fetchFollowerCount();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!headerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        if (entry.target instanceof HTMLElement) {
+          setHeaderHeight(entry.target.offsetHeight);
+        }
+      }
+    });
+    observer.observe(headerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const fetchMyShorts = async () => {
+    if (!user) return;
+    const { data, error } = await (supabase
+      .from('shorts' as any) as any)
+      .select('*')
+      .eq('creator_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching shorts:', error);
+      setMyShorts([]);
+    } else {
+      setMyShorts(data || []);
+    }
+  };
 
   const fetchMyPosts = async () => {
     if (!user) return;
@@ -168,8 +201,13 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
         {/* Header */}
         <div 
-          className={`sticky top-0 z-20 bg-background/95 backdrop-blur-md px-4 pt-2 pb-3 flex items-center justify-between transition-transform duration-300 ${!navVisible ? '-translate-y-full' : 'translate-y-0'}`} 
-          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+          ref={headerRef}
+          className="sticky top-0 z-20 bg-background/95 backdrop-blur-md px-4 pt-2 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out" 
+          style={{ 
+            paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
+            transform: !navVisible ? `translateY(-${headerHeight}px)` : 'translateY(0)',
+            marginBottom: !navVisible ? `-${headerHeight}px` : '0px'
+          }}
         >
           <h1 className="text-lg font-bold text-foreground">@{username}</h1>
           <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
@@ -296,13 +334,34 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           )}
 
           {activeTab === 'shorts' && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-3">
-                <PlaySquare size={28} className="text-muted-foreground/40" />
+            myShorts.length > 0 ? (
+              <div className="grid grid-cols-3 gap-0.5">
+                {myShorts.map(s => (
+                  <button key={s.id} className="relative aspect-[9/16] overflow-hidden group active:opacity-80 transition-opacity bg-secondary">
+                    <video 
+                      src={s.video_url} 
+                      className="w-full h-full object-cover"
+                      onMouseOver={e => (e.target as HTMLVideoElement).play()}
+                      onMouseOut={e => (e.target as HTMLVideoElement).pause()}
+                      muted
+                      loop
+                    />
+                    <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
+                      <PlaySquare size={10} className="text-white fill-white" />
+                      <span className="text-[10px] font-bold text-white">{s.views || 0}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
-              <p className="text-sm font-semibold text-foreground">No Shorts Yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Your short videos will appear here</p>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16">
+                <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-3">
+                  <PlaySquare size={28} className="text-muted-foreground/40" />
+                </div>
+                <p className="text-sm font-semibold text-foreground">No Shorts Yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Your short videos will appear here</p>
+              </div>
+            )
           )}
 
           {activeTab === 'prompts' && (

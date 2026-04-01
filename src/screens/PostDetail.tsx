@@ -1,12 +1,14 @@
-import { useState } from 'react';
-import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert } from 'lucide-react';
-import { formatNumber } from '@/lib/utils';
+import { useState, useRef } from 'react';
+import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert, Sparkles, Check, X } from 'lucide-react';
+import { formatNumber, cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import { Post } from '@/context/AppContext';
 import { useAppState } from '@/context/AppContext';
 import { useFollows } from '@/hooks/useFollows';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface PostDetailProps {
   post: Post;
@@ -113,225 +115,209 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   return (
     <div className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide animate-in slide-in-from-bottom-4 fade-in duration-300">
       {/* Header */}
-      <div className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3 bg-background/95 backdrop-blur-sm safe-top">
-        <button onClick={onBack} className="active:scale-95 transition-transform">
-          <ArrowLeft size={22} className="text-foreground" />
+      <div className="sticky top-0 z-50 flex items-center gap-3 px-4 py-3 bg-background/80 backdrop-blur-md safe-top">
+        <button onClick={onBack} className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center active:scale-95 transition-transform">
+          <ArrowLeft size={20} className="text-foreground" />
         </button>
-        <h1 className="text-base font-bold text-foreground flex-1 truncate">{post.title}</h1>
-        {isOwner ? (
-          <button onClick={() => setShowDeleteConfirm(true)} className="active:scale-95 transition-transform text-destructive">
-            <Trash2 size={20} />
-          </button>
-        ) : (
-          <button onClick={() => setShowReportConfirm(true)} className="active:scale-95 transition-transform text-muted-foreground hover:text-destructive">
-            <ShieldAlert size={20} />
-          </button>
-        )}
-      </div>
-
-      {showReportConfirm && (
-        <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-card rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-foreground mb-2">Report Copyright Violation?</h3>
-            <p className="text-sm text-muted-foreground mb-6">If you believe this content violates copyright or community guidelines, please report it. False reports may lead to account suspension.</p>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowReportConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl bg-secondary text-secondary-foreground font-semibold"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleReport}
-                className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold"
-              >
-                Report
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-card rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-bold text-foreground mb-2">Delete Post?</h3>
-            <p className="text-sm text-muted-foreground mb-6">This action cannot be undone. Are you sure you want to delete this post?</p>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl bg-secondary text-secondary-foreground font-semibold"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleDelete}
-                className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Image */}
-      <div className="relative cursor-pointer" onClick={() => setZoomed(!zoomed)}>
-        <WatermarkedImage
-          src={post.imageUrl}
-          alt={post.title}
-          className={`w-full transition-transform duration-300 ${zoomed ? 'scale-150' : 'scale-100'}`}
-          isPro={isPro}
-        />
-        <div className="absolute bottom-3 right-3 bg-black/50 rounded-full p-2">
-          {zoomed ? <ZoomOut size={16} className="text-white" /> : <ZoomIn size={16} className="text-white" />}
-        </div>
-      </div>
-
-      {/* Creator - tappable */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <button
-          onClick={() => onCreatorTap?.(post.creator.name, post.creator.id)}
-          className="flex items-center gap-2.5 active:opacity-70 transition-opacity"
-        >
-          <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-            <span className="text-sm font-bold text-secondary-foreground">{post.creator.initials}</span>
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-foreground flex items-center gap-1">
-              {post.creator.name} {post.creator.isVerified && <VerifiedBadge size={14} />}
-            </p>
-            <p className="text-[11px] text-muted-foreground">{post.creator.username}</p>
-          </div>
-        </button>
-        <button
-          onClick={handleFollow}
-          disabled={followLoading || isOwner}
-          className={`px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-all ${
-            following
-              ? 'bg-secondary text-secondary-foreground'
-              : 'bg-primary text-primary-foreground'
-          } ${isOwner ? 'opacity-50 cursor-not-allowed hidden' : ''}`}
-        >
-          {following ? <UserMinus size={14} /> : <UserPlus size={14} />}
-          {following ? 'Following' : 'Follow'}
-        </button>
-      </div>
-
-      {/* Prompt */}
-      <div className="px-4 pb-3">
-        <h3 className="text-xs font-semibold text-muted-foreground mb-1">PROMPT</h3>
-        <p className="text-sm text-foreground leading-relaxed">{post.prompt}</p>
-      </div>
-
-      {/* Tags */}
-      <div className="px-4 pb-3 flex flex-wrap gap-1.5">
-        {post.tags.map(tag => (
-          <span key={tag} className="px-2.5 py-1 rounded-full bg-secondary text-xs text-secondary-foreground">
-            #{tag}
-          </span>
-        ))}
-      </div>
-
-      {/* Stats - interactive */}
-      <div className="flex items-center gap-4 px-4 py-3 border-t border-border">
-        <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-          <Eye size={16} /> {formatNumber(post.views)}
-        </span>
-        <button onClick={handleLike} className="flex items-center gap-1.5 text-sm text-muted-foreground active:scale-95 transition-transform">
-          <Heart size={16} fill={post.isLiked ? 'hsl(var(--primary))' : 'none'} color={post.isLiked ? 'hsl(var(--primary))' : 'currentColor'} />
-          {formatNumber(post.likes)}
-        </button>
-        <button onClick={() => toggleSave(post.id)} className="flex items-center gap-1.5 text-sm text-muted-foreground active:scale-95 transition-transform">
-          <Bookmark size={16} fill={post.isSaved ? 'hsl(var(--primary))' : 'none'} color={post.isSaved ? 'hsl(var(--primary))' : 'currentColor'} />
-          {formatNumber(post.saves)}
-        </button>
-      </div>
-
-      {/* Actions */}
-      <div className="grid grid-cols-2 gap-2.5 px-4 py-3 pb-8">
-        <button
-          onClick={handleCopy}
-          className="py-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-        >
-          <Copy size={16} /> Copy Prompt
-        </button>
-        <button
-          onClick={handleDownload}
-          className="py-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-        >
-          <Download size={16} /> Download
-        </button>
-        <button
-          onClick={handleShare}
-          className="py-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-        >
-          <Share2 size={16} /> Share
-        </button>
-        <button
-          onClick={() => toggleSave(post.id)}
-          className="py-3 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-        >
-          <Bookmark size={16} fill={post.isSaved ? 'hsl(var(--primary))' : 'none'} color={post.isSaved ? 'hsl(var(--primary))' : 'currentColor'} />
-          {post.isSaved ? 'Saved' : 'Save'}
-        </button>
-        <button
-          onClick={() => onUsePrompt?.(post.prompt)}
-          className="py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center gap-2 col-span-2 active:scale-[0.97] transition-transform"
-        >
-          <Play size={16} /> Use Prompt
-        </button>
-      </div>
-
-      {/* Reviews Section */}
-      <div className="px-4 pb-12 border-t border-border pt-4">
-        <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
-          <MessageSquare size={16} /> Reviews ({reviews.length})
-        </h3>
-        
-        <div className="bg-secondary/50 rounded-xl p-3 mb-6">
-          <div className="flex items-center gap-1 mb-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button key={star} onClick={() => setRating(star)}>
-                <Star size={20} fill={star <= rating ? '#FFB800' : 'none'} color={star <= rating ? '#FFB800' : 'currentColor'} className="text-muted-foreground" />
-              </button>
-            ))}
-          </div>
-          <textarea
-            value={reviewText}
-            onChange={(e) => setReviewText(e.target.value)}
-            placeholder="Write a review..."
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none mb-2"
-            rows={2}
-          />
-          <div className="flex justify-end">
-            <button
-              onClick={handleSubmitReview}
-              className="px-4 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg active:scale-95 transition-transform"
-            >
-              Submit
+        <h1 className="text-sm font-bold text-foreground flex-1 truncate">{post.title}</h1>
+        <div className="flex items-center gap-2">
+          {isOwner ? (
+            <button onClick={() => setShowDeleteConfirm(true)} className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center active:scale-95 transition-transform text-destructive">
+              <Trash2 size={18} />
             </button>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {reviews.map((review, idx) => (
-            <div key={idx} className="border-b border-border/50 pb-3 last:border-0">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-bold text-foreground">{review.user}</span>
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={10} fill={i < review.rating ? '#FFB800' : 'none'} color={i < review.rating ? '#FFB800' : 'currentColor'} className="text-muted-foreground" />
-                  ))}
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">{review.text}</p>
-            </div>
-          ))}
-          {reviews.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">No reviews yet. Be the first!</p>
+          ) : (
+            <button onClick={() => setShowReportConfirm(true)} className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center active:scale-95 transition-transform text-muted-foreground hover:text-destructive">
+              <ShieldAlert size={18} />
+            </button>
           )}
         </div>
+      </div>
+
+      {/* Image Section */}
+      <div className="relative group">
+        <div className="cursor-pointer" onClick={() => setZoomed(!zoomed)}>
+          <WatermarkedImage
+            src={post.imageUrl}
+            alt={post.title}
+            className={cn(
+              "w-full transition-transform duration-500 ease-out",
+              zoomed ? 'scale-110' : 'scale-100'
+            )}
+            isPro={isPro}
+          />
+        </div>
+
+        {/* Image Overlays */}
+        <div className="absolute top-4 right-4 flex flex-col gap-3 z-10">
+          <button
+            onClick={handleLike}
+            className={cn(
+              "w-10 h-10 rounded-full backdrop-blur-md flex items-center justify-center transition-all active:scale-90 shadow-lg",
+              post.isLiked ? "bg-red-500 text-white" : "bg-black/30 text-white border border-white/10"
+            )}
+          >
+            <Heart size={20} className={post.isLiked ? "fill-current" : ""} />
+          </button>
+        </div>
+
+        <div className="absolute bottom-4 right-4 flex flex-col gap-3 z-10">
+          <button
+            onClick={handleDownload}
+            className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center text-white transition-all active:scale-90 shadow-lg"
+          >
+            <Download size={20} />
+          </button>
+          <button
+            onClick={handleShare}
+            className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-md border border-white/10 flex items-center justify-center text-white transition-all active:scale-90 shadow-lg"
+          >
+            <Share2 size={20} />
+          </button>
+          <button
+            onClick={() => toggleSave(post.id)}
+            className={cn(
+              "w-10 h-10 rounded-full backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-90 shadow-lg",
+              post.isSaved ? "bg-primary text-white" : "bg-black/30 text-white"
+            )}
+          >
+            <Bookmark size={20} className={post.isSaved ? "fill-current" : ""} />
+          </button>
+        </div>
+
+        <div className="absolute bottom-4 left-4 z-10">
+          <div className="bg-black/40 backdrop-blur-md border border-white/10 rounded-full px-3 py-1.5 flex items-center gap-2 text-white">
+            <Eye size={14} />
+            <span className="text-xs font-bold">{formatNumber(post.views)}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-5 pt-5 pb-32">
+        {/* Creator Row */}
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={() => onCreatorTap?.(post.creator.name, post.creator.id)}
+            className="flex items-center gap-3 active:opacity-70 transition-opacity"
+          >
+            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border">
+              {post.creator.avatar ? (
+                <img src={post.creator.avatar} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-sm font-bold text-foreground">{post.creator.initials}</span>
+              )}
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-foreground flex items-center gap-1">
+                {post.creator.name} {post.creator.isVerified && <VerifiedBadge size={14} />}
+              </p>
+              <p className="text-[11px] text-muted-foreground">{post.creator.username}</p>
+            </div>
+          </button>
+          <button
+            onClick={handleFollow}
+            disabled={followLoading || isOwner}
+            className={cn(
+              "px-5 py-2 rounded-full text-xs font-bold transition-all active:scale-95",
+              following ? "bg-secondary text-foreground" : "bg-primary text-primary-foreground",
+              isOwner && "hidden"
+            )}
+          >
+            {following ? 'Following' : 'Follow'}
+          </button>
+        </div>
+
+        {/* Prompt Section */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Prompt</h3>
+            <button 
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
+            >
+              <Copy size={12} /> COPY
+            </button>
+          </div>
+          <p className="text-sm text-foreground leading-relaxed font-medium bg-secondary/20 p-4 rounded-2xl border border-border/50">
+            {post.prompt}
+          </p>
+        </div>
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-2 mb-8">
+          {post.tags.map(tag => (
+            <span key={tag} className="px-3 py-1.5 rounded-full bg-secondary/50 text-[10px] font-bold text-muted-foreground border border-border/30">
+              #{tag.toUpperCase()}
+            </span>
+          ))}
+        </div>
+
+        {/* Reviews Section */}
+        <div className="border-t border-border pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <MessageSquare size={16} className="text-primary" /> 
+              Reviews ({reviews.length})
+            </h3>
+          </div>
+          
+          <div className="bg-secondary/30 rounded-2xl p-4 mb-6 border border-border/50">
+            <div className="flex items-center gap-1.5 mb-3">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button key={star} onClick={() => setRating(star)} className="transition-transform active:scale-110">
+                  <Star size={20} fill={star <= rating ? '#FFB800' : 'none'} color={star <= rating ? '#FFB800' : 'currentColor'} className={cn(star <= rating ? "text-yellow-400" : "text-muted-foreground/40")} />
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={reviewText}
+              onChange={(e) => setReviewText(e.target.value)}
+              placeholder="Share your thoughts..."
+              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none mb-3"
+              rows={2}
+            />
+            <div className="flex justify-end">
+              <button
+                onClick={handleSubmitReview}
+                className="px-6 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl active:scale-95 transition-all shadow-lg shadow-primary/20"
+              >
+                Submit Review
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {reviews.map((review, idx) => (
+              <div key={idx} className="bg-secondary/10 rounded-2xl p-4 border border-border/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-foreground">{review.user}</span>
+                  <div className="flex items-center gap-0.5">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} size={10} fill={i < review.rating ? '#FFB800' : 'none'} color={i < review.rating ? '#FFB800' : 'currentColor'} className="text-yellow-400" />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{review.text}</p>
+              </div>
+            ))}
+            {reviews.length === 0 && (
+              <div className="text-center py-8">
+                <MessageSquare size={32} className="mx-auto text-muted-foreground/20 mb-2" />
+                <p className="text-xs text-muted-foreground">No reviews yet. Be the first!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom CTA */}
+      <div className="fixed bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-background via-background to-transparent pt-10 z-50">
+        <Button
+          onClick={() => onUsePrompt?.(post.prompt)}
+          className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-bold text-base shadow-xl shadow-primary/20 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+        >
+          <Sparkles size={20} />
+          Use Prompt in Studio
+        </Button>
       </div>
     </div>
   );

@@ -1,250 +1,707 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ThumbsUp, ThumbsDown, MessageSquare, Share, Repeat, MoreVertical, Music, Heart } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Heart, 
+  MessageSquare, 
+  Share2, 
+  Sparkles, 
+  MoreVertical, 
+  Music, 
+  ChevronDown, 
+  ChevronUp,
+  X,
+  Flag,
+  Ban,
+  Bookmark,
+  Copy,
+  Video,
+  ArrowLeft,
+  Play,
+  Pause
+} from 'lucide-react';
+import { Drawer } from 'vaul';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
-const REELS_DATA = [
+interface Reel {
+  id: string;
+  videoUrl: string;
+  username: string;
+  profilePic: string;
+  description: string;
+  likes: string;
+  comments: string;
+  shares: string;
+  audio: string;
+  prompt: string;
+  isFollowing: boolean;
+  isLiked: boolean;
+  isSaved: boolean;
+}
+
+const MOCK_REELS: Reel[] = [
   {
-    id: '1',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    username: '@ai_creator',
-    description: 'How to generate viral AI videos in 10 seconds! 🤯 #ai #tech',
-    likes: '124K',
-    comments: '1,204',
-    shares: '45K',
-    audio: 'Original Audio - AI Creator',
+    id: 'mock-reel-1',
+    videoUrl: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+    username: 'cyber_artist',
+    profilePic: 'https://api.dicebear.com/7.x/avataaars/svg?seed=cyber',
+    description: 'AI Generated Cyberpunk Girl #AI #Cyberpunk',
+    likes: '1.2k',
+    comments: '45',
+    shares: '128',
+    audio: 'Cyberpunk 2077 - Rebel Path',
+    prompt: 'A girl standing in neon lights, futuristic fashion, high detail',
+    isFollowing: false,
+    isLiked: false,
+    isSaved: false,
   },
   {
-    id: '2',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    username: '@tech_hacks',
-    description: 'Top 3 AI tools you need in 2026. Number 2 is crazy! 🔥',
-    likes: '89K',
-    comments: '842',
-    shares: '12K',
-    audio: 'Trending Sound - Tech Hacks',
-  },
-  {
-    id: '3',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
-    username: '@future_now',
-    description: 'Behind the scenes of our new AI app update! 🚀',
-    likes: '250K',
-    comments: '3,400',
-    shares: '88K',
-    audio: 'Epic Cinematic - Future Now',
+    id: 'mock-reel-2',
+    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    username: 'nature_lover',
+    profilePic: 'https://api.dicebear.com/7.x/avataaars/svg?seed=nature',
+    description: 'Beautiful AI Nature Simulation #Nature #AI',
+    likes: '850',
+    comments: '23',
+    shares: '45',
+    audio: 'Birds Chirping - Nature Sounds',
+    prompt: 'A beautiful tree with yellow flowers, cinematic nature shot',
+    isFollowing: false,
+    isLiked: false,
+    isSaved: false,
   }
 ];
 
-export default function ShortsScreen() {
-  const [reels, setReels] = useState(REELS_DATA.map(r => ({ ...r, isLiked: false })));
-  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [isMuted, setIsMuted] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [showHeartAnimation, setShowHeartAnimation] = useState<number | null>(null);
+interface ShortsScreenProps {
+  onBack?: () => void;
+  onCreatorTap?: (username: string) => void;
+}
+
+export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps) {
+  const [viewMode, setViewMode] = useState<'Shorts' | 'Following'>('Shorts');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [reels, setReels] = useState<Reel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [showComments, setShowComments] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const observerOptions = {
-      root: containerRef.current,
-      rootMargin: '0px',
-      threshold: 0.6,
-    };
-
-    const handleIntersect = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry) => {
-        const video = entry.target as HTMLVideoElement;
-        const index = Number(video.dataset.index);
-
-        if (entry.isIntersecting) {
-          setActiveVideoIndex(index);
-          const playPromise = video.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              if (error.name !== 'AbortError') {
-                console.log("Auto-play prevented:", error);
-              }
-            });
-          }
-        } else {
-          video.pause();
-          video.currentTime = 0;
-        }
-      });
-    };
-
-    const observer = new IntersectionObserver(handleIntersect, observerOptions);
-
-    videoRefs.current.forEach((video) => {
-      if (video) observer.observe(video);
-    });
-
-    return () => observer.disconnect();
+    fetchReels();
   }, []);
 
-  const togglePlay = (index: number) => {
-    const video = videoRefs.current[index];
-    if (!video) return;
-
-    if (video.paused) {
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          if (error.name !== 'AbortError') {
-            console.log("Play prevented:", error);
-          }
-        });
+  const fetchReels = async () => {
+    try {
+      setLoading(true);
+      
+      // Skip fetch if using placeholder supabase URL
+      if (import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !import.meta.env.VITE_SUPABASE_URL) {
+        setReels(MOCK_REELS);
+        return;
       }
-    } else {
-      video.pause();
+
+      const { data, error } = await (supabase
+        .from('shorts' as any) as any)
+        .select('*, profiles(username, avatar_url)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedReels: Reel[] = data.map((item: any) => ({
+          id: item.id,
+          videoUrl: item.video_url,
+          username: item.profiles?.username || 'anonymous',
+          profilePic: item.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.id}`,
+          description: item.title || '',
+          likes: '1.2k',
+          comments: '45',
+          shares: '128',
+          audio: item.audio_name || 'Original Audio',
+          prompt: item.prompt || 'AI Generated Content',
+          isFollowing: false,
+          isLiked: false,
+          isSaved: false,
+        }));
+        if (formattedReels.length === 0) {
+          setReels(MOCK_REELS);
+        } else {
+          setReels(formattedReels);
+        }
+      }
+    } catch (error) {
+      // Suppress the console error to avoid cluttering when falling back to mock data
+      setReels(MOCK_REELS);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsMuted(!isMuted);
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current) return;
+    const index = Math.round(containerRef.current.scrollTop / containerRef.current.clientHeight);
+    if (index !== activeIndex) {
+      setActiveIndex(index);
+    }
+  }, [activeIndex]);
+
+  return (
+    <div className="h-full w-full bg-black relative overflow-hidden flex flex-col">
+      {/* Top Navigation - Glass Pill Style */}
+      <div className="absolute top-0 left-0 w-full z-50 px-4 pt-[max(env(safe-area-inset-top),1rem)] flex items-center justify-between pointer-events-none">
+        <button 
+          onClick={onBack}
+          className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-md text-white transition-all active:scale-90"
+        >
+          <ArrowLeft className="w-5 h-5 drop-shadow-md" />
+        </button>
+
+        <div className="relative pointer-events-auto absolute left-1/2 -translate-x-1/2">
+          <button 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-black/20 backdrop-blur-md text-white font-bold text-sm transition-all active:scale-95"
+          >
+            {viewMode}
+            <motion.div
+              animate={{ rotate: isDropdownOpen ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronDown className="w-4 h-4 opacity-80" />
+            </motion.div>
+          </button>
+
+          <AnimatePresence>
+            {isDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-36 bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50"
+              >
+                {(['Shorts', 'Following'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      setViewMode(mode);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={cn(
+                      "w-full px-4 py-3 text-sm font-bold text-left transition-colors hover:bg-white/5",
+                      viewMode === mode ? "text-white" : "text-white/40"
+                    )}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="w-10 h-10" /> {/* Spacer for centering */}
+      </div>
+
+      {/* Video Feed */}
+      <div 
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-scroll snap-y snap-mandatory no-scrollbar"
+      >
+        {loading ? (
+          <div className="h-full w-full flex flex-col items-center justify-center text-white/40 gap-4">
+            <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <p className="text-sm font-medium">Loading AI Shorts...</p>
+          </div>
+        ) : reels.length > 0 ? (
+          reels.map((reel, index) => (
+            <VideoItem 
+              key={reel.id}
+              reel={reel}
+              isActive={index === activeIndex}
+              onUpdateReel={(updated) => {
+                const newReels = [...reels];
+                newReels[index] = updated;
+                setReels(newReels);
+              }}
+              onShowComments={() => setShowComments(true)}
+              onCreatorTap={onCreatorTap}
+              onBack={onBack}
+            />
+          ))
+        ) : (
+          <div className="h-full w-full flex flex-col items-center justify-center text-white/40 gap-2">
+            <Video size={48} className="opacity-20 mb-2" />
+            <p className="text-sm font-medium">No shorts found</p>
+            <p className="text-xs">Be the first to upload a short!</p>
+          </div>
+        )}
+      </div>
+
+      {/* Comments Drawer */}
+      <Drawer.Root open={showComments} onOpenChange={setShowComments}>
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[100]" />
+          <Drawer.Content className="bg-zinc-950 border-t border-white/10 flex flex-col rounded-t-[32px] h-[75vh] fixed bottom-0 left-0 right-0 z-[101] outline-none">
+            <Drawer.Title className="sr-only">Comments</Drawer.Title>
+            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 my-4" />
+            
+            <div className="flex items-center justify-between px-6 pb-4 border-b border-white/5">
+              <h3 className="text-sm font-bold text-white">Comments</h3>
+              <button onClick={() => setShowComments(false)} className="p-1 rounded-full hover:bg-white/5 transition-colors">
+                <X size={18} className="text-white/60" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="flex flex-col items-center justify-center h-40 text-white/40">
+                <MessageSquare size={32} className="mb-3 opacity-20" />
+                <p className="text-sm font-medium">No comments yet</p>
+                <p className="text-xs mt-1">Be the first to share your thoughts!</p>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/5 bg-zinc-950 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3 border border-white/5">
+                <input 
+                  type="text" 
+                  placeholder="Add a comment..." 
+                  className="flex-1 bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
+                />
+                <button className="text-primary text-sm font-bold active:scale-95 transition-transform">Post</button>
+              </div>
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
+    </div>
+  );
+}
+
+interface VideoItemProps {
+  reel: Reel;
+  isActive: boolean;
+  onUpdateReel: (reel: Reel) => void;
+  onShowComments: () => void;
+  onCreatorTap?: (username: string) => void;
+  onBack?: () => void;
+}
+
+const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onShowComments, onCreatorTap, onBack }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [progress, setProgress] = useState(0);
+  const [isLiked, setIsLiked] = useState(reel.isLiked);
+  const [showHeart, setShowHeart] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(reel.isFollowing);
+  const [isSaved, setIsSaved] = useState(reel.isSaved);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  
+  // New states for loading, controls, and gestures
+  const [isBuffering, setIsBuffering] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showCenterIcon, setShowCenterIcon] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  
+  const lastTapRef = useRef(0);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartRef = useRef<{x: number, y: number} | null>(null);
+
+  useEffect(() => {
+    if (isActive && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    } else if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+      setIsPlaying(false);
+      setIsBuffering(true);
+    }
+  }, [isActive]);
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      const p = (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      setProgress(p);
+    }
   };
 
-  const handleLike = (index: number, forceLike: boolean = false) => {
-    setReels(prev => prev.map((reel, i) => {
-      if (i === index) {
-        return { ...reel, isLiked: forceLike ? true : !reel.isLiked };
+  const showControlsTemporarily = () => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 2500);
+  };
+
+  const handleVideoClick = (e: React.MouseEvent) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      // Double tap
+      if (!isLiked) {
+        setIsLiked(true);
+        onUpdateReel({ ...reel, isLiked: true });
+        // Background sync
+        if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+          (async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id });
+            }
+          })();
+        }
       }
-      return reel;
-    }));
+      setShowHeart(true);
+      setTimeout(() => setShowHeart(false), 800);
+    } else {
+      // Single tap - play/pause
+      if (videoRef.current) {
+        if (videoRef.current.paused) {
+          videoRef.current.play();
+          setIsPlaying(true);
+        } else {
+          videoRef.current.pause();
+          setIsPlaying(false);
+        }
+        setShowCenterIcon(true);
+        setTimeout(() => setShowCenterIcon(false), 1000);
+        showControlsTemporarily();
+      }
+    }
+    lastTapRef.current = now;
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!videoRef.current) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const x = clientX - rect.left;
+    const p = x / rect.width;
+    videoRef.current.currentTime = p * videoRef.current.duration;
+    showControlsTemporarily();
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
     
-    if (forceLike || !reels[index].isLiked) {
-      // Show heart animation
-      setShowHeartAnimation(index);
-      setTimeout(() => setShowHeartAnimation(null), 1000);
+    // Check if it's a horizontal swipe (more horizontal than vertical, and significant distance)
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx > 0) {
+        // Swipe right -> Exit
+        onBack?.();
+      } else {
+        // Swipe left -> Creator profile
+        onCreatorTap?.(reel.username);
+      }
     }
-  };
-
-  const handleVideoClick = (index: number) => {
-    if (clickTimeoutRef.current) {
-      // Double click
-      clearTimeout(clickTimeoutRef.current);
-      clickTimeoutRef.current = null;
-      handleLike(index, true);
-    } else {
-      // Single click
-      clickTimeoutRef.current = setTimeout(() => {
-        togglePlay(index);
-        clickTimeoutRef.current = null;
-      }, 250);
-    }
-  };
-
-  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    const video = e.currentTarget;
-    const currentProgress = (video.currentTime / video.duration) * 100;
-    setProgress(currentProgress || 0);
+    touchStartRef.current = null;
   };
 
   return (
-    <div 
-      ref={containerRef}
-      className="h-full w-full bg-black overflow-y-scroll snap-y snap-mandatory scrollbar-hide relative"
-    >
-      <div className="absolute top-0 left-0 w-full p-4 pt-safe-top z-20 flex justify-between items-center pointer-events-none">
-        <h1 className="text-xl font-bold text-white drop-shadow-md">Shorts</h1>
-        <button className="pointer-events-auto p-2">
-          <MoreVertical className="w-6 h-6 text-white drop-shadow-md" />
-        </button>
-      </div>
-
-      {reels.map((reel, index) => (
-        <div 
-          key={reel.id} 
-          className="h-full w-full snap-start snap-always relative bg-zinc-900"
-        >
-          <video
-            ref={(el) => (videoRefs.current[index] = el)}
-            data-index={index}
+    <div className="h-full w-full snap-start relative bg-black flex items-center justify-center overflow-hidden">
+      {/* Video Container - Truly Fullscreen */}
+      <div 
+        className="relative w-full h-full overflow-hidden bg-zinc-950"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {reel.videoUrl && !hasError ? (
+          <motion.video
+            ref={videoRef}
+            src={reel.videoUrl}
             className="w-full h-full object-cover"
             loop
-            muted={isMuted}
             playsInline
-            preload="auto"
-            poster={`https://picsum.photos/seed/${reel.id}/600/1000`}
-            onClick={() => handleVideoClick(index)}
             onTimeUpdate={handleTimeUpdate}
-          >
-            <source src={reel.videoUrl} type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
-
-          {/* Double Tap Heart Animation */}
-          {showHeartAnimation === index && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-              <Heart className="w-32 h-32 text-white fill-white animate-in zoom-in duration-300 fade-out-0 slide-out-to-top-8" />
-            </div>
-          )}
-
-          {/* Right Action Column */}
-          <div className="absolute right-2 bottom-[calc(56px+env(safe-area-inset-bottom)+24px)] flex flex-col items-center gap-5 z-10">
-            <button className="flex flex-col items-center gap-1 group" onClick={() => handleLike(index)}>
-              <ThumbsUp className={`w-7 h-7 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] ${reel.isLiked ? 'fill-white text-white' : 'text-white fill-transparent'}`} strokeWidth={1.5} />
-              <span className="text-white text-[11px] font-semibold drop-shadow-md">{reel.likes}</span>
+            onClick={handleVideoClick}
+            onWaiting={() => setIsBuffering(true)}
+            onPlaying={() => { setIsBuffering(false); setIsPlaying(true); }}
+            onCanPlay={() => setIsBuffering(false)}
+            animate={{ scale: isActive ? 1.02 : 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            onError={(e) => {
+              console.error('Video load error');
+              setHasError(true);
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 px-10 text-center">
+            <Video size={48} className="text-white/20 mb-4" />
+            <p className="text-white/40 text-sm font-medium">Video failed to load</p>
+            <button 
+              onClick={() => setHasError(false)}
+              className="mt-6 px-6 py-2 rounded-full bg-white/10 text-white/80 text-xs font-bold hover:bg-white/20 transition-colors"
+            >
+              Retry
             </button>
-
-            <button className="flex flex-col items-center gap-1 group">
-              <ThumbsDown className="w-7 h-7 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] fill-transparent" strokeWidth={1.5} />
-              <span className="text-white text-[11px] font-semibold drop-shadow-md">Dislike</span>
-            </button>
-
-            <button className="flex flex-col items-center gap-1 group">
-              <MessageSquare className="w-7 h-7 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] fill-transparent" strokeWidth={1.5} />
-              <span className="text-white text-[11px] font-semibold drop-shadow-md">{reel.comments}</span>
-            </button>
-
-            <button className="flex flex-col items-center gap-1 group">
-              <Share className="w-7 h-7 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] fill-transparent" strokeWidth={1.5} />
-              <span className="text-white text-[11px] font-semibold drop-shadow-md">Share</span>
-            </button>
-
-            <button className="flex flex-col items-center gap-1 group">
-              <Repeat className="w-7 h-7 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" strokeWidth={1.5} />
-              <span className="text-white text-[11px] font-semibold drop-shadow-md">Remix</span>
-            </button>
-
-            <div className="w-10 h-10 mt-2 rounded-lg overflow-hidden border-2 border-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-              <img src={`https://picsum.photos/seed/${reel.username}/100/100`} alt="avatar" className="w-full h-full object-cover" />
-            </div>
           </div>
+        )}
 
-          {/* Bottom Left Info */}
-          <div className="absolute bottom-[calc(56px+env(safe-area-inset-bottom))] left-0 w-[80%] p-4 pb-6 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10 pointer-events-none">
-            <div className="flex items-center gap-2 mb-2 pointer-events-auto">
-              <h3 className="text-white font-bold text-[15px] drop-shadow-md">{reel.username}</h3>
-              <button className="px-3 py-1 rounded-full bg-white text-black text-xs font-bold ml-2">
-                Subscribe
-              </button>
-            </div>
-            
-            <p className="text-white text-sm mb-3 drop-shadow-md line-clamp-2 pointer-events-auto">
-              {reel.description}
-            </p>
-            
-            <div className="flex items-center gap-2 text-white/90 pointer-events-auto">
-              <Music className="w-4 h-4 animate-pulse" />
-              <div className="w-[80%] overflow-hidden">
-                <div className="whitespace-nowrap animate-[marquee_5s_linear_infinite] text-sm font-medium">
-                  {reel.audio} • {reel.audio}
+        {/* Loading Spinner */}
+        <AnimatePresence>
+          {isBuffering && !hasError && (
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center bg-black/20 z-30 pointer-events-none"
+            >
+              <div className="w-10 h-10 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Center Play/Pause Icon */}
+        <AnimatePresence>
+          {showCenterIcon && (
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 1.5, opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-40"
+            >
+              <div className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center">
+                {isPlaying ? <Play className="w-8 h-8 text-white fill-white ml-1" /> : <Pause className="w-8 h-8 text-white fill-white" />}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Double Tap Heart */}
+        <AnimatePresence>
+          {showHeart && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1.2, opacity: 1 }}
+              exit={{ scale: 1.5, opacity: 0 }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none z-40"
+            >
+              <Heart className="w-24 h-24 text-white fill-white drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Bottom Gradient Overlay - More intense for readability */}
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none z-10" />
+
+        {/* Hide interactions while buffering */}
+        <AnimatePresence>
+          {!isBuffering && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 pointer-events-none z-20"
+            >
+              {/* Right Side Actions - AI Focused */}
+              <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3 pointer-events-auto">
+                <div className="flex flex-col items-center gap-1">
+                  <button 
+                    onClick={() => {
+                      const newLikedState = !isLiked;
+                      setIsLiked(newLikedState);
+                      onUpdateReel({ ...reel, isLiked: newLikedState });
+                      
+                      // Background sync
+                      if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+                        (async () => {
+                          const { data: { user } } = await supabase.auth.getUser();
+                          if (user) {
+                            if (newLikedState) {
+                              await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id });
+                            } else {
+                              await supabase.from('post_likes').delete().eq('post_id', reel.id).eq('user_id', user.id);
+                            }
+                          }
+                        })();
+                      }
+                    }}
+                    className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
+                  >
+                    <Heart className={cn("w-6 h-6 transition-colors drop-shadow-md", isLiked ? "fill-red-500 text-red-500" : "text-white group-hover:text-white/80")} />
+                  </button>
+                  <span className="text-[11px] font-bold text-white drop-shadow-md">{reel.likes}</span>
+                </div>
+
+                <div className="flex flex-col items-center gap-1">
+                  <button 
+                    onClick={() => onShowComments()}
+                    className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
+                  >
+                    <MessageSquare className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
+                  </button>
+                  <span className="text-[11px] font-bold text-white drop-shadow-md">{reel.comments}</span>
+                </div>
+
+                <div className="flex flex-col items-center gap-1">
+                  <button 
+                    onClick={() => {
+                      if (navigator.share) {
+                        navigator.share({
+                          title: `Check out @${reel.username}'s AI Short`,
+                          text: reel.description,
+                          url: window.location.href,
+                        }).catch(() => {});
+                      }
+                    }}
+                    className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
+                  >
+                    <Share2 className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
+                  </button>
+                  <span className="text-[11px] font-bold text-white drop-shadow-md">{reel.shares}</span>
+                </div>
+
+                {reel.prompt && (
+                  <div className="flex flex-col items-center gap-1">
+                    <button 
+                      onClick={() => toast.success('Analyzing content to generate similar...')}
+                      className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
+                    >
+                      <Sparkles className="w-6 h-6 text-primary drop-shadow-md group-hover:text-primary/80" />
+                    </button>
+                    <span className="text-[11px] font-bold text-primary drop-shadow-md">Remix</span>
+                  </div>
+                )}
+
+                <button 
+                  onClick={() => setIsMoreMenuOpen(true)}
+                  className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group mt-1"
+                >
+                  <MoreVertical className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
+                </button>
+              </div>
+
+              {/* Bottom Left Creator Section */}
+              <div className="absolute left-4 bottom-10 right-20 flex flex-col gap-3 pointer-events-auto">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-11 h-11 rounded-full border-2 border-white/30 overflow-hidden shadow-2xl flex-shrink-0 cursor-pointer"
+                    onClick={() => onCreatorTap?.(reel.username)}
+                  >
+                    <img src={reel.profilePic} alt={reel.username} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className="text-white font-bold text-sm drop-shadow-md cursor-pointer"
+                      onClick={() => onCreatorTap?.(reel.username)}
+                    >
+                      @{reel.username}
+                    </span>
+                    <button 
+                      onClick={() => {
+                        setIsFollowing(!isFollowing);
+                        onUpdateReel({ ...reel, isFollowing: !isFollowing });
+                      }}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-[11px] font-bold border transition-all active:scale-95",
+                        isFollowing 
+                          ? "bg-white/10 border-white/20 text-white/60" 
+                          : "bg-white border-white text-black"
+                      )}
+                    >
+                      {isFollowing ? 'Following' : 'Follow'}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <p className="text-white text-sm font-medium line-clamp-2 leading-relaxed drop-shadow-md">
+                    {reel.description}
+                  </p>
+                  <div className="flex items-center gap-2 text-white/80 text-xs w-fit">
+                    <Music className="w-3 h-3 animate-[spin_3s_linear_infinite]" />
+                    <span className="font-medium truncate max-w-[150px]">{reel.audio}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          {/* Progress Bar */}
-          <div className="absolute bottom-[calc(56px+env(safe-area-inset-bottom))] left-0 w-full h-[2px] bg-white/20 z-20">
-            <div 
-              className="h-full bg-red-600 transition-all duration-100 ease-linear" 
-              style={{ width: activeVideoIndex === index ? `${progress}%` : '0%' }}
-            />
-          </div>
-        </div>
-      ))}
+        {/* Interactive Progress Bar */}
+        <AnimatePresence>
+          {showControls && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-0 left-0 w-full h-6 flex items-end cursor-pointer z-30 group"
+              onClick={handleSeek}
+            >
+              <div className="w-full h-[3px] bg-white/20 relative overflow-hidden group-hover:h-[6px] transition-all">
+                <motion.div 
+                  className="absolute top-0 left-0 h-full bg-primary shadow-[0_0_12px_rgba(var(--primary),0.8)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* More Menu Bottom Sheet */}
+      <Drawer.Root open={isMoreMenuOpen} onOpenChange={setIsMoreMenuOpen}>
+        <Drawer.Portal>
+          <Drawer.Overlay className="fixed inset-0 bg-black/60 z-[100]" />
+          <Drawer.Content className="bg-zinc-950 border-t border-white/10 flex flex-col rounded-t-[32px] h-auto max-h-[80vh] fixed bottom-0 left-0 right-0 z-[101] outline-none">
+            <Drawer.Title className="sr-only">Video Options</Drawer.Title>
+            <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 my-4" />
+            <div className="p-4 pt-0 overflow-y-auto">
+              <div className="grid grid-cols-1 gap-1">
+                <button 
+                  onClick={() => {
+                    setIsSaved(!isSaved);
+                    onUpdateReel({ ...reel, isSaved: !isSaved });
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-white transition-colors"
+                >
+                  <Bookmark className={cn("w-6 h-6", isSaved && "fill-white")} />
+                  <span className="font-bold">Save to Collection</span>
+                </button>
+                
+                <button className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-white transition-colors">
+                  <Ban className="w-6 h-6" />
+                  <span className="font-bold">Not Interested</span>
+                </button>
+                
+                <button className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-red-500 transition-colors">
+                  <Flag className="w-6 h-6" />
+                  <span className="font-bold">Report Content</span>
+                </button>
+                
+                <div className="h-px bg-white/5 my-2 mx-4" />
+                
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(reel.prompt);
+                    setIsMoreMenuOpen(false);
+                    toast.success('Prompt copied!');
+                  }}
+                  className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-white transition-colors"
+                >
+                  <Copy className="w-6 h-6" />
+                  <div className="flex flex-col items-start">
+                    <span className="font-bold">Copy AI Prompt</span>
+                    <span className="text-xs text-white/40 truncate max-w-[250px]">{reel.prompt}</span>
+                  </div>
+                </button>
+              </div>
+              
+              <button 
+                onClick={() => setIsMoreMenuOpen(false)}
+                className="mt-4 w-full py-4 rounded-2xl bg-white/5 text-white font-bold text-sm transition-all active:scale-[0.98]"
+              >
+                Close
+              </button>
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
     </div>
   );
 }
