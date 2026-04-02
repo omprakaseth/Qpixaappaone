@@ -20,86 +20,143 @@ export default function AdminSettings() {
 
   const toggleSetting = async (key: string, current: string) => {
     const newVal = current === 'true' ? 'false' : 'true';
-    const { error } = await supabase.from('admin_settings').update({ value: newVal }).eq('key', key);
+    const { error } = await supabase.from('admin_settings').upsert({ key, value: newVal }, { onConflict: 'key' });
     if (error) { toast.error(error.message); return; }
     toast.success(`${key.replace(/_/g, ' ')} ${newVal === 'true' ? 'enabled' : 'disabled'}`);
     fetchSettings();
   };
 
   const updateSetting = async (key: string, value: string) => {
-    const { error } = await supabase.from('admin_settings').update({ value }).eq('key', key);
+    const { error } = await supabase.from('admin_settings').upsert({ key, value }, { onConflict: 'key' });
     if (error) { toast.error(error.message); return; }
     toast.success('Setting updated');
     fetchSettings();
   };
 
-  const toggleSettings = ['enable_studio', 'enable_ads', 'enable_creator_profiles', 'watermark_enabled'];
+  const toggleSettings = [
+    'enable_studio', 
+    'enable_ads', 
+    'enable_creator_profiles', 
+    'watermark_enabled', 
+    'show_get_pro',
+    'enable_registration',
+    'maintenance_mode',
+    'enable_search',
+    'enable_subscriptions'
+  ];
 
   const labels: Record<string, string> = {
     enable_studio: 'Enable Studio',
     enable_ads: 'Enable Ads',
     enable_creator_profiles: 'Enable Creator Profiles',
     watermark_enabled: 'Enable Watermark',
+    show_get_pro: 'Show Get Pro Button',
+    enable_registration: 'Allow New Registrations',
+    maintenance_mode: 'Maintenance Mode',
+    enable_search: 'Enable Search Feature',
+    enable_subscriptions: 'Enable Subscriptions',
   };
 
-  if (loading) return <p className="text-muted-foreground">Loading settings...</p>;
+  const descriptions: Record<string, string> = {
+    enable_studio: 'Allow users to access the AI generation studio',
+    enable_ads: 'Show advertisements to free users',
+    enable_creator_profiles: 'Enable public profiles for creators',
+    watermark_enabled: 'Add a watermark to generated images',
+    show_get_pro: 'Display the "GET PRO" button in the header',
+    enable_registration: 'Allow new users to sign up for accounts',
+    maintenance_mode: 'Put the app in maintenance mode (admin only access)',
+    enable_search: 'Allow users to search for posts and prompts',
+    enable_subscriptions: 'Allow users to buy subscriptions and credits',
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   const watermarkText = getValue('watermark_text');
 
   return (
-    <div>
-      <h2 className="text-xl font-bold text-foreground mb-6">Settings</h2>
-
-      <div className="bg-card border border-border rounded-xl divide-y divide-border mb-6">
-        {settings.filter(s => toggleSettings.includes(s.key)).map(s => (
-          <div key={s.id} className="flex items-center justify-between px-5 py-4">
-            <div>
-              <p className="text-sm text-foreground font-medium">{labels[s.key] || s.key}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Toggle {s.key.replace(/_/g, ' ')}</p>
-            </div>
-            <button
-              onClick={() => toggleSetting(s.key, s.value)}
-              className={`w-11 h-6 rounded-full relative transition-colors ${s.value === 'true' ? 'bg-primary' : 'bg-muted'}`}
-            >
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${s.value === 'true' ? 'left-[22px]' : 'left-0.5'}`} />
-            </button>
-          </div>
-        ))}
+    <div className="max-w-4xl mx-auto pb-20">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-2xl font-bold text-foreground">App Controls</h2>
+        <button 
+          onClick={fetchSettings}
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          Refresh Settings
+        </button>
       </div>
 
-      <h3 className="text-base font-bold text-foreground mb-3">Watermark Settings</h3>
-      <div className="bg-card border border-border rounded-xl p-5 space-y-5">
-        <div>
-          <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">WATERMARK TEXT (optional)</label>
-          <div className="flex gap-2">
-            <input
-              value={watermarkText}
-              onChange={e => {
-                setSettings(prev => prev.map(s => s.key === 'watermark_text' ? { ...s, value: e.target.value } : s));
-              }}
-              placeholder="Qpixa"
-              className="flex-1 bg-secondary rounded-lg px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none"
-            />
-            <button
-              onClick={() => updateSetting('watermark_text', watermarkText)}
-              className="px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
-            >
-              Save
-            </button>
+      <div className="grid gap-6">
+        <section>
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 px-1">Feature Toggles</h3>
+          <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border shadow-sm">
+            {toggleSettings.map(key => {
+              const setting = settings.find(s => s.key === key);
+              const value = setting?.value || 'false';
+              return (
+                <div key={key} className="flex items-center justify-between px-5 py-4 hover:bg-secondary/20 transition-colors">
+                  <div className="flex-1 pr-4">
+                    <p className="text-sm text-foreground font-semibold">{labels[key] || key}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{descriptions[key] || `Toggle ${key.replace(/_/g, ' ')}`}</p>
+                  </div>
+                  <button
+                    onClick={() => toggleSetting(key, value)}
+                    className={`w-12 h-6 rounded-full relative transition-all duration-200 ease-in-out ${value === 'true' ? 'bg-primary' : 'bg-muted'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-200 ${value === 'true' ? 'left-[26px]' : 'left-1'}`} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        </section>
 
-        <div>
-          <label className="text-xs font-semibold text-muted-foreground mb-1.5 block">PREVIEW</label>
-          <div className="relative rounded-lg overflow-hidden bg-muted aspect-video flex items-center justify-center">
-            <span className="text-muted-foreground text-sm">Sample Image</span>
-            {watermarkText && (
-              <span className="absolute bottom-2 right-2 text-white/50 text-[11px] font-bold tracking-wider drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)]">
-                {watermarkText}
-              </span>
-            )}
+        <section>
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3 px-1">Watermark Configuration</h3>
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6">
+            <div>
+              <label className="text-xs font-bold text-muted-foreground mb-2 block uppercase">Watermark Text</label>
+              <div className="flex gap-3">
+                <input
+                  value={watermarkText}
+                  onChange={e => {
+                    setSettings(prev => {
+                      const exists = prev.find(s => s.key === 'watermark_text');
+                      if (exists) {
+                        return prev.map(s => s.key === 'watermark_text' ? { ...s, value: e.target.value } : s);
+                      }
+                      return [...prev, { id: 'temp', key: 'watermark_text', value: e.target.value }];
+                    });
+                  }}
+                  placeholder="e.g. Qpixa AI"
+                  className="flex-1 bg-secondary border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+                <button
+                  onClick={() => updateSetting('watermark_text', watermarkText)}
+                  className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-muted-foreground mb-2 block uppercase">Live Preview</label>
+              <div className="relative rounded-2xl overflow-hidden bg-zinc-900 aspect-video flex items-center justify-center border border-border group">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&q=80')] bg-cover bg-center opacity-50 group-hover:opacity-60 transition-opacity" />
+                <span className="relative z-10 text-white/40 text-sm font-medium italic">Sample Image Preview</span>
+                {watermarkText && (
+                  <span className="absolute bottom-4 right-4 text-white/40 text-[14px] font-bold tracking-widest drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none select-none uppercase">
+                    {watermarkText}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

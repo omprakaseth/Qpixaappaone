@@ -258,7 +258,7 @@ function AppShell() {
         </AnimatePresence>
       </div>
 
-      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible && activeTab !== 'shorts'} />
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
 
       {/* Banner Ad - free users only */}
       {adSettings.enabled && adSettings.placementBanner && !isPro && navVisible && (
@@ -288,7 +288,7 @@ function AppShell() {
       />
 
       {/* Smart Upgrade Popup */}
-      {showUpgradePopup && !isPro && (
+      {showUpgradePopup && !isPro && adSettings.enableSubscriptions && (
         <div className="fixed top-16 left-4 right-4 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="bg-card border border-border rounded-2xl p-4 shadow-xl flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">

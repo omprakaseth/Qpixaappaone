@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store } from 'lucide-react';
+import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store, Bell, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import ScrollToTop from '@/components/ScrollToTop';
 import { toast } from 'sonner';
@@ -27,6 +28,7 @@ interface HomeScreenProps {
     placementFeed: boolean;
     adsensePublisherId: string;
     adsenseFeedSlot: string;
+    showGetPro?: boolean;
   };
   isPro?: boolean;
   navVisible?: boolean;
@@ -45,9 +47,39 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   const [filters, setFilters] = useState<FilterState>({ style: 'All', popularity: 'All', time: 'All Time' });
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
+  const [showTopHeader, setShowTopHeader] = useState(true);
   const navigate = useNavigate();
 
   // Filter posts
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications] = useState([
+    { id: '1', title: 'Welcome to Qpixa!', message: 'Start creating amazing AI art today.', created_at: new Date().toISOString() },
+    { id: '2', title: 'New Feature', message: 'Check out the new Shorts feed!', created_at: new Date().toISOString() },
+  ]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const currentScrollY = el.scrollTop;
+      // Threshold to avoid flickering
+      if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
+
+      // Hide top header on scroll down, show on scroll up
+      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        setShowTopHeader(false);
+      } else {
+        setShowTopHeader(true);
+      }
+      
+      lastScrollY.current = currentScrollY;
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [scrollRef]);
+
   const filteredPosts = useMemo(() => {
     return posts.filter(p => {
       if (activeCategory === 'Following') {
@@ -97,91 +129,29 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
 
   const topHeaderRef = useRef<HTMLDivElement>(null);
   const stickySectionRef = useRef<HTMLDivElement>(null);
-  const [topHeaderHeight, setTopHeaderHeight] = useState(0);
-  const [stickySectionHeight, setStickySectionHeight] = useState(0);
+  const [topHeaderHeight, setTopHeaderHeight] = useState(52);
+  const [stickySectionHeight, setStickySectionHeight] = useState(96);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!topHeaderRef.current || !stickySectionRef.current) return;
     const observer = new ResizeObserver(entries => {
       for (let entry of entries) {
         if (entry.target === topHeaderRef.current) {
-          setTopHeaderHeight(topHeaderRef.current.offsetHeight);
+          setTopHeaderHeight(entry.contentRect.height + (showTopHeader ? 8 : 0)); // Account for padding
         } else if (entry.target === stickySectionRef.current) {
-          setStickySectionHeight(stickySectionRef.current.offsetHeight);
+          setStickySectionHeight(entry.contentRect.height);
         }
       }
     });
     observer.observe(topHeaderRef.current);
     observer.observe(stickySectionRef.current);
     return () => observer.disconnect();
-  }, []);
-
-  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
-  const lastScrollTop = useRef(0);
-  const accumulatedDelta = useRef(0);
-  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    const scrollEl = scrollRef.current;
-    if (!scrollEl) return;
-
-    const handleScroll = () => {
-      const currentScroll = scrollEl.scrollTop;
-      const delta = currentScroll - lastScrollTop.current;
-
-      // Reset at top
-      if (currentScroll <= 0) {
-        setIsHeaderHidden(false);
-        accumulatedDelta.current = 0;
-        lastScrollTop.current = 0;
-        return;
-      }
-
-      // Ignore micro scrolls
-      if (Math.abs(delta) < 5) return;
-
-      // Threshold: only start hiding after 20px
-      if (currentScroll < 20) {
-        setIsHeaderHidden(false);
-        return;
-      }
-
-      if ((delta > 0 && accumulatedDelta.current > 0) || (delta < 0 && accumulatedDelta.current < 0)) {
-        accumulatedDelta.current += delta;
-      } else {
-        accumulatedDelta.current = delta;
-      }
-
-      // Debounce logic for smoothness
-      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-      scrollTimeout.current = setTimeout(() => {
-        const showThreshold = 15;
-        const hideThreshold = 30;
-
-        if (delta > 0 && !isHeaderHidden) {
-          // Meaningful scroll down
-          if (Math.abs(accumulatedDelta.current) > hideThreshold) {
-            setIsHeaderHidden(true);
-            accumulatedDelta.current = 0;
-          }
-        } else if (delta < 0 && isHeaderHidden) {
-          // Meaningful scroll up
-          if (Math.abs(accumulatedDelta.current) > showThreshold) {
-            setIsHeaderHidden(false);
-            accumulatedDelta.current = 0;
-          }
-        }
-      }, 50);
-
-      lastScrollTop.current = currentScroll;
-    };
-
-    scrollEl.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      scrollEl.removeEventListener('scroll', handleScroll);
-      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-    };
-  }, [scrollRef, isHeaderHidden]);
+  }, [showTopHeader]);
 
   return (
     <div
@@ -191,19 +161,16 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       onTouchEnd={handleTouchEnd}
     >
       <div 
-        className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm transition-transform duration-300 ease-in-out" 
-        style={{ 
-          transform: isHeaderHidden ? `translateY(-${topHeaderHeight}px)` : 'translateY(0)',
-          marginBottom: isHeaderHidden ? `-${topHeaderHeight}px` : '0px'
-        }}
+        className="fixed top-0 left-0 right-0 z-30 bg-background/95 backdrop-blur-sm transition-all duration-300 ease-in-out" 
       >
-        {/* Top Header: Hides on scroll */}
+        {/* Top Header: Hide on scroll down, show on scroll up */}
         <div 
           ref={topHeaderRef}
-          className="transition-opacity duration-200"
+          className={`transition-all duration-300 ease-in-out overflow-hidden ${
+            showTopHeader ? 'opacity-100 max-h-[100px]' : 'opacity-0 max-h-0 pointer-events-none'
+          }`}
           style={{ 
-            opacity: isHeaderHidden ? 0 : 1,
-            paddingTop: 'max(env(safe-area-inset-top), 0.5rem)'
+            paddingTop: showTopHeader ? 'max(env(safe-area-inset-top), 0.5rem)' : '0'
           }}
         >
           {/* R1: Logo & Actions */}
@@ -212,18 +179,20 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
               <span className="text-primary">Q</span>
               <span className="text-foreground">pixa</span>
             </h1>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => navigate('/market')}
-                className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center transition-colors hover:bg-secondary/80"
+                className="p-1.5 transition-opacity active:opacity-60"
               >
-                <Store size={18} className="text-muted-foreground" />
+                <Store size={22} className="text-foreground" />
               </button>
+              
               <button
-                onClick={onGetPro}
-                className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-bold flex items-center gap-1"
+                onClick={() => setShowNotifications(true)}
+                className="p-1.5 transition-opacity active:opacity-60 relative"
               >
-                GET PRO
+                <Bell size={22} className="text-foreground" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
               </button>
             </div>
           </div>
@@ -303,7 +272,13 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         </div>
       )}
 
-      <div className="px-4 pb-safe-nav transition-all duration-300 ease-in-out">
+      <div 
+        className={cn(
+          "px-4 pb-safe-nav",
+          isMounted && "transition-all duration-300 ease-in-out"
+        )}
+        style={{ paddingTop: topHeaderHeight + stickySectionHeight }}
+      >
         {activeCategory === 'Trending' && topThisMonth.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
@@ -387,6 +362,40 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         activeCategory={activeCategory}
       />
       <ScrollToTop scrollRef={scrollRef} />
+
+      {/* Notifications Panel */}
+      {showNotifications && (
+        <>
+          <div className="fixed inset-0 z-[80] bg-black/50" onClick={() => setShowNotifications(false)} />
+          <div className="fixed top-0 right-0 z-[81] w-80 max-w-[85vw] h-full bg-background border-l border-border animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between px-4 py-4 border-b border-border">
+              <h2 className="text-base font-bold text-foreground">Notifications</h2>
+              <button onClick={() => setShowNotifications(false)} className="p-1.5 rounded-full hover:bg-secondary">
+                <X size={18} className="text-muted-foreground" />
+              </button>
+            </div>
+            <div className="overflow-y-auto h-[calc(100%-60px)] p-4 space-y-3">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                  <Bell size={28} className="mb-2 opacity-40" />
+                  <p className="text-sm">No notifications yet</p>
+                </div>
+              ) : (
+                notifications.map(n => (
+                  <div key={n.id} className="p-3 rounded-xl bg-secondary/50 border border-border">
+                    <p className="text-sm font-semibold text-foreground">{n.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{n.message}</p>
+                    <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
+                      <span className="w-1 h-1 rounded-full bg-primary" />
+                      {new Date(n.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

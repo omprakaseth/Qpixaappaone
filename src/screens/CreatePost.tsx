@@ -112,8 +112,10 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
         if (type === 'post') {
           const { error } = await supabase.from('posts').insert({
             creator_id: user.id,
+            title: title.trim(),
             prompt: prompt.trim(),
             image_url: finalUrl,
+            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
           });
           if (error) throw error;
         } else if (type === 'short') {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter } from 'lucide-react';
+import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import ImageViewer from '@/components/ImageViewer';
 import { useAppState } from '@/context/AppContext';
@@ -7,6 +7,25 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/s
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+const STYLE_PRESETS = [
+  { id: 'none', name: 'None', prompt: '' },
+  { id: 'realistic', name: 'Realistic', prompt: 'highly detailed, photorealistic, 8k, masterpiece' },
+  { id: 'anime', name: 'Anime', prompt: 'anime style, vibrant colors, expressive eyes, clean lines' },
+  { id: 'cyberpunk', name: 'Cyberpunk', prompt: 'cyberpunk aesthetic, neon lights, futuristic city, rainy night' },
+  { id: 'oil', name: 'Oil Painting', prompt: 'oil painting, thick brushstrokes, classical art style, rich textures' },
+  { id: '3d', name: '3D Render', prompt: 'octane render, unreal engine 5, volumetric lighting, cinematic' },
+  { id: 'sketch', name: 'Sketch', prompt: 'pencil sketch, hand-drawn, charcoal, artistic' },
+];
+
+const ASPECT_RATIOS = [
+  { id: '1:1', name: 'Square', icon: '1:1' },
+  { id: '16:9', name: 'Landscape', icon: '16:9' },
+  { id: '9:16', name: 'Portrait', icon: '9:16' },
+  { id: '4:3', name: 'Classic', icon: '4:3' },
+  { id: '3:4', name: 'Tall', icon: '3:4' },
+];
 
 function useVisualViewport() {
   const [viewport, setViewport] = useState({ height: window.innerHeight, offsetTop: 0 });
@@ -88,7 +107,13 @@ function AiMessageBubble({ msg, isPro, onPublish, onBookmark, onDownload, onShar
 export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPublish }: StudioScreenProps) {
   const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user } = useAppState();
   const [prompt, setPrompt] = useState('');
+  const [negativePrompt, setNegativePrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState('gemini-3.1-flash-image-preview');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
+  const [selectedStyle, setSelectedStyle] = useState('none');
+  const [selectedRatio, setSelectedRatio] = useState('1:1');
   const [generationProgress, setGenerationProgress] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -223,30 +248,48 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     try {
       let generatedImageUrl = '';
       
-      // Use Gemini directly instead of Edge Function
+      // Use Gemini 3.1 for better quality
       const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
       
+      const stylePrompt = STYLE_PRESETS.find(s => s.id === selectedStyle)?.prompt || '';
+      let finalPrompt = stylePrompt ? `${userPrompt}, ${stylePrompt}` : userPrompt;
+      if (negativePrompt.trim()) {
+        finalPrompt += `. Avoid: ${negativePrompt.trim()}`;
+      }
+
       let response;
       if (imageToSend) {
         // Edit image
         const base64Data = imageToSend.split(',')[1];
         const mimeType = imageToSend.split(';')[0].split(':')[1] || 'image/png';
         response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: selectedModel,
           contents: {
             parts: [
               { inlineData: { data: base64Data, mimeType } },
-              { text: userPrompt }
+              { text: finalPrompt }
             ]
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: selectedRatio as any,
+              imageSize: "1K"
+            }
           }
         });
       } else {
         // Generate image
         response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: selectedModel,
           contents: {
-            parts: [{ text: userPrompt }]
+            parts: [{ text: finalPrompt }]
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: selectedRatio as any,
+              imageSize: "1K"
+            }
           }
         });
       }
@@ -312,7 +355,33 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     }
   };
 
-  const handleNewChat = () => { setMessages([]); setPrompt(''); removeAttachment(); };
+  const handleEnhancePrompt = async () => {
+    if (!prompt.trim() || enhancing) return;
+    
+    setEnhancing(true);
+    try {
+      const { GoogleGenAI } = await import('@google/genai');
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`,
+      });
+      
+      const enhanced = response.text?.trim();
+      if (enhanced) {
+        setPrompt(enhanced);
+        toast.success('Prompt enhanced!');
+      }
+    } catch (err) {
+      console.error('Enhance error:', err);
+      toast.error('Failed to enhance prompt');
+    } finally {
+      setEnhancing(false);
+    }
+  };
+
+  const handleNewChat = () => { setMessages([]); setPrompt(''); removeAttachment(); setSelectedStyle('none'); setSelectedRatio('1:1'); };
   
   const historyMessages = messages.filter(m => m.type === 'ai').filter(m => {
     if (historySearch && !m.text?.toLowerCase().includes(historySearch.toLowerCase())) {
@@ -702,6 +771,83 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
       {/* Input bar */}
       <div className="flex-shrink-0 bg-background border-t border-border px-3 py-2 z-20">
+        {/* Style & Ratio Selectors */}
+        <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className={cn(
+              "p-2 rounded-xl transition-colors",
+              showAdvanced ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
+            )}
+            title="Advanced Settings"
+          >
+            <SlidersHorizontal size={16} />
+          </button>
+          <div className="h-6 w-[1px] bg-border mx-1" />
+          <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
+            {ASPECT_RATIOS.map(ratio => (
+              <button
+                key={ratio.id}
+                onClick={() => setSelectedRatio(ratio.id)}
+                className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${
+                  selectedRatio === ratio.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {ratio.icon}
+              </button>
+            ))}
+          </div>
+          <div className="h-6 w-[1px] bg-border mx-1" />
+          <div className="flex items-center gap-1">
+            {STYLE_PRESETS.map(style => (
+              <button
+                key={style.id}
+                onClick={() => setSelectedStyle(style.id)}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-colors ${
+                  selectedStyle === style.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary text-muted-foreground border border-transparent'
+                }`}
+              >
+                {style.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {showAdvanced && (
+          <div className="mb-3 animate-in slide-in-from-bottom-2 duration-200">
+            <div className="bg-secondary/30 rounded-xl p-3 border border-border/50 space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">AI Model</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 Flash' },
+                    { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5' }
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => setSelectedModel(m.id)}
+                      className={`px-3 py-2 rounded-lg text-[10px] font-bold border transition-all ${
+                        selectedModel === m.id ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-background/50 border-transparent text-muted-foreground'
+                      }`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Negative Prompt</label>
+                <textarea
+                  value={negativePrompt}
+                  onChange={(e) => setNegativePrompt(e.target.value)}
+                  placeholder="What to exclude (e.g. low quality, blurry, extra fingers)..."
+                  className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 outline-none resize-none h-16"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {attachedPreview && (
           <div className="mb-2 relative inline-block">
             <img src={attachedPreview} alt="Attached" className="h-20 rounded-xl object-cover border border-border" />
@@ -725,12 +871,23 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
           />
           <div className="flex items-center justify-between pt-1">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
-            >
-              <Paperclip size={18} className="text-muted-foreground" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
+                title="Attach Image"
+              >
+                <Paperclip size={18} className="text-muted-foreground" />
+              </button>
+              <button
+                onClick={handleEnhancePrompt}
+                disabled={!prompt.trim() || enhancing}
+                className={`w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors ${enhancing ? 'animate-pulse text-primary' : 'text-muted-foreground'}`}
+                title="Enhance Prompt"
+              >
+                <Wand2 size={18} />
+              </button>
+            </div>
             <button
               onClick={handleGenerate}
               disabled={!prompt.trim() || generating}

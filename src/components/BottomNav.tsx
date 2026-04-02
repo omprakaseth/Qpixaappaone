@@ -21,13 +21,12 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
     return (
       <nav
         ref={ref}
-        className="fixed bottom-0 left-0 right-0 z-50 safe-bottom"
+        className={cn(
+          "fixed bottom-0 left-0 right-0 z-50 safe-bottom border-t border-border transition-all duration-300 ease-in-out",
+          !visible && "translate-y-full opacity-0 pointer-events-none"
+        )}
         style={{
-          backgroundColor: activeTab === 'shorts' ? 'transparent' : 'hsl(var(--background))',
-          backdropFilter: activeTab === 'shorts' ? 'none' : 'none',
-          borderTop: activeTab === 'shorts' ? 'none' : '1px solid hsl(var(--border))',
-          transform: visible ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s',
+          backgroundColor: activeTab === 'shorts' ? 'black' : 'hsl(var(--background))',
         }}
       >
         <div className={cn(

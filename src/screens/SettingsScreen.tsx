@@ -1,5 +1,5 @@
 import { ArrowLeft, User, Bell, Shield, Palette, Globe, CreditCard, HelpCircle, LogOut, ChevronRight, Info, FileText, Mail, Sun, Moon, Monitor, Save, Lock, Eye, EyeOff } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -66,7 +66,9 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [editUsername, setEditUsername] = useState('');
   const [editDisplayName, setEditDisplayName] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editAvatarUrl, setEditAvatarUrl] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [sendingFeedback, setSendingFeedback] = useState(false);
   
@@ -82,6 +84,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       setEditUsername(profile.username || '');
       setEditDisplayName(profile.display_name || '');
       setEditBio(profile.bio || '');
+      setEditAvatarUrl(profile.avatar_url || '');
     }
   }, [profile]);
 
@@ -94,6 +97,40 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !profile) return;
+    const file = e.target.files[0];
+    
+    // Check if it's a mock project
+    if (import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co') {
+      toast.error('Avatar upload is not available in demo mode');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.id}-${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      
+      setEditAvatarUrl(data.publicUrl);
+      toast.success('Avatar uploaded successfully! Click Save Changes to apply.');
+    } catch (error: any) {
+      console.error('Error uploading avatar:', error);
+      toast.error(error.message || 'Error uploading avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const saveProfile = async () => {
     if (!isLoggedIn) return;
     setSaving(true);
@@ -104,6 +141,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           username: editUsername.trim() || null,
           display_name: editDisplayName.trim() || null,
           bio: editBio.trim() || null,
+          avatar_url: editAvatarUrl || null,
         })
         .eq('id', profile?.id);
       if (error) throw error;
@@ -207,6 +245,32 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
                 {isLoggedIn ? (
                   <>
+                    <div className="flex flex-col items-center mb-4">
+                      <div className="relative w-20 h-20 rounded-full overflow-hidden bg-secondary border border-border mb-2">
+                        {editAvatarUrl ? (
+                          <img src={editAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <User size={32} />
+                          </div>
+                        )}
+                        {uploadingAvatar && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                      <label className="text-xs text-primary font-medium cursor-pointer hover:underline">
+                        Change Picture
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={handleAvatarUpload}
+                          disabled={uploadingAvatar}
+                        />
+                      </label>
+                    </div>
                     <div>
                       <label className="text-[10px] text-muted-foreground font-medium">Username</label>
                       <input

@@ -3,21 +3,72 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <link rel="manifest" href="/manifest.json" />
-    <title>My Google AI Studio App</title>
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister();
-          }
-        });
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Qpixa - Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community." />
+    <meta name="keywords" content="AI, Image Generator, Video Generator, Stable Diffusion, Midjourney, DALL-E, AI Art, Qpixa" />
+    <meta name="author" content="Qpixa" />
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content="Qpixa - AI Image & Video Generator" />
+    <meta property="og:description" content="Create, share, and remix stunning AI-generated images and videos." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://qpixa.com" />
+    <meta property="og:image" content="/icons/pwa-icon-512.png" />
+    
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/png" href="/icons/pwa-icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/pwa-icon-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Qpixa" />
+    
+    <title>Qpixa - AI Image & Video Generator</title>
+    <style>
+      #splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #000000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
       }
-    </script>
+      #splash-screen img {
+        width: 120px;
+        height: 120px;
+        border-radius: 24px;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.8; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash-screen">
+      <img src="/icons/pwa-icon-192.png" alt="Qpixa Logo" />
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remove splash screen after a short delay or when window loads
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('splash-screen');
+          if (splash) {
+            splash.style.opacity = '0';
+            setTimeout(() => splash.remove(), 500);
+          }
+        }, 800);
+      });
+    </script>
   </body>
 </html>
 

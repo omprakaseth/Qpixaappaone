@@ -622,6 +622,14 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
           )}
         </AnimatePresence>
 
+        {/* Permanent Progress Bar (Thin) */}
+        <div className="absolute bottom-0 left-0 w-full h-[2px] bg-white/10 z-20 pointer-events-none">
+          <motion.div 
+            className="h-full bg-primary/60"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
         {/* Interactive Progress Bar */}
         <AnimatePresence>
           {showControls && (

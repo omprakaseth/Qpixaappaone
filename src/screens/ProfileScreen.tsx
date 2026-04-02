@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare } from 'lucide-react';
+import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import EditProfileSheet from '@/components/profile/EditProfileSheet';
@@ -29,8 +30,13 @@ interface UserPrompt {
 
 export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, onPostTap, navVisible = true }: ProfileScreenProps) {
   const headerRef = useRef<HTMLDivElement>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
+  const [headerHeight, setHeaderHeight] = useState(52);
+  const [isMounted, setIsMounted] = useState(false);
   const { isLoggedIn, profile, user, refreshProfile } = useAppState();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const { followingIds } = useFollows();
   const [activeTab, setActiveTab] = useState<'posts' | 'shorts' | 'prompts' | 'about'>('posts');
   const [myPrompts, setMyPrompts] = useState<UserPrompt[]>([]);
@@ -202,11 +208,11 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         {/* Header */}
         <div 
           ref={headerRef}
-          className="sticky top-0 z-20 bg-background/95 backdrop-blur-md px-4 pt-2 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out" 
+          className="fixed top-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md px-4 pt-2 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out" 
           style={{ 
             paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
-            transform: !navVisible ? `translateY(-${headerHeight}px)` : 'translateY(0)',
-            marginBottom: !navVisible ? `-${headerHeight}px` : '0px'
+            transform: !navVisible ? 'translateY(-100%)' : 'translateY(0)',
+            opacity: !navVisible ? 0 : 1
           }}
         >
           <h1 className="text-lg font-bold text-foreground">@{username}</h1>
@@ -216,7 +222,13 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         </div>
 
         {/* Cover Photo */}
-        <div className="relative h-[160px] w-full overflow-hidden bg-secondary">
+        <div 
+          className={cn(
+            "relative w-full overflow-hidden bg-secondary",
+            isMounted && "transition-all duration-300 ease-in-out"
+          )}
+          style={{ paddingTop: headerHeight, height: 160 + headerHeight }}
+        >
           <img
             src={profile?.cover_url || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80'}
             alt="Cover"
@@ -244,7 +256,12 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
               {profile?.is_verified && <VerifiedBadge size={16} />}
             </h2>
             {profile?.bio && (
-              <p className="text-[13px] text-muted-foreground mt-1 text-center max-w-[280px] leading-relaxed">{profile.bio}</p>
+              <div className="flex items-center justify-center gap-2 mt-1 px-4">
+                <p className="text-[13px] text-muted-foreground text-center max-w-[280px] leading-relaxed">{profile.bio}</p>
+                <button className="p-1 text-muted-foreground hover:text-primary transition-colors flex-shrink-0 active:opacity-60">
+                  <Bell size={16} />
+                </button>
+              </div>
             )}
           </div>
 

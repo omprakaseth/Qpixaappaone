@@ -133,10 +133,19 @@ export default function Admin() {
   };
 
   const handleBack = () => {
-    if (window.history.length > 2) {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && hash !== 'dashboard') {
+      // If we are on a sub-tab, go back in history
       window.history.back();
+      // If history back didn't change the hash (e.g. first page), go to dashboard
+      setTimeout(() => {
+        if (window.location.hash.replace('#', '') === hash) {
+          handleNavigate('dashboard');
+        }
+      }, 50);
     } else {
-      handleNavigate('dashboard');
+      // If already on dashboard or no hash, go to app
+      navigate('/');
     }
   };
 
@@ -186,14 +195,20 @@ export default function Admin() {
 
   const SidebarContent = () => (
     <>
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold text-primary">Q</span>
           <span className="text-lg font-bold text-foreground">pixa</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ml-auto ${isSuperAdmin ? 'bg-primary text-primary-foreground' : 'bg-primary/20 text-primary'}`}>
-            {isSuperAdmin ? 'Super Admin' : 'Admin'}
-          </span>
         </div>
+        {activeTab !== 'dashboard' && (
+          <button 
+            onClick={handleBack}
+            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            title="Back to Dashboard"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        )}
       </div>
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {tabs.map(t => (

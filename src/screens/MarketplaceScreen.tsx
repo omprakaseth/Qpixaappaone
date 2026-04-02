@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { X, Clock, ShoppingCart, ArrowLeft, Trash2 } from 'lucide-react';
 import { Search, SlidersHorizontal, ChevronRight, Star, ChevronDown, Coins, Plus, Bell, Menu } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useAppState } from '@/context/AppContext';
 import { useCart } from '@/hooks/useCart';
@@ -105,8 +106,13 @@ const MOCK_MARKETPLACE_PROMPTS: MarketplacePrompt[] = [
 ];
 
 export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true }: MarketplaceScreenProps) {
-  const headerRef = useRef<HTMLDivElement>(null);
-  const [headerHeight, setHeaderHeight] = useState(0);
+  const [topHeaderHeight, setTopHeaderHeight] = useState(52);
+  const [stickySectionHeight, setStickySectionHeight] = useState(96);
+  const [isMounted, setIsMounted] = useState(false);
+  const [showTopHeader, setShowTopHeader] = useState(true);
+  const lastScrollY = useRef(0);
+  const topHeaderRef = useRef<HTMLDivElement>(null);
+  const stickySectionRef = useRef<HTMLDivElement>(null);
   const { isLoggedIn, credits, refreshProfile } = useAppState();
   const { items: cartItems, addToCart, removeFromCart, isInCart, count: cartCount } = useCart();
   const [search, setSearch] = useState('');
@@ -184,17 +190,44 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   }, []);
 
   useEffect(() => {
-    if (!headerRef.current) return;
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef?.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const currentScrollY = el.scrollTop;
+      if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        setShowTopHeader(false);
+      } else {
+        setShowTopHeader(true);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [scrollRef]);
+
+  useEffect(() => {
+    if (!topHeaderRef.current || !stickySectionRef.current) return;
     const observer = new ResizeObserver(entries => {
       for (let entry of entries) {
-        if (entry.target instanceof HTMLElement) {
-          setHeaderHeight(entry.target.offsetHeight);
+        if (entry.target === topHeaderRef.current) {
+          setTopHeaderHeight(entry.contentRect.height + (showTopHeader ? 8 : 0));
+        } else if (entry.target === stickySectionRef.current) {
+          setStickySectionHeight(entry.contentRect.height);
         }
       }
     });
-    observer.observe(headerRef.current);
+    observer.observe(topHeaderRef.current);
+    observer.observe(stickySectionRef.current);
     return () => observer.disconnect();
-  }, []);
+  }, [showTopHeader]);
 
   // Filter
   const filtered = prompts.filter(p => {
@@ -274,118 +307,132 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
       <div 
-        ref={headerRef}
-        className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-2 pb-3 transition-all duration-300 ease-in-out" 
-        style={{ 
-          paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
-          transform: !navVisible ? `translateY(-${headerHeight}px)` : 'translateY(0)',
-          marginBottom: !navVisible ? `-${headerHeight}px` : '0px'
-        }}
+        className="fixed top-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-b border-border transition-all duration-300 ease-in-out" 
       >
         {/* Top row: title + icons */}
-        <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-bold text-foreground">Marketplace</h1>
-          <div className="flex items-center gap-2">
-            {isLoggedIn && (
-              <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
-                <Coins size={13} className="text-primary" />
-                <span className="text-xs font-semibold text-foreground">{credits}</span>
-              </div>
-            )}
-            <button
-              onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
-              className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-            >
-              <Plus size={16} />
-            </button>
-            <button
-              onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
-              className="p-2 rounded-full hover:bg-secondary relative"
-              title="Cart"
-            >
-              <ShoppingCart size={18} className="text-muted-foreground" />
-              {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
-                  {cartCount}
-                </span>
+        <div 
+          ref={topHeaderRef}
+          className={`transition-all duration-300 ease-in-out overflow-hidden px-4 ${
+            showTopHeader ? 'opacity-100 max-h-[100px]' : 'opacity-0 max-h-0 pointer-events-none'
+          }`}
+          style={{ 
+            paddingTop: showTopHeader ? 'max(env(safe-area-inset-top), 0.5rem)' : '0'
+          }}
+        >
+          <div className="flex items-center justify-between h-[52px] mb-1">
+            <h1 className="text-lg font-bold text-foreground">Marketplace</h1>
+            <div className="flex items-center gap-2">
+              {isLoggedIn && (
+                <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
+                  <Coins size={13} className="text-primary" />
+                  <span className="text-xs font-semibold text-foreground">{credits}</span>
+                </div>
               )}
-            </button>
-            <button
-              onClick={() => setShowNotifications(true)}
-              className="p-2 rounded-full hover:bg-secondary relative"
-            >
-              <Bell size={18} className="text-muted-foreground" />
-              {notifications.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-              )}
-            </button>
+              <button
+                onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
+                className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+              >
+                <Plus size={16} />
+              </button>
+              <button
+                onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
+                className="p-1.5 transition-opacity active:opacity-60 relative"
+                title="Cart"
+              >
+                <ShoppingCart size={22} className="text-foreground" />
+                {cartCount > 0 && (
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-background">
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setShowNotifications(true)}
+                className="p-1.5 transition-opacity active:opacity-60 relative"
+              >
+                <Bell size={22} className="text-foreground" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Search bar */}
-        <div className="relative mb-3 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
-          <Search size={16} className="text-muted-foreground mr-2" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search prompts, models, creators..."
-            type="search"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
-          />
-        </div>
+        {/* Sticky Section: Always visible */}
+        <div ref={stickySectionRef} className="px-4 pb-3">
+          {/* Search bar */}
+          <div className="relative mb-3 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
+            <Search size={16} className="text-muted-foreground mr-2" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search prompts, models, creators..."
+              type="search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
+            />
+          </div>
 
-        {/* Filters row */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => setShowFilters(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground relative"
-          >
-            <SlidersHorizontal size={13} />
-            All Filters
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
-
-          <div className="relative">
+          {/* Filters row */}
+          <div className="flex items-center justify-between">
             <button
-              onClick={() => setShowSort(!showSort)}
-              className="flex items-center gap-1 text-xs text-muted-foreground font-medium"
+              onClick={() => setShowFilters(true)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground relative"
             >
-              Sort By
-              <ChevronDown size={14} />
+              <SlidersHorizontal size={13} />
+              All Filters
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
-            {showSort && (
-              <div className="absolute right-0 top-8 bg-card border border-border rounded-xl shadow-lg z-30 py-1 min-w-[140px]">
-                {[
-                  { id: 'popular', label: 'Most Popular' },
-                  { id: 'rating', label: 'Highest Rated' },
-                  { id: 'newest', label: 'Newest' },
-                  { id: 'price_low', label: 'Price: Low' },
-                ].map(opt => (
-                  <button
-                    key={opt.id}
-                    onClick={() => { setSortBy(opt.id); setShowSort(false); }}
-                    className={`w-full text-left px-4 py-2 text-xs transition-colors ${
-                      sortBy === opt.id ? 'text-primary font-semibold' : 'text-foreground hover:bg-secondary'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
+
+            <div className="relative">
+              <button
+                onClick={() => setShowSort(!showSort)}
+                className="flex items-center gap-1 text-xs text-muted-foreground font-medium"
+              >
+                Sort By
+                <ChevronDown size={14} />
+              </button>
+              {showSort && (
+                <div className="absolute right-0 top-8 bg-card border border-border rounded-xl shadow-lg z-30 py-1 min-w-[140px]">
+                  {[
+                    { id: 'popular', label: 'Most Popular' },
+                    { id: 'rating', label: 'Highest Rated' },
+                    { id: 'newest', label: 'Newest' },
+                    { id: 'price_low', label: 'Price: Low' },
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => { setSortBy(opt.id); setShowSort(false); }}
+                      className={`w-full text-left px-4 py-2 text-xs transition-colors ${
+                        sortBy === opt.id ? 'text-primary font-semibold' : 'text-foreground hover:bg-secondary'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Categories with horizontal scroll */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-safe-nav">
+      <div 
+        ref={scrollRef} 
+        className={cn(
+          "flex-1 overflow-y-auto pb-safe-nav",
+          isMounted && "transition-all duration-300 ease-in-out"
+        )}
+        style={{ paddingTop: topHeaderHeight + stickySectionHeight }}
+      >
         {/* Selected category view */}
         {selectedCategory ? (
           <div>

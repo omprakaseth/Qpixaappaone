@@ -11,6 +11,8 @@ export interface AdSettings {
   adsensePublisherId: string;
   adsenseFeedSlot: string;
   adsenseBannerSlot: string;
+  showGetPro: boolean;
+  enableSubscriptions: boolean;
 }
 
 const defaults: AdSettings = {
@@ -23,6 +25,8 @@ const defaults: AdSettings = {
   adsensePublisherId: '',
   adsenseFeedSlot: '',
   adsenseBannerSlot: '',
+  showGetPro: true,
+  enableSubscriptions: true,
 };
 
 function ensurePubPrefix(id: string): string {
@@ -43,6 +47,7 @@ export function useAdSettings() {
           'enable_ads', 'ad_frequency', 'ad_reward_credits',
           'ad_placement_feed', 'ad_placement_banner', 'ad_placement_reward',
           'adsense_publisher_id', 'adsense_feed_slot', 'adsense_banner_slot',
+          'show_get_pro', 'enable_subscriptions',
         ]);
 
       if (data) {
@@ -58,6 +63,8 @@ export function useAdSettings() {
           adsensePublisherId: ensurePubPrefix(m.adsense_publisher_id || ''),
           adsenseFeedSlot: m.adsense_feed_slot || '',
           adsenseBannerSlot: m.adsense_banner_slot || '',
+          showGetPro: m.show_get_pro !== 'false',
+          enableSubscriptions: m.enable_subscriptions !== 'false',
         });
       }
       setLoading(false);

@@ -1,5 +1,5 @@
 {
-  "name": "AI Shorts Viewer",
-  "description": "A modern, full-screen vertical AI content viewer with interactive controls and smooth animations.",
-  "requestFramePermissions": []
+  "name": "Qpixa - AI Art Social Platform",
+  "description": "A full-featured AI art generation and social platform where creators can generate, share, and discover amazing AI-powered content.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"]
 }
