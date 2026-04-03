@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import EditProfileSheet from '@/components/profile/EditProfileSheet';
 import DashboardSheet from '@/components/profile/DashboardSheet';
 import VerifiedBadge from '@/components/VerifiedBadge';
@@ -71,7 +71,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   }, []);
 
   const fetchMyShorts = async () => {
-    if (!user) return;
+    if (!user || isPlaceholder) return;
     const { data, error } = await (supabase
       .from('shorts' as any) as any)
       .select('*')
@@ -87,7 +87,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   };
 
   const fetchMyPosts = async () => {
-    if (!user) return;
+    if (!user || isPlaceholder) return;
     const { data, error } = await supabase
       .from('posts')
       .select(`
@@ -138,7 +138,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   };
 
   const fetchFollowerCount = async () => {
-    if (!user) return;
+    if (!user || isPlaceholder) return;
     const { count, error } = await supabase
       .from('follows')
       .select('*', { count: 'exact', head: true })
@@ -151,7 +151,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   };
 
   const fetchMyPrompts = async () => {
-    if (!user) return;
+    if (!user || isPlaceholder) return;
     const { data, error } = await supabase
       .from('marketplace_prompts')
       .select('id, title, preview_image, price, rating, sales_count, model_type, category')

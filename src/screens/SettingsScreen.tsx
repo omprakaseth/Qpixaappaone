@@ -1,4 +1,4 @@
-import { ArrowLeft, User, Bell, Shield, Palette, Globe, CreditCard, HelpCircle, LogOut, ChevronRight, Info, FileText, Mail, Sun, Moon, Monitor, Save, Lock, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, User, Bell, Shield, Palette, Globe, CreditCard, HelpCircle, LogOut, ChevronRight, Info, FileText, Mail, Sun, Moon, Monitor, Save, Lock, Eye, EyeOff, Download } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,11 +39,10 @@ const sections = [
   { id: 'theme', label: 'Theme', icon: Palette },
   { id: 'language', label: 'Language', icon: Globe },
   { id: 'subscription', label: 'Subscription', icon: CreditCard },
+  { id: 'install', label: 'Install App', icon: Download },
   { id: 'feedback', label: 'Send Feedback', icon: Mail },
-  { id: 'about', label: 'About', icon: Info },
-  { id: 'privacy_policy', label: 'Privacy Policy', icon: FileText },
   { id: 'help', label: 'Help & Support', icon: HelpCircle },
-  { id: 'contact', label: 'Contact Us', icon: Mail },
+  { id: 'legal', label: 'Legal & About', icon: Info },
 ];
 
 const themeOptions: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
@@ -61,6 +60,33 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [activityStatus, setActivityStatus] = useState(() => localStorage.getItem('qpixa-activity') !== 'false');
   const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => (localStorage.getItem('qpixa-visibility') as any) || 'public');
   const [language, setLanguage] = useState(() => localStorage.getItem('qpixa-lang') || 'en');
+  
+  // PWA Install
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      toast.info('App is already installed or not supported on this browser.');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    }
+  };
   
   // Account editing
   const [editUsername, setEditUsername] = useState('');
@@ -370,7 +396,18 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               </div>
             )}
 
-            {/* Subscription section */}
+            {/* Install section */}
+            {id === 'install' && activeSection === 'install' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                <p className="text-xs text-muted-foreground">Install Qpixa on your home screen for a better experience, faster loading, and offline access.</p>
+                <button
+                  onClick={handleInstall}
+                  className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-2"
+                >
+                  <Download size={14} /> Install Now
+                </button>
+              </div>
+            )}
             {id === 'subscription' && activeSection === 'subscription' && (
               <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
@@ -402,9 +439,70 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
               </div>
             )}
 
-            {/* About section */}
-            {id === 'about' && activeSection === 'about' && (
+            {/* Legal & About section */}
+            {id === 'legal' && activeSection === 'legal' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-4">
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold text-foreground px-1">Information</h3>
+                  <div className="grid grid-cols-1 gap-1">
+                    <button 
+                      onClick={() => setActiveSection('about_detail')}
+                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-secondary transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Info size={14} className="text-muted-foreground" />
+                        <span className="text-xs">About Qpixa</span>
+                      </div>
+                      <ChevronRight size={12} className="text-muted-foreground" />
+                    </button>
+                    <button 
+                      onClick={() => setActiveSection('contact_detail')}
+                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-secondary transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Mail size={14} className="text-muted-foreground" />
+                        <span className="text-xs">Contact Us</span>
+                      </div>
+                      <ChevronRight size={12} className="text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xs font-bold text-foreground px-1">Legal</h3>
+                  <div className="grid grid-cols-1 gap-1">
+                    <button 
+                      onClick={() => setActiveSection('privacy_detail')}
+                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-secondary transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText size={14} className="text-muted-foreground" />
+                        <span className="text-xs">Privacy Policy</span>
+                      </div>
+                      <ChevronRight size={12} className="text-muted-foreground" />
+                    </button>
+                    <button 
+                      onClick={() => setActiveSection('terms_detail')}
+                      className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-secondary transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText size={14} className="text-muted-foreground" />
+                        <span className="text-xs">Terms of Service</span>
+                      </div>
+                      <ChevronRight size={12} className="text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center pt-2">© 2026 Qpixa. All rights reserved.</p>
+              </div>
+            )}
+
+            {/* About Detail */}
+            {activeSection === 'about_detail' && id === 'legal' && (
               <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                <button onClick={() => setActiveSection('legal')} className="flex items-center gap-1 text-[10px] text-primary font-bold mb-2">
+                  <ArrowLeft size={10} /> Back
+                </button>
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-lg font-bold text-primary">Q</span>
@@ -420,47 +518,51 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 <div className="border-t border-border pt-3">
                   <p className="text-xs font-semibold text-foreground">Developer</p>
                   <p className="text-xs text-muted-foreground mt-1">Om Prakash Seth</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Full-stack developer passionate about AI and creative tools.</p>
                 </div>
-                <p className="text-[10px] text-muted-foreground">© 2026 Qpixa. All rights reserved.</p>
               </div>
             )}
 
-            {/* Privacy Policy section */}
-            {id === 'privacy_policy' && activeSection === 'privacy_policy' && (
+            {/* Contact Detail */}
+            {activeSection === 'contact_detail' && id === 'legal' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3">
+                <button onClick={() => setActiveSection('legal')} className="flex items-center gap-1 text-[10px] text-primary font-bold mb-2">
+                  <ArrowLeft size={10} /> Back
+                </button>
+                <h3 className="text-sm font-bold text-foreground">Contact Us</h3>
+                <p className="text-xs text-muted-foreground">Reach out to us for any queries or feedback.</p>
+                <div className="flex items-center gap-2 p-3 bg-secondary rounded-xl">
+                  <Mail size={14} className="text-primary" />
+                  <span className="text-xs text-foreground">support@qpixa.com</span>
+                </div>
+              </div>
+            )}
+
+            {/* Privacy Detail */}
+            {activeSection === 'privacy_detail' && id === 'legal' && (
               <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3 max-h-[400px] overflow-y-auto">
+                <button onClick={() => setActiveSection('legal')} className="flex items-center gap-1 text-[10px] text-primary font-bold mb-2">
+                  <ArrowLeft size={10} /> Back
+                </button>
                 <h3 className="text-sm font-bold text-foreground">Privacy Policy</h3>
-                <p className="text-[10px] text-muted-foreground">Last updated: March 2026</p>
-                
                 <div className="space-y-3 text-xs text-muted-foreground leading-relaxed">
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">1. Information We Collect</h4>
-                    <p>We collect information you provide directly: account details (email, username, profile photo), content you create, and usage data to improve our services.</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">2. How We Use Your Information</h4>
-                    <p>Your data is used to provide and improve Qpixa services, personalize your experience, process transactions, and send important updates.</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">3. Data Storage & Security</h4>
-                    <p>Your data is securely stored using industry-standard encryption. We use secure cloud infrastructure to protect your information.</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">4. Third-Party Services</h4>
-                    <p>We may use third-party services like Google AdSense for advertising. These services have their own privacy policies.</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">5. Your Rights</h4>
-                    <p>You can access, update, or delete your personal data at any time through your profile settings. You can also request a full data export.</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">6. Cookies & Ads</h4>
-                    <p>We use cookies for authentication and ads. Free users see ads via Google AdSense. Pro users enjoy an ad-free experience.</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-1">7. Contact</h4>
-                    <p>For privacy concerns, contact us at: <span className="text-primary">support@qpixa.com</span></p>
-                  </div>
+                  <p>We collect information you provide directly: account details, content you create, and usage data to improve our services.</p>
+                  <p>Your data is securely stored using industry-standard encryption.</p>
+                  <p>For privacy concerns, contact us at: <span className="text-primary">support@qpixa.com</span></p>
+                </div>
+              </div>
+            )}
+
+            {/* Terms Detail */}
+            {activeSection === 'terms_detail' && id === 'legal' && (
+              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-3 max-h-[400px] overflow-y-auto">
+                <button onClick={() => setActiveSection('legal')} className="flex items-center gap-1 text-[10px] text-primary font-bold mb-2">
+                  <ArrowLeft size={10} /> Back
+                </button>
+                <h3 className="text-sm font-bold text-foreground">Terms of Service</h3>
+                <div className="space-y-3 text-xs text-muted-foreground leading-relaxed">
+                  <p>By using Qpixa, you agree to be bound by these Terms of Service.</p>
+                  <p>You retain ownership of the content you create.</p>
+                  <p>Users are prohibited from generating or sharing content that is illegal or harmful.</p>
                 </div>
               </div>
             )}
@@ -542,17 +644,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 >
                   {sendingFeedback ? 'Sending...' : 'Send Feedback'}
                 </button>
-              </div>
-            )}
-
-            {/* Contact section */}
-            {id === 'contact' && activeSection === 'contact' && (
-              <div className="ml-10 mr-3 mb-2 p-4 bg-card border border-border rounded-xl space-y-2">
-                <p className="text-xs text-muted-foreground">Reach out to us for any queries or feedback.</p>
-                <div className="flex items-center gap-2">
-                  <Mail size={14} className="text-primary" />
-                  <span className="text-xs text-foreground">support@qpixa.com</span>
-                </div>
               </div>
             )}
           </div>

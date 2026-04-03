@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { useAppState } from '@/context/AppContext';
 
 export function useFollows() {
@@ -8,7 +8,7 @@ export function useFollows() {
   const [loading, setLoading] = useState(false);
 
   const fetchFollows = useCallback(async () => {
-    if (!user) { setFollowingIds(new Set()); return; }
+    if (!user || isPlaceholder) { setFollowingIds(new Set()); return; }
     const { data } = await supabase
       .from('follows')
       .select('following_id')
@@ -19,7 +19,7 @@ export function useFollows() {
   useEffect(() => { fetchFollows(); }, [fetchFollows]);
 
   const toggleFollow = useCallback(async (targetUserId: string) => {
-    if (!user) return;
+    if (!user || isPlaceholder) return;
     setLoading(true);
     const isFollowing = followingIds.has(targetUserId);
     if (isFollowing) {

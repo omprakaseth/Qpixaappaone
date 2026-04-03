@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal } from 'lucide-react';
+import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import ImageViewer from '@/components/ImageViewer';
 import { useAppState } from '@/context/AppContext';
@@ -108,7 +108,89 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.1-flash-image-preview');
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-image');
+  const MODELS = [
+    { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 (Free)', provider: 'Google' },
+    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 (High Quality)', provider: 'Google' },
+    { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL (Free)', provider: 'HuggingFace' },
+    { id: 'runwayml/stable-diffusion-v1-5', name: 'SD v1.5 (Fast & Free)', provider: 'HuggingFace' },
+  ];
+
+  const generateWithHuggingFace = async (modelId: string, promptText: string, signal?: AbortSignal) => {
+    // In this environment, secrets from the UI are often available via import.meta.env
+    const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
+    
+    if (!HF_TOKEN) {
+      console.error('HF_TOKEN is missing in import.meta.env');
+      throw new Error('Hugging Face Token missing. Please ensure you added VITE_HF_TOKEN in Settings -> Secrets and refreshed the app.');
+    }
+
+    const callApi = async (retryCount = 0): Promise<any> => {
+      try {
+        if (signal?.aborted) throw new Error('Aborted');
+        
+        console.log(`Calling HF API for model: ${modelId}, attempt: ${retryCount + 1}`);
+        const response = await fetch(
+          `https://api-inference.huggingface.co/models/${modelId}`,
+          {
+            headers: { 
+              Authorization: `Bearer ${HF_TOKEN}`,
+              "Content-Type": "application/json"
+            },
+            method: "POST",
+            body: JSON.stringify({ 
+              inputs: promptText,
+              options: { wait_for_model: true }
+            }),
+            signal // Pass the abort signal
+          }
+        );
+
+        if (response.status === 503 && retryCount < 5) {
+          setGenerationProgress(prev => Math.min(prev + 2, 98));
+          await new Promise(r => setTimeout(r, 8000)); // Wait longer for HF models
+          return callApi(retryCount + 1);
+        }
+
+        if (!response.ok) {
+          const errText = await response.text();
+          let errorMessage = `API Error ${response.status}`;
+          try {
+            const errJson = JSON.parse(errText);
+            errorMessage = errJson.error || errorMessage;
+          } catch {
+            errorMessage = errText.substring(0, 100) || errorMessage;
+          }
+          throw new Error(errorMessage);
+        }
+        
+        const blob = await response.blob();
+        if (blob.size < 100) { // Likely an error message even if 200 OK
+          const text = await blob.text();
+          try {
+            const json = JSON.parse(text);
+            if (json.error) throw new Error(json.error);
+          } catch { /* not json */ }
+        }
+
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (err: any) {
+        console.error('HF API Call failed:', err);
+        if (err.message?.includes('Failed to fetch')) {
+          throw new Error('Connection failed. This might be due to an invalid token or network issues.');
+        }
+        throw err;
+      }
+    };
+
+    return callApi();
+  };
+
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
@@ -116,6 +198,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const [selectedRatio, setSelectedRatio] = useState('1:1');
   const [generationProgress, setGenerationProgress] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [history, setHistory] = useState<ChatMessage[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
@@ -130,6 +213,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (initialPrompt) {
@@ -159,12 +243,17 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         if (data && data.length > 0) {
           const restored: ChatMessage[] = [];
           data.forEach((g: any) => {
+            // User message
             restored.push({ id: `h-u-${g.id}`, type: 'user', text: g.prompt, createdAt: new Date(g.created_at).toLocaleDateString() });
+            // AI message (only if image exists)
             if (g.image_url) {
               restored.push({ id: `h-a-${g.id}`, type: 'ai', text: g.prompt, imageUrl: g.image_url, createdAt: new Date(g.created_at).toLocaleDateString() });
             }
           });
+          // For chat messages, we want oldest first (as they are in 'restored')
           setMessages(restored);
+          // For history sidebar, we want newest first
+          setHistory([...restored].reverse());
         }
       } catch (e) {
         console.error('Failed to load history', e);
@@ -214,6 +303,16 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       return;
     }
 
+    // Check if Gemini 3 model is selected and if API key is needed
+    if (selectedModel === 'gemini-3.1-flash-image-preview') {
+      const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
+      if (!hasKey) {
+        toast.info('This model requires a paid API key. Please select one.');
+        await (window as any).aistudio?.openSelectKey();
+        return;
+      }
+    }
+
     if (credits <= 0) {
       toast.error('No credits remaining. Please add credits to continue.');
       return;
@@ -232,15 +331,19 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     setGenerating(true);
     setGenerationProgress(0);
 
+    // Setup AbortController
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     // Simulate progress
     const progressInterval = setInterval(() => {
       setGenerationProgress(prev => {
-        if (prev >= 95) return 95;
-        // Faster progress initially, slower towards the end
-        const increment = prev < 50 ? 15 : prev < 80 ? 5 : 2;
+        if (prev >= 98) return 98;
+        // Faster progress initially
+        const increment = prev < 40 ? 18 : prev < 70 ? 8 : prev < 90 ? 3 : 1;
         return prev + increment;
       });
-    }, 500);
+    }, 300);
 
     const imageToSend = attachedImage;
     removeAttachment();
@@ -248,61 +351,70 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     try {
       let generatedImageUrl = '';
       
-      // Use Gemini 3.1 for better quality
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      
       const stylePrompt = STYLE_PRESETS.find(s => s.id === selectedStyle)?.prompt || '';
       let finalPrompt = stylePrompt ? `${userPrompt}, ${stylePrompt}` : userPrompt;
       if (negativePrompt.trim()) {
         finalPrompt += `. Avoid: ${negativePrompt.trim()}`;
       }
 
-      let response;
-      if (imageToSend) {
-        // Edit image
-        const base64Data = imageToSend.split(',')[1];
-        const mimeType = imageToSend.split(';')[0].split(':')[1] || 'image/png';
-        response = await ai.models.generateContent({
-          model: selectedModel,
-          contents: {
-            parts: [
-              { inlineData: { data: base64Data, mimeType } },
-              { text: finalPrompt }
-            ]
-          },
-          config: {
-            imageConfig: {
-              aspectRatio: selectedRatio as any,
-              imageSize: "1K"
-            }
-          }
-        });
+      const currentModel = MODELS.find(m => m.id === selectedModel);
+
+      if (currentModel?.provider === 'HuggingFace') {
+        const result = await generateWithHuggingFace(selectedModel, finalPrompt, controller.signal);
+        generatedImageUrl = result as string;
       } else {
-        // Generate image
-        response = await ai.models.generateContent({
-          model: selectedModel,
-          contents: {
-            parts: [{ text: finalPrompt }]
-          },
-          config: {
-            imageConfig: {
-              aspectRatio: selectedRatio as any,
-              imageSize: "1K"
+        // Use Gemini 3.1 for better quality
+        const { GoogleGenAI } = await import('@google/genai');
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
+        
+        let response;
+        if (imageToSend) {
+          // Edit image
+          const base64Data = imageToSend.split(',')[1];
+          const mimeType = imageToSend.split(';')[0].split(':')[1] || 'image/png';
+          response = await ai.models.generateContent({
+            model: selectedModel,
+            contents: {
+              parts: [
+                { inlineData: { data: base64Data, mimeType } },
+                { text: finalPrompt }
+              ]
+            },
+            config: {
+              imageConfig: {
+                aspectRatio: selectedRatio as any,
+                imageSize: "1K"
+              }
             }
-          }
-        });
+          });
+        } else {
+          // Generate image
+          response = await ai.models.generateContent({
+            model: selectedModel,
+            contents: {
+              parts: [{ text: finalPrompt }]
+            },
+            config: {
+              imageConfig: {
+                aspectRatio: selectedRatio as any,
+                imageSize: "1K"
+              }
+            }
+          });
+        }
+
+        if (controller.signal.aborted) throw new Error('Aborted');
+
+        const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+        if (part && part.inlineData) {
+          generatedImageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+        } else {
+          throw new Error('No image generated by AI');
+        }
       }
 
       clearInterval(progressInterval);
       setGenerationProgress(100);
-
-      const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-      if (part && part.inlineData) {
-        generatedImageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-      } else {
-        throw new Error('No image generated by AI');
-      }
 
       // Deduct credit manually since we bypassed the edge function
       if (user) {
@@ -318,6 +430,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         createdAt: 'Just now',
       };
       setMessages(prev => [...prev, aiMsg]);
+      setHistory(prev => [aiMsg, ...prev]);
 
       // Save to generation history
       try {
@@ -333,7 +446,16 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       }
 
       await refreshProfile();
+      abortControllerRef.current = null;
     } catch (err: any) {
+      clearInterval(progressInterval);
+      abortControllerRef.current = null;
+      if (err.message === 'Aborted') {
+        toast.info('Generation stopped');
+        setGenerating(false);
+        setGenerationProgress(0);
+        return;
+      }
       console.error('Generation error:', err);
       const errorMsg = err.message || 'Something went wrong. Please try again.';
       
@@ -352,6 +474,13 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     } finally {
       setGenerating(false);
       setGenerationProgress(0);
+    }
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
   };
 
@@ -381,9 +510,15 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     }
   };
 
-  const handleNewChat = () => { setMessages([]); setPrompt(''); removeAttachment(); setSelectedStyle('none'); setSelectedRatio('1:1'); };
+  const handleNewChat = () => { 
+    setMessages([]); 
+    setPrompt(''); 
+    removeAttachment(); 
+    setSelectedStyle('none'); 
+    setSelectedRatio('1:1'); 
+  };
   
-  const historyMessages = messages.filter(m => m.type === 'ai').filter(m => {
+  const historyMessages = history.filter(m => m.type === 'ai').filter(m => {
     if (historySearch && !m.text?.toLowerCase().includes(historySearch.toLowerCase())) {
       return false;
     }
@@ -728,17 +863,25 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
             {generating && (
               <div className="flex justify-start">
                 <div className="bg-card rounded-2xl rounded-bl-sm p-4 max-w-[85%] border border-border/50 shadow-sm w-full">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="relative">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                          <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                        </div>
+                        <div className="absolute inset-0 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
                       </div>
-                      <div className="absolute inset-0 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      <div>
+                        <p className="text-sm font-medium">{attachedImage ? 'Editing image...' : 'Generating image...'}</p>
+                        <p className="text-xs text-muted-foreground">This usually takes 5-10 seconds</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{attachedImage ? 'Editing image...' : 'Generating image...'}</p>
-                      <p className="text-xs text-muted-foreground">This usually takes 5-10 seconds</p>
-                    </div>
+                    <button 
+                      onClick={handleStop}
+                      className="px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-[10px] font-bold hover:bg-destructive/20 transition-colors"
+                    >
+                      Stop
+                    </button>
                   </div>
                   
                   {/* Progress Bar */}
@@ -770,78 +913,56 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       />
 
       {/* Input bar */}
-      <div className="flex-shrink-0 bg-background border-t border-border px-3 py-2 z-20">
-        {/* Style & Ratio Selectors */}
-        <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className={cn(
-              "p-2 rounded-xl transition-colors",
-              showAdvanced ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground"
-            )}
-            title="Advanced Settings"
-          >
-            <SlidersHorizontal size={16} />
-          </button>
-          <div className="h-6 w-[1px] bg-border mx-1" />
-          <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
-            {ASPECT_RATIOS.map(ratio => (
-              <button
-                key={ratio.id}
-                onClick={() => setSelectedRatio(ratio.id)}
-                className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${
-                  selectedRatio === ratio.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {ratio.icon}
-              </button>
-            ))}
-          </div>
-          <div className="h-6 w-[1px] bg-border mx-1" />
-          <div className="flex items-center gap-1">
-            {STYLE_PRESETS.map(style => (
-              <button
-                key={style.id}
-                onClick={() => setSelectedStyle(style.id)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-colors ${
-                  selectedStyle === style.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary text-muted-foreground border border-transparent'
-                }`}
-              >
-                {style.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
+      <div className="flex-shrink-0 bg-background border-t border-border px-3 py-2 z-20 mb-[2%]">
         {showAdvanced && (
           <div className="mb-3 animate-in slide-in-from-bottom-2 duration-200">
-            <div className="bg-secondary/30 rounded-xl p-3 border border-border/50 space-y-3">
+            <div className="bg-secondary/30 rounded-xl p-2.5 border border-border/50 space-y-3">
+              {/* Style Presets */}
               <div>
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">AI Model</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 Flash' },
-                    { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5' }
-                  ].map(m => (
+                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Style Preset</label>
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+                  {STYLE_PRESETS.map(style => (
+                    <button
+                      key={style.id}
+                      onClick={() => setSelectedStyle(style.id)}
+                      className={`px-2.5 py-1 rounded-lg text-[9px] font-semibold whitespace-nowrap transition-colors ${
+                        selectedStyle === style.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary text-muted-foreground border border-transparent'
+                      }`}
+                    >
+                      {style.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 block">AI Model</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {MODELS.map(m => (
                     <button
                       key={m.id}
                       onClick={() => setSelectedModel(m.id)}
-                      className={`px-3 py-2 rounded-lg text-[10px] font-bold border transition-all ${
+                      className={`px-2 py-1.5 rounded-lg text-[9px] font-bold border transition-all flex flex-row items-center justify-between gap-2 ${
                         selectedModel === m.id ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-background/50 border-transparent text-muted-foreground'
                       }`}
                     >
-                      {m.name}
+                      <span className="truncate">{m.name.replace(' (Free)', '').replace(' (High Quality)', '').replace(' (Fast & Free)', '')}</span>
+                      {m.provider === 'HuggingFace' || m.id === 'gemini-2.5-flash-image' ? (
+                        <span className="text-[7px] px-1 py-0.5 bg-green-500/20 text-green-500 rounded uppercase font-black">Free</span>
+                      ) : (
+                        <span className="text-[7px] px-1 py-0.5 bg-amber-500/20 text-amber-500 rounded uppercase font-black">Pro</span>
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Negative Prompt</label>
+                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Negative Prompt</label>
                 <textarea
                   value={negativePrompt}
                   onChange={(e) => setNegativePrompt(e.target.value)}
-                  placeholder="What to exclude (e.g. low quality, blurry, extra fingers)..."
-                  className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 outline-none resize-none h-16"
+                  placeholder="What to exclude..."
+                  className="w-full bg-transparent text-[10px] text-foreground placeholder:text-muted-foreground/50 outline-none resize-none h-10"
                 />
               </div>
             </div>
@@ -880,6 +1001,19 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                 <Paperclip size={18} className="text-muted-foreground" />
               </button>
               <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors relative",
+                  showAdvanced ? "text-primary" : "text-muted-foreground"
+                )}
+                title="Advanced Settings"
+              >
+                <SlidersHorizontal size={18} />
+                {(selectedStyle !== 'none' || negativePrompt.trim() !== '') && (
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full border border-background" />
+                )}
+              </button>
+              <button
                 onClick={handleEnhancePrompt}
                 disabled={!prompt.trim() || enhancing}
                 className={`w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors ${enhancing ? 'animate-pulse text-primary' : 'text-muted-foreground'}`}
@@ -889,14 +1023,15 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
               </button>
             </div>
             <button
-              onClick={handleGenerate}
-              disabled={!prompt.trim() || generating}
-              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center disabled:opacity-50"
+              onClick={generating ? handleStop : handleGenerate}
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                generating ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'
+              } disabled:opacity-50`}
             >
               {generating ? (
-                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                <Square size={12} fill="currentColor" />
               ) : (
-                <Send size={14} className="text-primary-foreground" />
+                <Send size={14} />
               )}
             </button>
           </div>

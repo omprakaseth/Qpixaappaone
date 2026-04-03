@@ -22,7 +22,7 @@ import {
 import { Drawer } from 'vaul';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 
 interface Reel {
   id: string;
@@ -96,29 +96,32 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
       setLoading(true);
       
       // Skip fetch if using placeholder supabase URL
-      if (import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !import.meta.env.VITE_SUPABASE_URL) {
+      if (isPlaceholder) {
         setReels(MOCK_REELS);
+        setLoading(false);
         return;
       }
 
+      // @ts-ignore - Deep type instantiation issue in this environment
       const { data, error } = await (supabase
-        .from('shorts' as any) as any)
+        .from('posts')
         .select('*, profiles(username, avatar_url)')
-        .order('created_at', { ascending: false });
+        .eq('is_short', true)
+        .order('created_at', { ascending: false }) as any);
 
       if (error) throw error;
 
       if (data) {
         const formattedReels: Reel[] = data.map((item: any) => ({
           id: item.id,
-          videoUrl: item.video_url,
+          videoUrl: item.image_url,
           username: item.profiles?.username || 'anonymous',
           profilePic: item.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.id}`,
           description: item.title || '',
-          likes: '1.2k',
-          comments: '45',
-          shares: '128',
-          audio: item.audio_name || 'Original Audio',
+          likes: item.likes_count?.toString() || '0',
+          comments: '0',
+          shares: '0',
+          audio: 'Original Audio',
           prompt: item.prompt || 'AI Generated Content',
           isFollowing: false,
           isLiked: false,
@@ -147,9 +150,17 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
   }, [activeIndex]);
 
   return (
-    <div className="h-full w-full bg-black relative overflow-hidden flex flex-col">
+    <div className="h-full w-full bg-black relative overflow-hidden flex flex-col pb-14">
       {/* Top Navigation - Glass Pill Style */}
-      <div className="absolute top-0 left-0 w-full z-50 px-4 pt-[max(env(safe-area-inset-top),1rem)] flex items-center justify-between pointer-events-none">
+      <motion.div 
+        initial={{ y: 0, opacity: 1 }}
+        animate={{ 
+          y: activeIndex >= 3 ? -100 : 0,
+          opacity: activeIndex >= 3 ? 0 : 1
+        }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="absolute top-0 left-0 w-full z-50 px-4 pt-[max(env(safe-area-inset-top),1rem)] flex items-center justify-between pointer-events-none"
+      >
         <button 
           onClick={onBack}
           className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-md text-white transition-all active:scale-90"
@@ -200,7 +211,7 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
         </div>
 
         <div className="w-10 h-10" /> {/* Spacer for centering */}
-      </div>
+      </motion.div>
 
       {/* Video Feed */}
       <div 
@@ -498,7 +509,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
               className="absolute inset-0 pointer-events-none z-20"
             >
               {/* Right Side Actions - AI Focused */}
-              <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3 pointer-events-auto">
+              <div className="absolute right-3 bottom-16 flex flex-col items-center gap-3 pointer-events-auto h-[300px] justify-end">
                 <div className="flex flex-col items-center gap-1">
                   <button 
                     onClick={() => {
@@ -576,7 +587,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
               </div>
 
               {/* Bottom Left Creator Section */}
-              <div className="absolute left-4 bottom-10 right-20 flex flex-col gap-3 pointer-events-auto">
+              <div className="absolute left-4 bottom-6 right-20 flex flex-col gap-3 pointer-events-auto">
                 <div className="flex items-center gap-3">
                   <div 
                     className="w-11 h-11 rounded-full border-2 border-white/30 overflow-hidden shadow-2xl flex-shrink-0 cursor-pointer"
@@ -612,9 +623,22 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
                   <p className="text-white text-sm font-medium line-clamp-2 leading-relaxed drop-shadow-md">
                     {reel.description}
                   </p>
-                  <div className="flex items-center gap-2 text-white/80 text-xs w-fit">
-                    <Music className="w-3 h-3 animate-[spin_3s_linear_infinite]" />
-                    <span className="font-medium truncate max-w-[150px]">{reel.audio}</span>
+                  <div className="flex items-center gap-2 text-white/80 text-xs w-48 overflow-hidden">
+                    <Music className="w-3 h-3 flex-shrink-0" />
+                    <div className="flex-1 overflow-hidden relative h-4">
+                      <motion.div 
+                        animate={{ x: ["0%", "-50%"] }}
+                        transition={{ 
+                          duration: 10, 
+                          repeat: Infinity, 
+                          ease: "linear" 
+                        }}
+                        className="flex gap-8 whitespace-nowrap absolute left-0"
+                      >
+                        <span className="font-medium">{reel.audio}</span>
+                        <span className="font-medium">{reel.audio}</span>
+                      </motion.div>
+                    </div>
                   </div>
                 </div>
               </div>

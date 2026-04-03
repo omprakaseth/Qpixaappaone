@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store, Bell, X } from 'lucide-react';
+import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store, Bell, X, Sparkles, Image as ImageIcon, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import ScrollToTop from '@/components/ScrollToTop';
@@ -8,13 +8,12 @@ import ImageCard from '@/components/ImageCard';
 import SkeletonCard from '@/components/SkeletonCard';
 import FilterPanel, { FilterState } from '@/components/FilterPanel';
 import QuickActions from '@/components/QuickActions';
-import CategoryExplorer from '@/screens/CategoryExplorer';
 import FeedAdCard from '@/components/ads/FeedAdCard';
 import { useAppState } from '@/context/AppContext';
 import { Post } from '@/context/AppContext';
 import { useFollows } from '@/hooks/useFollows';
 
-const categories = ['Trending', 'Following', 'Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature'];
+const categories = ['Trending', 'Following', 'Shorts', 'Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature'];
 
 interface HomeScreenProps {
   scrollRef: React.RefObject<HTMLDivElement>;
@@ -35,16 +34,15 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro, navVisible = true }: HomeScreenProps) {
-  const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user } = useAppState();
+  const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user, initialLoading, uploadingPost, retryUpload, clearUpload } = useAppState();
   const { followingIds } = useFollows();
   const [activeCategory, setActiveCategory] = useState('Trending');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
-  const [explorerOpen, setExplorerOpen] = useState(false);
   const [quickActionsPost, setQuickActionsPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [filters, setFilters] = useState<FilterState>({ style: 'All', popularity: 'All', time: 'All Time' });
+  const [filters, setFilters] = useState<FilterState>({ style: 'All', popularity: 'All', time: 'All Time', category: 'All' });
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
   const [showTopHeader, setShowTopHeader] = useState(true);
@@ -56,6 +54,10 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     { id: '1', title: 'Welcome to Qpixa!', message: 'Start creating amazing AI art today.', created_at: new Date().toISOString() },
     { id: '2', title: 'New Feature', message: 'Check out the new Shorts feed!', created_at: new Date().toISOString() },
   ]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -89,6 +91,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         return false;
       }
       if (searchQuery && !p.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (filters.category !== 'All' && p.category !== filters.category) return false;
       if (filters.style !== 'All' && p.style !== filters.style) return false;
       return true;
     });
@@ -103,13 +106,16 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   useEffect(() => {
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && !loading) {
+        // Mock loading more posts
         setLoading(true);
-        setLoading(false);
+        setTimeout(() => {
+          setLoading(false);
+        }, 1500);
       }
     }, { threshold: 0.1 });
     if (loadMoreRef.current) observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [loading, posts.length]);
+  }, [loading]);
 
   const touchStart = useRef(0);
   const handleTouchStart = (e: React.TouchEvent) => { touchStart.current = e.touches[0].clientY; };
@@ -180,6 +186,58 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
               <span className="text-foreground">pixa</span>
             </h1>
             <div className="flex items-center gap-1">
+              {uploadingPost && (
+                <div className="flex items-center gap-2 mr-2">
+                  <div className="relative w-8 h-8 flex items-center justify-center">
+                    <svg className="w-8 h-8 -rotate-90">
+                      <circle
+                        cx="16"
+                        cy="16"
+                        r="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className="text-secondary"
+                      />
+                      <circle
+                        cx="16"
+                        cy="16"
+                        r="14"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeDasharray={88}
+                        strokeDashoffset={88 - (88 * uploadingPost.progress) / 100}
+                        className={cn(
+                          "transition-all duration-300",
+                          uploadingPost.status === 'error' ? "text-destructive" : "text-primary"
+                        )}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      {uploadingPost.status === 'uploading' && (
+                        <Upload size={14} className="text-primary animate-bounce" />
+                      )}
+                      {uploadingPost.status === 'success' && (
+                        <Sparkles size={14} className="text-primary" />
+                      )}
+                      {uploadingPost.status === 'error' && (
+                        <button onClick={retryUpload} className="text-destructive">
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {uploadingPost.status === 'error' && (
+                    <button 
+                      onClick={retryUpload}
+                      className="text-[10px] font-bold text-destructive underline"
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
               <button
                 onClick={() => navigate('/market')}
                 className="p-1.5 transition-opacity active:opacity-60"
@@ -226,17 +284,6 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           {/* R3: Categories */}
           <div className="flex items-center gap-2 px-4 pb-2 h-[40px]">
             <button
-              onClick={() => setExplorerOpen(true)}
-              className="flex-shrink-0 w-8 h-8 rounded-full bg-secondary text-foreground flex items-center justify-center transition-colors hover:bg-secondary/80"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-                <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
-            </button>
-            <button
               onClick={() => setFilterOpen(true)}
               className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                 Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
@@ -251,7 +298,13 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
               {categories.map(cat => (
                 <button
                   key={cat}
-                  onClick={() => setActiveCategory(cat)}
+                  onClick={() => {
+                    if (cat === 'Shorts') {
+                      navigate('/shorts');
+                    } else {
+                      setActiveCategory(cat);
+                    }
+                  }}
                   className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
                     activeCategory === cat
                       ? 'bg-primary text-primary-foreground'
@@ -307,40 +360,66 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
             <p className="text-sm font-semibold text-foreground">Following Feed</p>
             <p className="text-xs text-center mt-1 px-8">Follow creators from their profile to see their posts here</p>
           </div>
+        ) : filteredPosts.length === 0 && !initialLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
+              <Sparkles size={40} className="text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Welcome to Qpixa!</h2>
+            <p className="text-muted-foreground text-sm mb-8 max-w-[280px]">
+              You are the first one here! Start by generating and sharing your first AI masterpiece.
+            </p>
+            <button
+              onClick={onCreatePost}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+            >
+              <Upload size={20} />
+              Create First Post
+            </button>
+            
+            <div className="mt-12 grid grid-cols-2 gap-4 w-full max-w-sm">
+              <div className="bg-secondary/50 p-4 rounded-2xl border border-border/50">
+                <ImageIcon size={20} className="text-primary mb-2" />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Step 1</p>
+                <p className="text-xs font-semibold">Generate Image</p>
+              </div>
+              <div className="bg-secondary/50 p-4 rounded-2xl border border-border/50">
+                <TrendingUp size={20} className="text-primary mb-2" />
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Step 2</p>
+                <p className="text-xs font-semibold">Share with World</p>
+              </div>
+            </div>
+          </div>
         ) : (
           <>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-              {filteredPosts.map((post, index) => (
-                <React.Fragment key={post.id}>
-                  <ImageCard
-                    post={post}
-                    onTap={() => onPostTap(post)}
-                    onDoubleTap={() => toggleLike(post.id)}
-                    onLongPress={() => setQuickActionsPost(post)}
-                    onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
-                  />
-                  {adSettings?.enabled && adSettings.placementFeed && !isPro &&
-                    (index + 1) % (adSettings.frequency * 2) === 0 && (
-                    <FeedAdCard
-                      publisherId={adSettings.adsensePublisherId}
-                      slotId={adSettings.adsenseFeedSlot}
-                    />
-                  )}
-                </React.Fragment>
-              ))}
-              {loading && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`sk-${i}`} />)}
+              {(initialLoading && posts.length === 0) ? (
+                Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={`sk-init-${i}`} />)
+              ) : (
+                <>
+                  {filteredPosts.map((post, index) => (
+                    <React.Fragment key={post.id}>
+                      <ImageCard
+                        post={post}
+                        onTap={() => onPostTap(post)}
+                        onDoubleTap={() => toggleLike(post.id)}
+                        onLongPress={() => setQuickActionsPost(post)}
+                        onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
+                      />
+                      {adSettings?.enabled && adSettings.placementFeed && !isPro &&
+                        (index + 1) % (adSettings.frequency * 2) === 0 && (
+                        <FeedAdCard
+                          publisherId={adSettings.adsensePublisherId}
+                          slotId={adSettings.adsenseFeedSlot}
+                        />
+                      )}
+                    </React.Fragment>
+                  ))}
+                  {loading && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`sk-${i}`} />)}
+                </>
+              )}
             </div>
             <div ref={loadMoreRef} className="h-4" />
-
-            <div className="flex flex-wrap items-center justify-center gap-3 py-6 mt-4 border-t border-border">
-              <Link to="/about" className="text-xs text-muted-foreground hover:text-primary transition-colors">About</Link>
-              <span className="text-muted-foreground/30 text-xs">•</span>
-              <Link to="/privacy" className="text-xs text-muted-foreground hover:text-primary transition-colors">Privacy</Link>
-              <span className="text-muted-foreground/30 text-xs">•</span>
-              <Link to="/terms" className="text-xs text-muted-foreground hover:text-primary transition-colors">Terms</Link>
-              <span className="text-muted-foreground/30 text-xs">•</span>
-              <Link to="/contact" className="text-xs text-muted-foreground hover:text-primary transition-colors">Contact</Link>
-            </div>
           </>
         )}
       </div>
@@ -354,12 +433,6 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           if (action === 'save') toggleSave(quickActionsPost.id);
           if (action === 'copy') navigator.clipboard?.writeText(quickActionsPost.prompt);
         }}
-      />
-      <CategoryExplorer
-        open={explorerOpen}
-        onClose={() => setExplorerOpen(false)}
-        onSelect={setActiveCategory}
-        activeCategory={activeCategory}
       />
       <ScrollToTop scrollRef={scrollRef} />
 

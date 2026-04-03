@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Heart } from 'lucide-react';
-import { formatNumber } from '@/lib/utils';
+import { formatNumber, cn } from '@/lib/utils';
 import { Post } from '@/context/AppContext';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
+import { Loader2 } from 'lucide-react';
 
 interface ImageCardProps {
   post: Post;
@@ -15,6 +16,7 @@ interface ImageCardProps {
 export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCreatorTap }: ImageCardProps) {
   const [showHeart, setShowHeart] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [isClicking, setIsClicking] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggered = useRef(false);
   const isScrolling = useRef(false);
@@ -22,7 +24,12 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
 
   const handleTap = useDoubleTap(
     () => {
-      if (!longPressTriggered.current) onTap();
+      if (!longPressTriggered.current) {
+        setIsClicking(true);
+        onTap();
+        // Reset clicking state after a short delay or when component unmounts/remounts
+        setTimeout(() => setIsClicking(false), 2000);
+      }
     },
     () => {
       if (longPressTriggered.current) return;
@@ -58,7 +65,10 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
 
   return (
     <div
-      className="relative rounded-[20px] overflow-hidden bg-card cursor-pointer h-[220px] w-full"
+      className={cn(
+        "relative rounded-[20px] overflow-hidden bg-card cursor-pointer h-[220px] w-full transition-all active:scale-[0.98]",
+        isClicking && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+      )}
       onClick={() => {
         if (longPressTriggered.current) return;
         handleTap();
@@ -76,10 +86,21 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
         <img
           src={post.imageUrl}
           alt={post.title}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={cn(
+            "w-full h-full object-cover transition-all duration-500",
+            imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
+            isClicking && "brightness-50 scale-110"
+          )}
           loading="lazy"
           onLoad={() => setImgLoaded(true)}
         />
+
+        {/* Loading spinner when clicking */}
+        {isClicking && (
+          <div className="absolute inset-0 flex items-center justify-center z-20">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          </div>
+        )}
 
         {/* AI Badge - top left */}
         <span className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">

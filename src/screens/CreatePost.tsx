@@ -16,7 +16,7 @@ interface CreatePostProps {
 type PostType = 'post' | 'short';
 
 export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: CreatePostProps) {
-  const { addPost, user } = useAppState();
+  const { user, startUpload } = useAppState();
   const [type, setType] = useState<PostType>('post');
   const [title, setTitle] = useState('');
   const [prompt, setPrompt] = useState(initialPrompt || '');
@@ -26,7 +26,6 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
   const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl || null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const videoFileRef = useRef<HTMLInputElement>(null);
 
@@ -61,104 +60,33 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
       toast.error('Please enter a prompt');
       return;
     }
-    if (type === 'short' && !selectedFile) {
-      toast.error('Please upload a video for your Short');
+    if (type === 'short' && !selectedFile && !imagePreview) {
+      toast.error('Please upload a video or image');
+      return;
+    }
+
+    if (!user) {
+      toast.error('Please login to publish');
       return;
     }
 
     setPublishing(true);
-    setUploadProgress(0);
-
+    
     try {
-      let finalUrl = type === 'short' ? videoPreview : imagePreview;
-
-      if (user && selectedFile) {
-        // Simulate upload progress
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            if (prev >= 90) {
-              clearInterval(progressInterval);
-              return 90;
-            }
-            return prev + 10;
-          });
-        }, 200);
-
-        const fileExt = selectedFile.name.split('.').pop();
-        const timestamp = Date.now();
-        const fileName = `${timestamp}.${fileExt}`;
-        const bucket = 'prompt-images';
-        const filePath = `${user.id}/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, selectedFile, {
-            contentType: selectedFile.type,
-            upsert: false
-          });
-          
-        clearInterval(progressInterval);
-        setUploadProgress(100);
-        
-        if (uploadError) throw uploadError;
-        
-        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-        finalUrl = data.publicUrl;
-      } else {
-        setUploadProgress(100);
-      }
-
-      if (user) {
-        if (type === 'post') {
-          const { error } = await supabase.from('posts').insert({
-            creator_id: user.id,
-            title: title.trim(),
-            prompt: prompt.trim(),
-            image_url: finalUrl,
-            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-          });
-          if (error) throw error;
-        } else if (type === 'short') {
-          const { error } = await (supabase.from('shorts' as any) as any).insert({
-            video_url: finalUrl,
-            creator_id: user.id,
-            title: title.trim() || null,
-            audio_name: audioName.trim() || null,
-          });
-          if (error) throw error;
-          toast.success('Short uploaded successfully!');
-        }
-        toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} published!`);
-      } else {
-        // Fallback to local state for non-logged-in users
-        if (type === 'post') {
-          const newPost: Post = {
-            id: `post-${Date.now()}`,
-            title: title.trim(),
-            imageUrl: imagePreview || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600&h=600&fit=crop',
-            creator: { id: user?.id || 'mock-id', name: 'You', username: '@you', avatar: '', initials: 'YO' },
-            prompt: prompt.trim(),
-            tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-            category: 'Trending',
-            style: 'Digital Art',
-            aspectRatio: '1:1',
-            views: 0,
-            likes: 0,
-            saves: 0,
-            comments: 0,
-            createdAt: new Date().toISOString(),
-            isLiked: false,
-            isSaved: false,
-          };
-          addPost(newPost);
-        }
-        toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} created!`);
-      }
+      await startUpload({
+        title,
+        prompt,
+        tags,
+        type,
+        file: selectedFile,
+        previewUrl: type === 'short' ? videoPreview : imagePreview
+      });
+      
+      toast.info('Upload started in background');
       onBack();
     } catch (err: any) {
-      console.error('Post error details:', err);
-      const errorMessage = err.message || err.error_description || 'Unknown error';
-      toast.error(`Failed to publish ${type}: ${errorMessage}`);
+      console.error('Post error:', err);
+      toast.error('Failed to start upload');
     } finally {
       setPublishing(false);
     }
@@ -176,18 +104,10 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
         <h1 className="text-base font-bold text-foreground">Create</h1>
         <button
           onClick={handlePost}
-          disabled={publishing || (type === 'post' && !title.trim()) || (type === 'short' && !selectedFile)}
-          className="ml-auto px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50 relative overflow-hidden"
+          disabled={publishing || (type === 'post' && !title.trim())}
+          className="ml-auto px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
         >
-          {publishing && (
-            <div 
-              className="absolute inset-y-0 left-0 bg-white/20 transition-all duration-200" 
-              style={{ width: `${uploadProgress}%` }} 
-            />
-          )}
-          <span className="relative z-10">
-            {publishing ? `Uploading ${uploadProgress}%` : 'Publish'}
-          </span>
+          {publishing ? 'Starting...' : 'Publish'}
         </button>
       </div>
 

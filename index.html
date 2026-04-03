@@ -21,6 +21,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Qpixa" />
+    <link rel="manifest" href="/manifest.json" />
     
     <title>Qpixa - AI Image & Video Generator</title>
     <style>
@@ -58,6 +59,15 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('Service Worker registered!', reg))
+            .catch(err => console.log('Service Worker registration failed: ', err));
+        });
+      }
+
       // Remove splash screen after a short delay or when window loads
       window.addEventListener('load', () => {
         setTimeout(() => {

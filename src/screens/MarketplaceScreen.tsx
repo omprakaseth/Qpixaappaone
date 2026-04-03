@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { X, Clock, ShoppingCart, ArrowLeft, Trash2 } from 'lucide-react';
 import { Search, SlidersHorizontal, ChevronRight, Star, ChevronDown, Coins, Plus, Bell, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -132,11 +132,18 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20)
-      .then(({ data }) => { if (data) setNotifications(data); });
+    if (!isPlaceholder) {
+      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20)
+        .then(({ data }) => { if (data) setNotifications(data); });
+    }
 
     // Fetch marketplace prompts
     const fetchPrompts = async () => {
+      if (isPlaceholder) {
+        setPrompts(MOCK_MARKETPLACE_PROMPTS);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const { data, error } = await supabase

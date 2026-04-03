@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
@@ -28,6 +28,7 @@ export interface Post {
   createdAt: string;
   isLiked: boolean;
   isSaved: boolean;
+  isShort: boolean;
 }
 
 interface Profile {
@@ -44,9 +45,23 @@ interface Profile {
   cover_url: string | null;
 }
 
+export interface UploadingPost {
+  id: string;
+  title: string;
+  prompt: string;
+  tags: string;
+  type: 'post' | 'short';
+  file: File | null;
+  previewUrl: string | null;
+  progress: number;
+  status: 'uploading' | 'error' | 'success';
+  error?: string;
+}
+
 interface AppState {
   posts: Post[];
   setPosts: React.Dispatch<React.SetStateAction<Post[]>>;
+  initialLoading: boolean;
   user: User | null;
   session: Session | null;
   profile: Profile | null;
@@ -54,6 +69,10 @@ interface AppState {
   isPro: boolean;
   credits: number;
   setCredits: React.Dispatch<React.SetStateAction<number>>;
+  uploadingPost: UploadingPost | null;
+  startUpload: (data: Omit<UploadingPost, 'id' | 'progress' | 'status'>) => Promise<void>;
+  retryUpload: () => Promise<void>;
+  clearUpload: () => void;
   toggleLike: (id: string) => void;
   toggleSave: (id: string) => void;
   addPost: (post: Post) => void;
@@ -90,6 +109,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-2',
@@ -115,6 +135,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-3',
@@ -140,6 +161,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-4',
@@ -165,6 +187,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-5',
@@ -190,6 +213,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-6',
@@ -215,6 +239,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-7',
@@ -240,6 +265,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-8',
@@ -265,6 +291,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-9',
@@ -290,6 +317,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-10',
@@ -315,6 +343,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-11',
@@ -340,6 +369,7 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   },
   {
     id: 'mock-12',
@@ -365,17 +395,107 @@ const MOCK_POSTS: Post[] = [
     createdAt: new Date().toISOString(),
     isLiked: false,
     isSaved: false,
+    isShort: false,
   }
 ];
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [credits, setCredits] = useState(40);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [uploadingPost, setUploadingPost] = useState<UploadingPost | null>(null);
+
+  const startUpload = async (data: Omit<UploadingPost, 'id' | 'progress' | 'status'>) => {
+    const uploadId = `upload-${Date.now()}`;
+    const newUpload: UploadingPost = {
+      ...data,
+      id: uploadId,
+      progress: 0,
+      status: 'uploading'
+    };
+    setUploadingPost(newUpload);
+    performUpload(newUpload);
+  };
+
+  const retryUpload = async () => {
+    if (!uploadingPost) return;
+    const retrying = { ...uploadingPost, status: 'uploading' as const, progress: 0, error: undefined };
+    setUploadingPost(retrying);
+    performUpload(retrying);
+  };
+
+  const clearUpload = () => {
+    setUploadingPost(null);
+  };
+
+  const performUpload = async (upload: UploadingPost) => {
+    if (!user) {
+      setUploadingPost(prev => prev ? { ...prev, status: 'error', error: 'User not logged in' } : null);
+      return;
+    }
+
+    try {
+      let finalUrl = upload.previewUrl;
+
+      if (upload.file) {
+        setUploadingPost(prev => prev ? { ...prev, progress: 10 } : null);
+        
+        const fileExt = upload.file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const bucket = 'prompt-images';
+        const filePath = `${user.id}/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(filePath, upload.file, {
+            contentType: upload.file.type,
+            upsert: false
+          });
+          
+        if (uploadError) throw uploadError;
+        
+        setUploadingPost(prev => prev ? { ...prev, progress: 60 } : null);
+        const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+        finalUrl = data.publicUrl;
+      }
+
+      const postData: any = {
+        creator_id: user.id,
+        title: upload.title.trim(),
+        prompt: upload.prompt.trim(),
+        image_url: finalUrl,
+        is_short: upload.type === 'short',
+        tags: upload.tags.split(',').map(t => t.trim()).filter(Boolean),
+      };
+
+      const { error } = await supabase.from('posts').insert(postData);
+      if (error) throw error;
+
+      setUploadingPost(prev => prev ? { ...prev, progress: 100, status: 'success' } : null);
+      toast.success(`${upload.type === 'short' ? 'Short' : 'Post'} published!`);
+      fetchPosts();
+      
+      // Auto clear after 3 seconds on success
+      setTimeout(() => {
+        setUploadingPost(current => current?.id === upload.id ? null : current);
+      }, 3000);
+
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      setUploadingPost(prev => prev ? { ...prev, status: 'error', error: err.message || 'Upload failed' } : null);
+      toast.error(`Upload failed: ${err.message}`);
+    }
+  };
 
   const fetchPosts = async () => {
+    if (isPlaceholder) {
+      setPosts(MOCK_POSTS);
+      setInitialLoading(false);
+      return;
+    }
     try {
       // Fetch posts with creator profile
       const { data, error } = await supabase
@@ -419,17 +539,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
           createdAt: p.created_at,
           isLiked: false,
           isSaved: false,
+          isShort: p.is_short || false,
         }));
         
         if (formattedPosts.length === 0) {
-          setPosts(MOCK_POSTS);
+          // If it's a real database but empty, keep it empty so we can show a welcome screen
+          // If it's placeholder mode, we use mock posts
+          setPosts(isPlaceholder ? MOCK_POSTS : []);
         } else {
           setPosts(formattedPosts);
         }
       }
     } catch (err) {
       console.error('Error fetching posts:', err);
-      setPosts(MOCK_POSTS); // Fallback to mock posts on error
+      if (isPlaceholder) setPosts(MOCK_POSTS); // Only fallback to mock on error if in placeholder mode
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -459,7 +584,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (isPlaceholder) {
+      console.log('🚀 Supabase Mode: Placeholder/Mock Data (Check your AI Studio Secrets)');
+    } else {
+      console.log('✅ Supabase Connected: Real Database is active');
+    }
+    
     fetchPosts().catch(console.error); // Fetch posts on mount
+
+    if (isPlaceholder) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
@@ -476,7 +609,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleLike = async (id: string) => {
-    if (!user) return; // Must be logged in
+    if (!user || isPlaceholder) return; // Must be logged in
     
     // Optimistic update
     setPosts(prev => prev.map(p =>
@@ -506,7 +639,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleSave = async (id: string) => {
-    if (!user) return; // Must be logged in
+    if (!user || isPlaceholder) return; // Must be logged in
     
     // Optimistic update
     setPosts(prev => prev.map(p =>
@@ -552,6 +685,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (isPlaceholder) {
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      return;
+    }
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
@@ -567,7 +706,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      posts, setPosts, user, session, profile, isLoggedIn, isPro, credits, setCredits,
+      posts, setPosts, initialLoading, user, session, profile, isLoggedIn, isPro, credits, setCredits,
+      uploadingPost, startUpload, retryUpload, clearUpload,
       toggleLike, toggleSave, addPost, deletePost, signOut, refreshProfile, fetchPosts
     }}>
       {children}

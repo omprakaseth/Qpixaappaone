@@ -10,6 +10,8 @@ if (!SUPABASE_URL || !SUPABASE_URL.startsWith('http')) {
 
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key';
 
+export const isPlaceholder = !import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || SUPABASE_ANON_KEY === 'placeholder-anon-key';
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 

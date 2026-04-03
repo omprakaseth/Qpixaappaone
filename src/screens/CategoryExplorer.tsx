@@ -16,6 +16,7 @@ const explorerCategories = [
   { id: 'Cyberpunk', label: 'Cyberpunk', emoji: '🌆' },
   { id: 'Fantasy', label: 'Fantasy', emoji: '🐉' },
   { id: 'Space', label: 'Space', emoji: '🚀' },
+  { id: 'Shorts', label: 'Shorts', emoji: '🎬' },
   { id: 'Characters', label: 'Characters', emoji: '🧙' },
   { id: 'Landscape', label: 'Landscape', emoji: '🏔️' },
 ];

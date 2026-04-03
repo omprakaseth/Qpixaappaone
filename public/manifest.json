@@ -8,7 +8,7 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#0d0e14",
-  "theme_color": "#e65c00",
+  "theme_color": "#8b5cf6",
   "orientation": "portrait",
   "categories": ["graphics", "photo", "utilities"],
   "launch_handler": {
