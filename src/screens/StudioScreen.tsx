@@ -117,73 +117,38 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   ];
 
   const generateWithHuggingFace = async (modelId: string, promptText: string, signal?: AbortSignal) => {
-    // In this environment, secrets from the UI are often available via import.meta.env
-    const HF_TOKEN = import.meta.env.VITE_HF_TOKEN;
-    
-    if (!HF_TOKEN) {
-      console.error('HF_TOKEN is missing in import.meta.env');
-      throw new Error('Hugging Face Token missing. Please ensure you added VITE_HF_TOKEN in Settings -> Secrets and refreshed the app.');
-    }
-
     const callApi = async (retryCount = 0): Promise<any> => {
       try {
         if (signal?.aborted) throw new Error('Aborted');
         
-        console.log(`Calling HF API for model: ${modelId}, attempt: ${retryCount + 1}`);
-        const response = await fetch(
-          `https://api-inference.huggingface.co/models/${modelId}`,
-          {
-            headers: { 
-              Authorization: `Bearer ${HF_TOKEN}`,
-              "Content-Type": "application/json"
-            },
-            method: "POST",
-            body: JSON.stringify({ 
-              inputs: promptText,
-              options: { wait_for_model: true }
-            }),
-            signal // Pass the abort signal
-          }
-        );
+        console.log(`Calling HF Proxy for model: ${modelId}, attempt: ${retryCount + 1}`);
+        const response = await fetch('/api/hf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            modelId,
+            inputs: promptText,
+            options: { wait_for_model: true }
+          }),
+          signal
+        });
 
         if (response.status === 503 && retryCount < 5) {
           setGenerationProgress(prev => Math.min(prev + 2, 98));
-          await new Promise(r => setTimeout(r, 8000)); // Wait longer for HF models
+          await new Promise(r => setTimeout(r, 8000));
           return callApi(retryCount + 1);
         }
 
         if (!response.ok) {
-          const errText = await response.text();
-          let errorMessage = `API Error ${response.status}`;
-          try {
-            const errJson = JSON.parse(errText);
-            errorMessage = errJson.error || errorMessage;
-          } catch {
-            errorMessage = errText.substring(0, 100) || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
-        
-        const blob = await response.blob();
-        if (blob.size < 100) { // Likely an error message even if 200 OK
-          const text = await blob.text();
-          try {
-            const json = JSON.parse(text);
-            if (json.error) throw new Error(json.error);
-          } catch { /* not json */ }
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate image with Hugging Face');
         }
 
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        const data = await response.json();
+        return data.imageUrl;
       } catch (err: any) {
-        console.error('HF API Call failed:', err);
-        if (err.message?.includes('Failed to fetch')) {
-          throw new Error('Connection failed. This might be due to an invalid token or network issues.');
-        }
+        if (err.name === 'AbortError' || err.message === 'Aborted') throw err;
+        console.error('HF API Error:', err);
         throw err;
       }
     };
@@ -363,54 +328,31 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         const result = await generateWithHuggingFace(selectedModel, finalPrompt, controller.signal);
         generatedImageUrl = result as string;
       } else {
-        // Use Gemini 3.1 for better quality
-        const { GoogleGenAI } = await import('@google/genai');
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-        
-        let response;
-        if (imageToSend) {
-          // Edit image
-          const base64Data = imageToSend.split(',')[1];
-          const mimeType = imageToSend.split(';')[0].split(':')[1] || 'image/png';
-          response = await ai.models.generateContent({
+        // Use backend proxy for Gemini models
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: finalPrompt,
             model: selectedModel,
-            contents: {
-              parts: [
-                { inlineData: { data: base64Data, mimeType } },
-                { text: finalPrompt }
-              ]
-            },
+            image: imageToSend,
             config: {
               imageConfig: {
                 aspectRatio: selectedRatio as any,
                 imageSize: "1K"
               }
             }
-          });
-        } else {
-          // Generate image
-          response = await ai.models.generateContent({
-            model: selectedModel,
-            contents: {
-              parts: [{ text: finalPrompt }]
-            },
-            config: {
-              imageConfig: {
-                aspectRatio: selectedRatio as any,
-                imageSize: "1K"
-              }
-            }
-          });
+          }),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to generate image');
         }
 
-        if (controller.signal.aborted) throw new Error('Aborted');
-
-        const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        if (part && part.inlineData) {
-          generatedImageUrl = `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-        } else {
-          throw new Error('No image generated by AI');
-        }
+        const data = await response.json();
+        generatedImageUrl = data.imageUrl;
       }
 
       clearInterval(progressInterval);
@@ -489,15 +431,20 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     
     setEnhancing(true);
     try {
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || process.env.GEMINI_API_KEY });
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`,
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`,
+          type: 'text',
+          model: 'gemini-3-flash-preview'
+        })
       });
+
+      if (!response.ok) throw new Error('Failed to enhance prompt');
       
-      const enhanced = response.text?.trim();
+      const data = await response.json();
+      const enhanced = data.text?.trim();
       if (enhanced) {
         setPrompt(enhanced);
         toast.success('Prompt enhanced!');

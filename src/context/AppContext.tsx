@@ -3,6 +3,8 @@ import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 
+import { usePWAInstall } from '@/hooks/usePWAInstall';
+
 // We redefine Post interface here to match Supabase schema
 export interface Post {
   id: string;
@@ -41,6 +43,7 @@ interface Profile {
   is_banned: boolean;
   is_verified: boolean;
   subscription_plan: string;
+  role?: string;
   created_at: string;
   cover_url: string | null;
 }
@@ -80,6 +83,8 @@ interface AppState {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   fetchPosts: () => Promise<void>;
+  deferredPrompt: any;
+  installApp: () => Promise<void>;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -408,6 +413,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [uploadingPost, setUploadingPost] = useState<UploadingPost | null>(null);
 
+  const { deferredPrompt, promptInstall: installApp } = usePWAInstall();
+
   const startUpload = async (data: Omit<UploadingPost, 'id' | 'progress' | 'status'>) => {
     const uploadId = `upload-${Date.now()}`;
     const newUpload: UploadingPost = {
@@ -438,6 +445,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      // Ensure profile exists before posting (prevents foreign key constraint error)
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (!existingProfile) {
+        const username = user.user_metadata?.username || user.email?.split('@')[0] || 'user';
+        const displayName = user.user_metadata?.display_name || username;
+        await supabase.from('profiles').insert({ id: user.id, username, display_name: displayName });
+      }
+
       let finalUrl = upload.previewUrl;
 
       if (upload.file) {
@@ -559,15 +579,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchProfile = async (currentUser: User) => {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', currentUser.id)
       .single();
-    if (data) {
-      setProfile(data as Profile);
-      setCredits(data.credits);
-    } else if (error?.code === 'PGRST116') {
+
+    if (error?.code === 'PGRST116') {
       // Profile doesn't exist yet — create it
       const username = currentUser?.user_metadata?.username || currentUser?.email?.split('@')[0] || 'user';
       const displayName = currentUser?.user_metadata?.display_name || username;
@@ -576,10 +594,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .insert({ id: currentUser.id, username, display_name: displayName })
         .select()
         .single();
-      if (newProfile) {
-        setProfile(newProfile as Profile);
-        setCredits(newProfile.credits);
+      data = newProfile;
+    }
+
+    if (data) {
+      // Auto-assign admin role to specific email
+      if (currentUser.email === 'omprakashseth248@gmail.com' && (data as any).role !== 'admin') {
+        const { data: updatedProfile } = await supabase
+          .from('profiles')
+          .update({ role: 'admin' } as any)
+          .eq('id', currentUser.id)
+          .select()
+          .single();
+        if (updatedProfile) data = updatedProfile;
       }
+
+      setProfile(data as Profile);
+      setCredits(data.credits);
     }
   };
 
@@ -708,7 +739,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       posts, setPosts, initialLoading, user, session, profile, isLoggedIn, isPro, credits, setCredits,
       uploadingPost, startUpload, retryUpload, clearUpload,
-      toggleLike, toggleSave, addPost, deletePost, signOut, refreshProfile, fetchPosts
+      toggleLike, toggleSave, addPost, deletePost, signOut, refreshProfile, fetchPosts,
+      deferredPrompt, installApp
     }}>
       {children}
     </AppContext.Provider>

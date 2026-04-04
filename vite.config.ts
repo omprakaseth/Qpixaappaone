@@ -12,6 +12,9 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        devOptions: {
+          enabled: true
+        },
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'Qpixa - AI Image & Video Generator',
@@ -20,6 +23,8 @@ export default defineConfig(({mode}) => {
           theme_color: '#000000',
           background_color: '#000000',
           display: 'standalone',
+          start_url: '/',
+          scope: '/',
           icons: [
             {
               src: '/icons/pwa-icon-192.png',

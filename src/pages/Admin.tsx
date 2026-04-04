@@ -17,9 +17,12 @@ import AdminStudioAPI from '@/components/admin/AdminStudioAPI';
 import AdminAdsManager from '@/components/admin/AdminAdsManager';
 import AdminManagement from '@/components/admin/AdminManagement';
 import AdminProfileCard from '@/components/admin/AdminProfileCard';
+import AdminTasks from '@/components/admin/AdminTasks';
+import { ClipboardList } from 'lucide-react';
 
 const ALL_TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'tasks', label: 'Tasks & Orders', icon: ClipboardList },
   { id: 'users', label: 'Users', icon: Users },
   { id: 'content', label: 'Posts', icon: FileText },
   { id: 'prompts', label: 'Prompts', icon: Megaphone },
@@ -178,6 +181,7 @@ export default function Admin() {
 
     switch (activeTab) {
       case 'dashboard': return <AdminDashboard onNavigate={handleNavigate} />;
+      case 'tasks': return <AdminTasks isSuperAdmin={isSuperAdmin} />;
       case 'users': return <AdminUsers {...commonProps} />;
       case 'content': return <AdminContent {...commonProps} />;
       case 'prompts': return <AdminPrompts {...commonProps} />;

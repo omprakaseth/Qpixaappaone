@@ -21,7 +21,8 @@ import RewardedAdModal from '@/components/ads/RewardedAdModal';
 import { useSmartScroll } from '@/hooks/useSmartScroll';
 import { useAdSettings } from '@/hooks/useAdSettings';
 import { Post } from '@/context/AppContext';
-import { Loader2, Sparkles, Key } from 'lucide-react';
+import { Loader2, Sparkles, Key, RotateCcw, Upload, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 function AppShell() {
   const location = useLocation();
@@ -40,22 +41,9 @@ function AppShell() {
   const { posts, isPro, isLoggedIn, user, profile } = useAppState();
   const { settings: adSettings } = useAdSettings();
   const [showRewardAd, setShowRewardAd] = useState(false);
-  const [upgradePopupShown, setUpgradePopupShown] = useState(false);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const upgradeTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // Show upgrade popup once on app load for free users
-  useEffect(() => {
-    if (!isPro && isLoggedIn && !upgradePopupShown) {
-      const timer = setTimeout(() => {
-        setShowUpgradePopup(true);
-        setUpgradePopupShown(true);
-        // Auto-hide after 5 seconds
-        upgradeTimerRef.current = setTimeout(() => setShowUpgradePopup(false), 5000);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isPro, isLoggedIn, upgradePopupShown]);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [createPostData, setCreatePostData] = useState<{ imageUrl?: string; prompt?: string }>({});

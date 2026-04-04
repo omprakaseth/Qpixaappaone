@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   is_banned BOOLEAN DEFAULT FALSE,
   is_verified BOOLEAN DEFAULT FALSE,
   subscription_plan TEXT DEFAULT 'free',
+  role TEXT DEFAULT 'user',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   cover_url TEXT
 );
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS public.posts (
   creator_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   prompt TEXT NOT NULL,
   tags TEXT[] DEFAULT '{}',
+  is_short BOOLEAN DEFAULT false,
   category TEXT,
   style TEXT,
   aspect_ratio TEXT DEFAULT '1:1',
@@ -233,3 +235,65 @@ BEGIN
   RETURN NULL; -- Not authorized
 END;
 $$;
+
+-- 8.5 User Roles & Permissions
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'super_admin', 'moderator')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(user_id, role)
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_permissions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  allowed_tabs TEXT[] DEFAULT '{}',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 9. Admin Tasks Table (For assigning orders to employees)
+CREATE TABLE IF NOT EXISTS public.admin_tasks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  assigned_to UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  assigned_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'pending', -- pending, in_progress, completed
+  priority TEXT DEFAULT 'medium', -- low, medium, high
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 10. Admin Logs Table (For tracking employee actions)
+CREATE TABLE IF NOT EXISTS public.admin_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  admin_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  target_id TEXT,
+  details JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- RLS for Admin Tasks
+ALTER TABLE public.admin_tasks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Super admins can do everything with tasks" ON public.admin_tasks FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'super_admin')
+);
+CREATE POLICY "Admins can view their own tasks" ON public.admin_tasks FOR SELECT USING (
+  assigned_to = auth.uid() OR assigned_by = auth.uid()
+);
+CREATE POLICY "Admins can update their own tasks" ON public.admin_tasks FOR UPDATE USING (
+  assigned_to = auth.uid()
+);
+
+-- RLS for Admin Logs
+ALTER TABLE public.admin_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Super admins can view all logs" ON public.admin_logs FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'super_admin')
+);
+CREATE POLICY "Admins can insert logs" ON public.admin_logs FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin'))
+);
+

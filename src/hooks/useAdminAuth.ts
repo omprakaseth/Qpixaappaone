@@ -18,7 +18,7 @@ export function useAdminAuth() {
     }
     setUser(session.user);
 
-    if (session.user.email === 'qpixerapp@gmail.com') {
+    if (session.user.email === 'qpixerapp@gmail.com' || session.user.email === 'omprakashseth248@gmail.com') {
       setIsAdmin(true);
       setIsSuperAdmin(true);
       setLoading(false);

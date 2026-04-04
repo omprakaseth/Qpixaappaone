@@ -440,8 +440,20 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
         )}
         style={{ paddingTop: topHeaderHeight + stickySectionHeight }}
       >
-        {/* Selected category view */}
-        {selectedCategory ? (
+        {loading ? (
+          <div className="flex flex-col gap-8 px-4 pt-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="space-y-4">
+                <div className="h-6 w-32 bg-secondary/50 rounded-lg animate-pulse" />
+                <div className="flex gap-4 overflow-x-hidden">
+                  {[1, 2].map(j => (
+                    <div key={j} className="w-[85vw] max-w-[340px] h-[220px] rounded-[20px] bg-secondary/30 animate-pulse shrink-0" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : selectedCategory ? (
           <div>
             <div className="flex items-center gap-2 px-4 pt-4 pb-3">
               <button onClick={() => setSelectedCategory(null)} className="p-1.5 rounded-full hover:bg-secondary">

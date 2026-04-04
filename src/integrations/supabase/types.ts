@@ -53,6 +53,39 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_tasks: {
+        Row: {
+          assigned_by: string | null
+          assigned_to: string | null
+          created_at: string
+          description: string | null
+          id: string
+          priority: string | null
+          status: string | null
+          title: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title: string
+        }
+        Update: {
+          assigned_by?: string | null
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          priority?: string | null
+          status?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string

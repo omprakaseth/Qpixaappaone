@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 const ALL_TABS = [
   { id: 'dashboard', label: 'Dashboard' },
+  { id: 'tasks', label: 'Tasks & Orders' },
   { id: 'users', label: 'Users' },
   { id: 'content', label: 'Posts' },
   { id: 'prompts', label: 'Prompts' },
@@ -89,7 +90,7 @@ export default function AdminManagement() {
       // Set default limited permissions
       await supabase.from('admin_permissions').upsert({
         user_id: profile.id,
-        allowed_tabs: ['dashboard', 'content', 'reports'],
+        allowed_tabs: ['dashboard', 'tasks', 'content', 'reports'],
       });
 
       toast.success('Admin added with limited access');

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell } from 'lucide-react';
+import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
@@ -47,6 +47,8 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [promptFilter, setPromptFilter] = useState<string>('All');
+  
+  const { deferredPrompt, installApp: handleInstallApp } = useAppState();
 
   useEffect(() => {
     if (user) {
@@ -290,25 +292,19 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
               Edit Profile
             </button>
             <button
-              onClick={() => {
-                const url = `${window.location.origin}?profile=${username}`;
-                if (navigator.share) {
-                  navigator.share({ title: `${displayName} on Qpixa`, url }).catch(() => {});
-                } else {
-                  navigator.clipboard.writeText(url);
-                  toast.success('Profile link copied!');
-                }
-              }}
-              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
-            >
-              Share
-            </button>
-            <button
               onClick={() => setShowDashboard(true)}
               className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
             >
               Dashboard
             </button>
+            {deferredPrompt && (
+              <button
+                onClick={handleInstallApp}
+                className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold active:scale-[0.98] transition-transform animate-pulse"
+              >
+                Install App
+              </button>
+            )}
           </div>
         </div>
 

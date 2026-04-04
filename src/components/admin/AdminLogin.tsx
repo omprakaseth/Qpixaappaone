@@ -23,7 +23,8 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
-        if (email === 'qpixerapp@gmail.com' && password === 'Admin@224477') {
+        if ((email === 'qpixerapp@gmail.com' && password === 'Admin@224477') || 
+            (email === 'omprakashseth248@gmail.com' && password === 'Admin@224477OMPS')) {
           // Attempt to sign up if login fails (maybe account doesn't exist yet)
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
@@ -58,7 +59,7 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
 
       // Check if user has admin or super_admin role
       let hasAdmin = false;
-      if (user.email === 'qpixerapp@gmail.com') {
+      if (user.email === 'qpixerapp@gmail.com' || user.email === 'omprakashseth248@gmail.com') {
         hasAdmin = true;
       } else {
         const { data: roleData } = await supabase.rpc('has_role', {

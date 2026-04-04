@@ -109,14 +109,15 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: profile.id,
           username: username.trim(),
           display_name: displayName.trim() || null,
           bio: bio.trim() || null,
           avatar_url: avatarUrl || null,
           cover_url: coverUrl || null,
-        })
-        .eq('id', profile.id);
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'id' });
       if (error) throw error;
       toast.success('Profile updated!');
       onSaved();
@@ -126,7 +127,7 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
       if (err.code === '23505') {
         toast.error('Username is already taken');
       } else {
-        toast.error('Failed to save profile');
+        toast.error(`Failed to save profile: ${err.message || 'Unknown error'}`);
       }
     } finally {
       setSaving(false);
