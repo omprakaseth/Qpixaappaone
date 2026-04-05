@@ -14,7 +14,7 @@ interface UserProfile {
   created_at: string;
 }
 
-export default function AdminUsers() {
+export default function AdminUsers({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [creditsModal, setCreditsModal] = useState<{ userId: string; current: number } | null>(null);

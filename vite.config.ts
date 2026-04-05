@@ -12,14 +12,18 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        manifestFilename: 'manifest.json',
+        workbox: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // Increase to 5MB
+        },
         devOptions: {
           enabled: true
         },
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        includeAssets: ['favicon.ico', 'icons/pwa-icon-192.png', 'icons/pwa-icon-512.png'],
         manifest: {
           name: 'Qpixa - AI Image & Video Generator',
           short_name: 'Qpixa',
-          description: 'Create, share, and remix stunning AI-generated images and videos.',
+          description: 'Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community.',
           theme_color: '#000000',
           background_color: '#000000',
           display: 'standalone',
@@ -29,18 +33,20 @@ export default defineConfig(({mode}) => {
             {
               src: '/icons/pwa-icon-192.png',
               sizes: '192x192',
-              type: 'image/png'
-            },
-            {
-              src: '/icons/pwa-icon-512.png',
-              sizes: '512x512',
-              type: 'image/png'
+              type: 'image/png',
+              purpose: 'any'
             },
             {
               src: '/icons/pwa-icon-512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any maskable'
+              purpose: 'any'
+            },
+            {
+              src: '/icons/pwa-icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable'
             }
           ]
         }

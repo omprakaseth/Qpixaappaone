@@ -83,18 +83,41 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   }, [scrollRef]);
 
   const filteredPosts = useMemo(() => {
-    return posts.filter(p => {
+    console.log(`HomeScreen: Filtering ${posts.length} posts. ActiveCategory: ${activeCategory}, Search: ${searchQuery}, Filters:`, filters);
+    const filtered = posts.filter(p => {
+      // 1. Handle "Following" tab
       if (activeCategory === 'Following') {
         const creatorId = (p as any).creator_id;
-        if (!creatorId || (!followingIds.includes(creatorId) && creatorId !== user?.id)) return false;
-      } else if (activeCategory !== 'Trending' && p.category !== activeCategory) {
-        return false;
+        if (!creatorId || (!followingIds.has(creatorId) && creatorId !== user?.id)) return false;
+      } 
+      // 2. Handle "Trending" (Default) - Show everything!
+      else if (activeCategory === 'Trending') {
+        // No category filter for Trending
+      } 
+      // 3. Handle specific category tabs with Smart Logic (Match category OR tags)
+      else {
+        const matchesCategory = p.category === activeCategory;
+        const matchesTags = p.tags?.some(tag => tag.toLowerCase() === activeCategory.toLowerCase());
+        if (!matchesCategory && !matchesTags) return false;
       }
-      if (searchQuery && !p.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+
+      // 4. Handle Search Query (Search in title AND tags)
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const inTitle = p.title?.toLowerCase().includes(q);
+        const inTags = p.tags?.some(tag => tag.toLowerCase().includes(q));
+        const inPrompt = p.prompt?.toLowerCase().includes(q);
+        if (!inTitle && !inTags && !inPrompt) return false;
+      }
+
+      // 5. Handle Filter Panel (Explicit filters)
       if (filters.category !== 'All' && p.category !== filters.category) return false;
       if (filters.style !== 'All' && p.style !== filters.style) return false;
+      
       return true;
     });
+    console.log(`HomeScreen: ${filtered.length} posts remaining after filter`);
+    return filtered;
   }, [posts, activeCategory, searchQuery, filters, followingIds, user?.id]);
 
   const topThisMonth = useMemo(() => {

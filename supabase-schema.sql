@@ -266,34 +266,53 @@ CREATE TABLE IF NOT EXISTS public.admin_tasks (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 10. Admin Logs Table (For tracking employee actions)
-CREATE TABLE IF NOT EXISTS public.admin_logs (
+-- 11. User Notifications Table
+CREATE TABLE IF NOT EXISTS public.user_notifications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  admin_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  action TEXT NOT NULL,
-  target_id TEXT,
-  details JSONB,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  actor_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  type TEXT NOT NULL, -- 'like', 'comment', 'follow', 'system'
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  link TEXT,
+  is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- RLS for Admin Tasks
-ALTER TABLE public.admin_tasks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Super admins can do everything with tasks" ON public.admin_tasks FOR ALL USING (
-  EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'super_admin')
-);
-CREATE POLICY "Admins can view their own tasks" ON public.admin_tasks FOR SELECT USING (
-  assigned_to = auth.uid() OR assigned_by = auth.uid()
-);
-CREATE POLICY "Admins can update their own tasks" ON public.admin_tasks FOR UPDATE USING (
-  assigned_to = auth.uid()
+-- 12. Push Subscriptions Table
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  subscription JSONB NOT NULL,
+  device_type TEXT, -- 'mobile', 'desktop'
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(user_id, subscription)
 );
 
--- RLS for Admin Logs
-ALTER TABLE public.admin_logs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Super admins can view all logs" ON public.admin_logs FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role = 'super_admin')
+-- Enable RLS
+ALTER TABLE public.user_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Users can view their own notifications." ON public.user_notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own notifications." ON public.user_notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "System can insert notifications." ON public.user_notifications FOR INSERT WITH CHECK (true);
+
+-- 13. Post Comments Table
+CREATE TABLE IF NOT EXISTS public.post_comments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  post_id UUID REFERENCES public.posts(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  rating INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-CREATE POLICY "Admins can insert logs" ON public.admin_logs FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
+
+-- Enable RLS
+ALTER TABLE public.post_comments ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Comments are viewable by everyone." ON public.post_comments FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert comments." ON public.post_comments FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Users can delete their own comments." ON public.post_comments FOR DELETE USING (auth.uid() = user_id);
 

@@ -12,23 +12,10 @@ export function useSmartScroll(enabled = true) {
   }, []);
 
   const lastScrollY = useRef(0);
-  const [node, setNode] = useState<HTMLElement | null>(null);
-  const refObject = useRef<HTMLElement | null>(null);
-
-  const scrollRef = useCallback((element: HTMLElement | null) => {
-    refObject.current = element;
-    setNode(element);
-  }, []);
-
-  // Attach .current to the callback ref so it can be used as a RefObject
-  if (!Object.prototype.hasOwnProperty.call(scrollRef, 'current')) {
-    Object.defineProperty(scrollRef, 'current', {
-      get: () => refObject.current,
-    });
-  }
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback((e: Event) => {
-    if (!enabled || !node) return;
+    if (!enabled) return;
     
     const target = e.target as HTMLElement;
     const current = target.scrollTop;
@@ -51,13 +38,14 @@ export function useSmartScroll(enabled = true) {
     }
 
     lastScrollY.current = current;
-  }, [enabled, node, setVisible]);
+  }, [enabled, setVisible]);
 
   useEffect(() => {
+    const node = scrollRef.current;
     if (!node || !enabled) return;
     node.addEventListener('scroll', handleScroll, { passive: true });
     return () => node.removeEventListener('scroll', handleScroll);
-  }, [node, enabled, handleScroll]);
+  }, [enabled, handleScroll]);
 
   // Reset visibility when tab changes (enabled toggles)
   useEffect(() => {
@@ -65,7 +53,7 @@ export function useSmartScroll(enabled = true) {
       setVisible(true);
       lastScrollY.current = 0;
     }
-  }, [enabled, node, setVisible]);
+  }, [enabled, setVisible]);
 
   return { visible: enabled ? visible : true, scrollRef };
 }

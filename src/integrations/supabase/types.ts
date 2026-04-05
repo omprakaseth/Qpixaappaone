@@ -227,6 +227,7 @@ export type Database = {
           prompt_text: string
           rating: number
           sales_count: number
+          tags: string[]
           title: string
         }
         Insert: {
@@ -243,6 +244,7 @@ export type Database = {
           prompt_text: string
           rating?: number
           sales_count?: number
+          tags?: string[]
           title: string
         }
         Update: {
@@ -259,6 +261,7 @@ export type Database = {
           prompt_text?: string
           rating?: number
           sales_count?: number
+          tags?: string[]
           title?: string
         }
         Relationships: []
@@ -347,36 +350,51 @@ export type Database = {
       }
       posts: {
         Row: {
+          audio_name: string | null
+          category: string | null
           created_at: string
           creator_id: string
           id: string
           image_url: string | null
           is_featured: boolean
           is_hidden: boolean
+          is_short: boolean
           likes: number
           prompt: string
+          tags: string[]
+          title: string | null
           views: number
         }
         Insert: {
+          audio_name?: string | null
+          category?: string | null
           created_at?: string
           creator_id: string
           id?: string
           image_url?: string | null
           is_featured?: boolean
           is_hidden?: boolean
+          is_short?: boolean
           likes?: number
           prompt: string
+          tags?: string[]
+          title?: string | null
           views?: number
         }
         Update: {
+          audio_name?: string | null
+          category?: string | null
           created_at?: string
           creator_id?: string
           id?: string
           image_url?: string | null
           is_featured?: boolean
           is_hidden?: boolean
+          is_short?: boolean
           likes?: number
           prompt?: string
+          tags?: string[]
+          title?: string | null
           views?: number
         }
         Relationships: []

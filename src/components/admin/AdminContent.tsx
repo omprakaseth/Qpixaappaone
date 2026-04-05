@@ -15,7 +15,7 @@ interface Post {
   created_at: string;
 }
 
-export default function AdminContent() {
+export default function AdminContent({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());

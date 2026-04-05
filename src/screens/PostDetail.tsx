@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert, Sparkles, Check, X } from 'lucide-react';
 import { formatNumber, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,19 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Comment {
+  id: string;
+  content: string;
+  rating: number;
+  user_id: string;
+  created_at: string;
+  profiles?: {
+    display_name: string;
+    avatar_url: string;
+  };
+}
 
 interface PostDetailProps {
   post: Post;
@@ -18,14 +31,39 @@ interface PostDetailProps {
 }
 
 export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: PostDetailProps) {
-  const { toggleLike, toggleSave, isPro, isLoggedIn, user, deletePost } = useAppState();
+  const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
   const [zoomed, setZoomed] = useState(false);
   const [reviewText, setReviewText] = useState('');
   const [rating, setRating] = useState(0);
-  const [reviews, setReviews] = useState<{rating: number, text: string, user: string}[]>([]);
+  const [reviews, setReviews] = useState<Comment[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReportConfirm, setShowReportConfirm] = useState(false);
+
+  useEffect(() => {
+    const fetchReviews = async () => {
+      setLoadingReviews(true);
+      const { data, error } = await (supabase as any)
+        .from('post_comments')
+        .select(`
+          *,
+          profiles:user_id (
+            display_name,
+            avatar_url
+          )
+        `)
+        .eq('post_id', post.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setReviews(data as unknown as Comment[]);
+      }
+      setLoadingReviews(false);
+    };
+
+    fetchReviews();
+  }, [post.id]);
 
   if (!post || !post.creator) {
     return (
@@ -82,8 +120,8 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
     toast.success('Prompt copied!');
   };
 
-  const handleSubmitReview = () => {
-    if (!isLoggedIn) {
+  const handleSubmitReview = async () => {
+    if (!isLoggedIn || !user) {
       toast.error('Please sign in to leave a review');
       return;
     }
@@ -96,10 +134,45 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       return;
     }
     
-    setReviews([{ rating, text: reviewText, user: 'You' }, ...reviews]);
-    setReviewText('');
-    setRating(0);
-    toast.success('Review submitted!');
+    try {
+      const { data, error } = await (supabase as any)
+        .from('post_comments')
+        .insert({
+          post_id: post.id,
+          user_id: user.id,
+          content: reviewText,
+          rating: rating
+        })
+        .select(`
+          *,
+          profiles:user_id (
+            display_name,
+            avatar_url
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      // Send notification to post creator
+      if (post.creator.id !== user.id) {
+        await (supabase as any).from('user_notifications').insert({
+          user_id: post.creator.id,
+          actor_id: user.id,
+          type: 'comment',
+          title: 'New Comment! 💬',
+          message: `${profile?.display_name || 'Someone'} commented on your post "${post.title}"`,
+          link: `/post/${post.id}`
+        });
+      }
+
+      setReviews([data as unknown as Comment, ...reviews]);
+      setReviewText('');
+      setRating(0);
+      toast.success('Review submitted!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to submit review');
+    }
   };
 
   const handleDelete = async () => {
@@ -286,20 +359,31 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
           </div>
 
           <div className="space-y-4">
-            {reviews.map((review, idx) => (
-              <div key={idx} className="bg-secondary/10 rounded-2xl p-4 border border-border/20">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-foreground">{review.user}</span>
-                  <div className="flex items-center gap-0.5">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} size={10} fill={i < review.rating ? '#FFB800' : 'none'} color={i < review.rating ? '#FFB800' : 'currentColor'} className="text-yellow-400" />
-                    ))}
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{review.text}</p>
+            {loadingReviews ? (
+              <div className="flex justify-center py-4">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            ))}
-            {reviews.length === 0 && (
+            ) : (
+              reviews.map((review) => (
+                <div key={review.id} className="bg-secondary/10 rounded-2xl p-4 border border-border/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-secondary overflow-hidden">
+                        {review.profiles?.avatar_url && <img src={review.profiles.avatar_url} alt="" className="w-full h-full object-cover" />}
+                      </div>
+                      <span className="text-xs font-bold text-foreground">{review.profiles?.display_name || 'User'}</span>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      {[...Array(5)].map((_, i) => (
+                        <Star key={i} size={10} fill={i < review.rating ? '#FFB800' : 'none'} color={i < review.rating ? '#FFB800' : 'currentColor'} className="text-yellow-400" />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{review.content}</p>
+                </div>
+              ))
+            )}
+            {!loadingReviews && reviews.length === 0 && (
               <div className="text-center py-8">
                 <MessageSquare size={32} className="mx-auto text-muted-foreground/20 mb-2" />
                 <p className="text-xs text-muted-foreground">No reviews yet. Be the first!</p>

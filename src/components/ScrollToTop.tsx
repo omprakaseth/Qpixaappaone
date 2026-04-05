@@ -7,7 +7,7 @@ interface ScrollToTopProps {
 
 export default function ScrollToTop({ scrollRef }: ScrollToTopProps) {
   const [show, setShow] = useState(false);
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const resetHideTimer = () => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -18,6 +18,7 @@ export default function ScrollToTop({ scrollRef }: ScrollToTopProps) {
     const el = scrollRef.current;
     if (!el) return;
     const handleScroll = () => {
+      if (!el) return;
       const shouldShow = el.scrollTop > 400;
       if (shouldShow) {
         setShow(true);

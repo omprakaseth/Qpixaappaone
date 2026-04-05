@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Coins } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
-export default function AdminCredits() {
+export default function AdminCredits({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [totalCredits, setTotalCredits] = useState(0);
   const [avgCredits, setAvgCredits] = useState(0);
 

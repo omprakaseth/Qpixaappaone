@@ -1,6 +1,7 @@
 import React from 'react';
-import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
+import { Home, PlaySquare, Sparkles, Bell, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useNotifications } from '@/context/NotificationContext';
 
 interface BottomNavProps {
   activeTab: string;
@@ -12,12 +13,14 @@ const tabs = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'shorts', label: 'Shorts', icon: PlaySquare },
   { id: 'studio', label: 'Studio', icon: Sparkles },
-  { id: 'favorites', label: 'Favorites', icon: Heart },
+  { id: 'notifications', label: 'Alerts', icon: Bell },
   { id: 'profile', label: 'Profile', icon: User },
 ];
 
 const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
   ({ activeTab, onTabChange, visible }, ref) => {
+    const { unreadCount } = useNotifications();
+
     return (
       <nav
         ref={ref}
@@ -40,19 +43,26 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
               <button
                 key={id}
                 onClick={() => onTabChange(id)}
-                className="flex flex-col items-center gap-0.5 flex-1 py-1 active:scale-95 transition-transform"
+                className="flex flex-col items-center gap-0.5 flex-1 py-1 active:scale-95 transition-transform relative"
               >
-                <Icon
-                  size={22}
-                  className="transition-all duration-200"
-                  style={{
-                    color: isActive 
-                      ? (isShortsTab ? '#fff' : 'hsl(var(--primary))') 
-                      : (isShortsTab ? 'rgba(255,255,255,0.6)' : 'hsl(var(--muted-foreground))'),
-                    transform: isActive ? 'scale(1.1)' : 'scale(1)',
-                  }}
-                  strokeWidth={isActive ? 2.5 : 1.8}
-                />
+                <div className="relative">
+                  <Icon
+                    size={22}
+                    className="transition-all duration-200"
+                    style={{
+                      color: isActive 
+                        ? (isShortsTab ? '#fff' : 'hsl(var(--primary))') 
+                        : (isShortsTab ? 'rgba(255,255,255,0.6)' : 'hsl(var(--muted-foreground))'),
+                      transform: isActive ? 'scale(1.1)' : 'scale(1)',
+                    }}
+                    strokeWidth={isActive ? 2.5 : 1.8}
+                  />
+                  {id === 'notifications' && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground border border-background">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </div>
                 <span
                   className="text-[10px] font-medium transition-colors"
                   style={{ 

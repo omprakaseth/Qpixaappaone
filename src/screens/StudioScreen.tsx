@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square } from 'lucide-react';
+import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import ImageViewer from '@/components/ImageViewer';
+import AILoader from '@/components/AILoader';
 import { useAppState } from '@/context/AppContext';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { analytics } from '@/lib/analytics';
+import { GoogleGenAI } from '@google/genai';
 
 const STYLE_PRESETS = [
   { id: 'none', name: 'None', prompt: '' },
@@ -63,6 +66,15 @@ interface ChatMessage {
   imageUrl?: string;
   attachedImageUrl?: string;
   createdAt: string;
+  status?: 'pending' | 'success' | 'error';
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface StudioScreenProps {
@@ -71,8 +83,30 @@ interface StudioScreenProps {
   onPublish?: (imageUrl: string, prompt: string) => void;
 }
 
-function AiMessageBubble({ msg, isPro, onPublish, onBookmark, onDownload, onShare, onReusePrompt, setViewerImage }: any) {
+function AiMessageBubble({ msg, isPro, onPublish, onBookmark, onDownload, onShare, onReusePrompt, setViewerImage, onStop, generating }: any) {
   const [showPrompt, setShowPrompt] = useState(false);
+
+  if (msg.status === 'pending') {
+    return (
+      <div className="flex justify-start items-center gap-4">
+        <AILoader showSecondary={false} />
+      </div>
+    );
+  }
+
+  if (msg.status === 'error') {
+    return (
+      <div className="flex justify-start">
+        <div className="bg-destructive/10 text-destructive rounded-2xl rounded-bl-sm p-4 border border-destructive/20 max-w-[85%]">
+          <div className="flex items-center gap-2 mb-2">
+            <Flag size={16} />
+            <span className="text-xs font-bold uppercase tracking-wider">Generation Failed</span>
+          </div>
+          <p className="text-sm leading-relaxed">{msg.text}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex justify-start">
@@ -91,12 +125,20 @@ function AiMessageBubble({ msg, isPro, onPublish, onBookmark, onDownload, onShar
           ) : (
             <button onClick={() => setShowPrompt(true)} className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-3 bg-secondary/50 px-2 py-1 rounded-md">Show Prompt</button>
           )}
-          <div className="flex items-center gap-4">
-            <button onClick={() => msg.imageUrl && onPublish?.(msg.imageUrl, msg.text || '')} className="text-muted-foreground hover:text-primary transition-colors" title="Publish"><Upload size={16} /></button>
-            <button onClick={() => msg.imageUrl && onBookmark(msg.imageUrl, msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors"><Bookmark size={16} /></button>
-            <button onClick={() => msg.imageUrl && onDownload(msg.imageUrl)} className="text-muted-foreground hover:text-foreground transition-colors"><Download size={16} /></button>
-            <button onClick={() => msg.imageUrl && onShare(msg.imageUrl, msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors"><Share2 size={16} /></button>
-            <button onClick={() => onReusePrompt(msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors" title="Reuse Prompt"><RotateCcw size={16} /></button>
+          <div className="flex items-center justify-between mt-1">
+            <div className="flex items-center gap-4">
+              <button onClick={() => msg.imageUrl && onBookmark(msg.imageUrl, msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors" title="Bookmark"><Bookmark size={16} /></button>
+              <button onClick={() => msg.imageUrl && onDownload(msg.imageUrl)} className="text-muted-foreground hover:text-foreground transition-colors" title="Download"><Download size={16} /></button>
+              <button onClick={() => msg.imageUrl && onShare(msg.imageUrl, msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors" title="Share"><Share2 size={16} /></button>
+              <button onClick={() => onReusePrompt(msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors" title="Reuse Prompt"><RotateCcw size={16} /></button>
+            </div>
+            <button 
+              onClick={() => msg.imageUrl && onPublish?.(msg.imageUrl, msg.text || '')} 
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all text-[10px] font-bold uppercase tracking-wider"
+            >
+              <Upload size={14} />
+              Post to Feed
+            </button>
           </div>
         </div>
       </div>
@@ -156,6 +198,78 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     return callApi();
   };
 
+  const generateWithGemini = async (modelId: string, promptText: string, imageBase64?: string | null, signal?: AbortSignal) => {
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Generation timed out. Please try again or check your connection.')), 60000);
+    });
+
+    const generationPromise = (async () => {
+      try {
+        let apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
+        
+        if (!apiKey && (window as any).aistudio?.openSelectKey) {
+          toast.info('Please select an API key to continue with this model.');
+          await (window as any).aistudio.openSelectKey();
+          apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
+        }
+
+        if (!apiKey) {
+          throw new Error('No API key found. Please add GEMINI_API_KEY to your environment or select a key in AI Studio.');
+        }
+
+        const ai = new GoogleGenAI({ apiKey });
+        const isGemini3 = modelId.includes('gemini-3');
+        
+        let contents: any;
+        if (imageBase64) {
+          const base64Data = imageBase64.split(',')[1];
+          const mimeType = imageBase64.split(';')[0].split(':')[1] || 'image/png';
+          contents = {
+            parts: [
+              { inlineData: { data: base64Data, mimeType } },
+              { text: promptText }
+            ]
+          };
+        } else {
+          contents = {
+            parts: [{ text: promptText }]
+          };
+        }
+
+        // Optimize config: Only send imageSize for Gemini 3 models
+        const config: any = {
+          imageConfig: {
+            aspectRatio: selectedRatio as any,
+          }
+        };
+
+        if (isGemini3) {
+          config.imageConfig.imageSize = "1K";
+        }
+
+        const response = await ai.models.generateContent({
+          model: modelId,
+          contents,
+          config
+        });
+
+        const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+        if (part && part.inlineData) {
+          return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
+        } else {
+          throw new Error("No image generated by AI. The model might have returned text instead or blocked the request.");
+        }
+      } catch (err: any) {
+        console.error('Gemini Client Error:', err);
+        throw err;
+      }
+    })();
+
+    // Race between generation and timeout
+    return Promise.race([generationPromise, timeoutPromise]) as Promise<string>;
+  };
+
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
@@ -164,6 +278,10 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const [generationProgress, setGenerationProgress] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
@@ -174,7 +292,10 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const { height: vpHeight, offsetTop: vpOffsetTop, isKeyboardVisible } = useVisualViewport();
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [longPressSession, setLongPressSession] = useState<ChatSession | null>(null);
+  const [showSessionActions, setShowSessionActions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -195,43 +316,108 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     }
   }, [prompt]);
 
-  // Load generation history from DB
+  // Load sessions from Local Storage
   useEffect(() => {
-    const loadHistory = async () => {
-      if (!user) return;
+    const loadSessions = () => {
       try {
-        const { data, error } = await supabase.from('generations').select('*').eq('user_id', user.id).order('created_at', { ascending: true }).limit(50);
-        if (error) {
-          console.error('Error loading history:', error);
-          return;
-        }
-        if (data && data.length > 0) {
-          const restored: ChatMessage[] = [];
-          data.forEach((g: any) => {
-            // User message
-            restored.push({ id: `h-u-${g.id}`, type: 'user', text: g.prompt, createdAt: new Date(g.created_at).toLocaleDateString() });
-            // AI message (only if image exists)
-            if (g.image_url) {
-              restored.push({ id: `h-a-${g.id}`, type: 'ai', text: g.prompt, imageUrl: g.image_url, createdAt: new Date(g.created_at).toLocaleDateString() });
+        const savedSessions = localStorage.getItem('qpixa_studio_sessions');
+        if (savedSessions) {
+          const parsed: ChatSession[] = JSON.parse(savedSessions);
+          setSessions(parsed);
+          
+          // If there are sessions, load the most recent one
+          if (parsed.length > 0 && !currentSessionId) {
+            const mostRecent = parsed[0];
+            setCurrentSessionId(mostRecent.id);
+            setMessages(mostRecent.messages);
+            
+            // Check for pending generations and resume if possible
+            const pendingMsg = mostRecent.messages.find(m => m.status === 'pending');
+            if (pendingMsg && !generating) {
+              // We can't easily auto-resume because we might lack context (like attached image)
+              // But we can mark it as error so user can retry, or just leave it.
+              // For now, let's just mark it as error so it doesn't stay stuck forever
+              const updatedMessages = mostRecent.messages.map(m => 
+                m.status === 'pending' ? { ...m, status: 'error' as const, text: 'Generation interrupted. Please try again.' } : m
+              );
+              setMessages(updatedMessages);
+              updateSessionMessages(mostRecent.id, updatedMessages);
             }
-          });
-          // For chat messages, we want oldest first (as they are in 'restored')
-          setMessages(restored);
-          // For history sidebar, we want newest first
-          setHistory([...restored].reverse());
+          }
         }
       } catch (e) {
-        console.error('Failed to load history', e);
+        console.error('Failed to load sessions', e);
       }
     };
-    loadHistory();
-  }, [user]);
+    loadSessions();
+  }, []);
+
+  // Helper to save sessions to local storage
+  const saveSessionsToLocalStorage = (updatedSessions: ChatSession[]) => {
+    try {
+      localStorage.setItem('qpixa_studio_sessions', JSON.stringify(updatedSessions));
+    } catch (e) {
+      console.error('Failed to save sessions', e);
+    }
+  };
+
+  const handleCreateSession = (firstPrompt: string): ChatSession => {
+    const newSession: ChatSession = {
+      id: `session-${Date.now()}`,
+      title: firstPrompt.slice(0, 30) + (firstPrompt.length > 30 ? '...' : ''),
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setSessions(prev => [newSession, ...prev]);
+    setCurrentSessionId(newSession.id);
+    return newSession;
+  };
+
+  const updateSessionMessages = (sessionId: string, newMessages: ChatMessage[]) => {
+    setSessions(prev => {
+      const updated = prev.map(s => 
+        s.id === sessionId 
+          ? { ...s, messages: newMessages, updatedAt: new Date().toISOString() } 
+          : s
+      );
+      saveSessionsToLocalStorage(updated);
+      return updated;
+    });
+  };
+
+  const handleRenameSession = (id: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    setSessions(prev => {
+      const updated = prev.map(s => s.id === id ? { ...s, title: newTitle } : s);
+      saveSessionsToLocalStorage(updated);
+      return updated;
+    });
+    setEditingSessionId(null);
+  };
+
+  const handleDeleteSession = (id: string) => {
+    setSessions(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      saveSessionsToLocalStorage(updated);
+      return updated;
+    });
+    if (currentSessionId === id) {
+      handleNewChat();
+    }
+  };
+
+  const handleSelectSession = (session: ChatSession) => {
+    setCurrentSessionId(session.id);
+    setMessages(session.messages);
+    setMenuOpen(false);
+  };
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -245,13 +431,34 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      setAttachedImage(base64);
-      setAttachedPreview(base64);
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingAttachment(true);
+    setAttachedPreview(URL.createObjectURL(file));
+
+    try {
+      if (!user) throw new Error('Please login to upload images');
+      
+      const fileName = `attachment-${Date.now()}-${file.name}`;
+      const filePath = `${user.id}/${fileName}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('prompt-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('prompt-images')
+        .getPublicUrl(filePath);
+
+      setAttachedImage(publicUrl);
+      toast.success('Image uploaded successfully');
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      toast.error('Failed to upload image');
+      setAttachedPreview(null);
+    } finally {
+      setIsUploadingAttachment(false);
+    }
     e.target.value = '';
   };
 
@@ -268,30 +475,37 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       return;
     }
 
-    // Check if Gemini 3 model is selected and if API key is needed
-    if (selectedModel === 'gemini-3.1-flash-image-preview') {
-      const hasKey = await (window as any).aistudio?.hasSelectedApiKey();
-      if (!hasKey) {
-        toast.info('This model requires a paid API key. Please select one.');
-        await (window as any).aistudio?.openSelectKey();
-        return;
-      }
-    }
-
-    if (credits <= 0) {
-      toast.error('No credits remaining. Please add credits to continue.');
-      return;
-    }
-
     const userPrompt = prompt.trim();
+    
+    // 1. Manage Session
+    let activeSessionId = currentSessionId;
+    if (!activeSessionId) {
+      const newSession = handleCreateSession(userPrompt);
+      activeSessionId = newSession.id;
+    }
+
+    // 2. Add User Message and Pending AI Message immediately
     const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
+      id: `msg-u-${Date.now()}`,
       type: 'user',
       text: userPrompt,
       attachedImageUrl: attachedPreview || undefined,
-      createdAt: 'Just now',
+      createdAt: new Date().toISOString(),
+      status: 'success'
     };
-    setMessages(prev => [...prev, userMsg]);
+
+    const pendingAiMsg: ChatMessage = {
+      id: `msg-a-pending-${Date.now()}`,
+      type: 'ai',
+      text: userPrompt,
+      createdAt: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    const newMessages = [...messages, userMsg, pendingAiMsg];
+    setMessages(newMessages);
+    updateSessionMessages(activeSessionId, newMessages);
+    
     setPrompt('');
     setGenerating(true);
     setGenerationProgress(0);
@@ -304,7 +518,6 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     const progressInterval = setInterval(() => {
       setGenerationProgress(prev => {
         if (prev >= 98) return 98;
-        // Faster progress initially
         const increment = prev < 40 ? 18 : prev < 70 ? 8 : prev < 90 ? 3 : 1;
         return prev + increment;
       });
@@ -315,7 +528,6 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
     try {
       let generatedImageUrl = '';
-      
       const stylePrompt = STYLE_PRESETS.find(s => s.id === selectedStyle)?.prompt || '';
       let finalPrompt = stylePrompt ? `${userPrompt}, ${stylePrompt}` : userPrompt;
       if (negativePrompt.trim()) {
@@ -323,68 +535,50 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       }
 
       const currentModel = MODELS.find(m => m.id === selectedModel);
-
       if (currentModel?.provider === 'HuggingFace') {
-        const result = await generateWithHuggingFace(selectedModel, finalPrompt, controller.signal);
-        generatedImageUrl = result as string;
+        generatedImageUrl = await generateWithHuggingFace(selectedModel, finalPrompt, controller.signal);
       } else {
-        // Use backend proxy for Gemini models
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: finalPrompt,
-            model: selectedModel,
-            image: imageToSend,
-            config: {
-              imageConfig: {
-                aspectRatio: selectedRatio as any,
-                imageSize: "1K"
-              }
-            }
-          }),
-          signal: controller.signal
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to generate image');
-        }
-
-        const data = await response.json();
-        generatedImageUrl = data.imageUrl;
+        generatedImageUrl = await generateWithGemini(selectedModel, finalPrompt, imageToSend, controller.signal);
       }
 
       clearInterval(progressInterval);
       setGenerationProgress(100);
 
-      // Deduct credit manually since we bypassed the edge function
+      // Update AI Message to success
+      const finalAiMsg: ChatMessage = {
+        ...pendingAiMsg,
+        id: `msg-a-${Date.now()}`,
+        imageUrl: generatedImageUrl,
+        status: 'success'
+      };
+
+      const finalMessages = [...messages, userMsg, finalAiMsg];
+      setMessages(finalMessages);
+      updateSessionMessages(activeSessionId, finalMessages);
+
+      // Deduct credit
       if (user) {
         await supabase.from('profiles').update({ credits: credits - 1 }).eq('id', user.id);
-        setCredits(prev => prev - 1); // Update UI immediately
+        setCredits(prev => prev - 1);
       }
 
-      const aiMsg: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        type: 'ai',
-        text: userPrompt,
-        imageUrl: generatedImageUrl,
-        createdAt: 'Just now',
-      };
-      setMessages(prev => [...prev, aiMsg]);
-      setHistory(prev => [aiMsg, ...prev]);
-
-      // Save to generation history
-      try {
-        if (user) {
-          await supabase.from('generations').insert({
-            user_id: user.id,
-            prompt: userPrompt,
-            image_url: generatedImageUrl,
-          });
+      // Save to DB
+      if (user && !isPlaceholder) {
+        let finalImageUrl = generatedImageUrl;
+        if (generatedImageUrl.startsWith('data:')) {
+          try {
+            const res = await fetch(generatedImageUrl);
+            const blob = await res.blob();
+            const fileName = `studio-${Date.now()}.png`;
+            const filePath = `${user.id}/${fileName}`;
+            const { error: uploadError } = await supabase.storage.from('prompt-images').upload(filePath, blob, { contentType: 'image/png' });
+            if (!uploadError) {
+              const { data: { publicUrl } } = supabase.storage.from('prompt-images').getPublicUrl(filePath);
+              finalImageUrl = publicUrl;
+            }
+          } catch (e) { console.error(e); }
         }
-      } catch (e) {
-        console.error('Failed to save history:', e);
+        await supabase.from('generations').insert({ user_id: user.id, prompt: userPrompt, image_url: finalImageUrl });
       }
 
       await refreshProfile();
@@ -392,26 +586,21 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     } catch (err: any) {
       clearInterval(progressInterval);
       abortControllerRef.current = null;
+      
+      // Update AI Message to error
+      const errorAiMsg: ChatMessage = {
+        ...pendingAiMsg,
+        status: 'error',
+        text: `Error: ${err.message || 'Generation failed'}`
+      };
+      const errorMessages = [...messages, userMsg, errorAiMsg];
+      setMessages(errorMessages);
+      updateSessionMessages(activeSessionId, errorMessages);
+
       if (err.message === 'Aborted') {
         toast.info('Generation stopped');
-        setGenerating(false);
-        setGenerationProgress(0);
-        return;
-      }
-      console.error('Generation error:', err);
-      const errorMsg = err.message || 'Something went wrong. Please try again.';
-      
-      if (errorMsg.includes('Requested entity was not found') || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('403')) {
-        toast.error('API Key error. Please select a valid Google Cloud API key with Gemini API enabled.');
-        if (window.aistudio && window.aistudio.openSelectKey) {
-          try {
-            await window.aistudio.openSelectKey();
-          } catch (e) {
-            console.error('Failed to open key selector', e);
-          }
-        }
       } else {
-        toast.error(errorMsg);
+        toast.error(err.message || 'Something went wrong');
       }
     } finally {
       setGenerating(false);
@@ -431,20 +620,22 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     
     setEnhancing(true);
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`,
-          type: 'text',
-          model: 'gemini-3-flash-preview'
-        })
+      let apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
+      
+      if (!apiKey && (window as any).aistudio?.openSelectKey) {
+        await (window as any).aistudio.openSelectKey();
+        apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
+      }
+
+      if (!apiKey) throw new Error('API Key missing');
+
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`
       });
 
-      if (!response.ok) throw new Error('Failed to enhance prompt');
-      
-      const data = await response.json();
-      const enhanced = data.text?.trim();
+      const enhanced = response.text?.trim();
       if (enhanced) {
         setPrompt(enhanced);
         toast.success('Prompt enhanced!');
@@ -460,6 +651,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const handleNewChat = () => { 
     setMessages([]); 
     setPrompt(''); 
+    setCurrentSessionId(null);
     removeAttachment(); 
     setSelectedStyle('none'); 
     setSelectedRatio('1:1'); 
@@ -603,6 +795,24 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     setFeedbackText('');
   };
 
+  const handleShareSession = async (session: ChatSession) => {
+    try {
+      const text = `Check out my AI Studio chat: "${session.title}" on Qpixa!`;
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Qpixa AI Studio Chat',
+          text: text,
+          url: window.location.href
+        });
+      } else {
+        await navigator.clipboard.writeText(text);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Share error:', err);
+    }
+  };
+
   const containerStyle: React.CSSProperties = isKeyboardVisible
     ? { position: 'fixed', top: `${vpOffsetTop}px`, left: 0, right: 0, height: `${vpHeight}px`, zIndex: 30 }
     : { position: 'fixed', top: 0, left: 0, right: 0, bottom: '56px', zIndex: 30 };
@@ -620,53 +830,104 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
           </SheetTrigger>
           <SheetContent side="left" className="w-80 bg-card border-border p-0 flex flex-col" onOpenAutoFocus={(e) => e.preventDefault()}>
             <div className="p-4 border-b border-border shrink-0">
-              <SheetTitle className="text-base font-bold text-foreground">AI Studio</SheetTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Generation History</p>
+              <SheetTitle className="text-base font-bold text-foreground">Chat History</SheetTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Manage your conversations</p>
               
               <div className="mt-4 space-y-3">
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <input
                     type="text"
-                    placeholder="Search history..."
+                    placeholder="Search chats..."
                     value={historySearch}
                     onChange={(e) => setHistorySearch(e.target.value)}
                     className="w-full bg-secondary text-foreground text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:ring-1 focus:ring-primary"
                   />
                 </div>
-                
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-                  <Filter size={12} className="text-muted-foreground shrink-0" />
-                  {(['all', 'today', 'week', 'month'] as const).map(filter => (
-                    <button
-                      key={filter}
-                      onClick={() => setHistoryFilter(filter)}
-                      className={`px-3 py-1 rounded-full text-[10px] font-semibold capitalize shrink-0 transition-colors ${
-                        historyFilter === filter ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {filter}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {historyMessages.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-8">No generations yet</p>
+              {sessions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Clock size={32} className="mb-2 opacity-20" />
+                  <p className="text-xs">No chat history yet</p>
+                </div>
               ) : (
-                historyMessages.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => { setPrompt(item.text || ''); setMenuOpen(false); }}
-                    className="w-full text-left bg-secondary rounded-xl p-3 hover:bg-muted transition-colors"
+                sessions.filter(s => s.title.toLowerCase().includes(historySearch.toLowerCase())).map(session => (
+                  <div
+                    key={session.id}
+                    className={cn(
+                      "group relative flex items-center gap-3 w-full p-3 rounded-xl transition-all cursor-pointer",
+                      currentSessionId === session.id ? "bg-primary/10 border border-primary/20" : "bg-secondary/50 hover:bg-secondary border border-transparent"
+                    )}
+                    onClick={() => handleSelectSession(session)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setLongPressSession(session);
+                      setShowSessionActions(true);
+                    }}
                   >
-                    {item.imageUrl && <img src={item.imageUrl} alt="" className="w-full aspect-video object-cover rounded-lg mb-2" />}
-                    <p className="text-xs text-foreground line-clamp-2">{item.text}</p>
-                    <span className="text-[10px] text-muted-foreground">{item.createdAt}</span>
-                  </button>
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <MessageSquare size={16} className="text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {editingSessionId === session.id ? (
+                        <input
+                          autoFocus
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onBlur={() => handleRenameSession(session.id, editTitle)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleRenameSession(session.id, editTitle)}
+                          className="w-full bg-background text-xs font-medium py-0.5 px-1 rounded outline-none ring-1 ring-primary"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <p className="text-xs font-medium text-foreground truncate">{session.title}</p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {new Date(session.updatedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                    
+                    {/* Status Icon for Pending */}
+                    {session.messages.some(m => m.status === 'pending') && (
+                      <RotateCcw size={12} className="text-primary animate-spin shrink-0" />
+                    )}
+
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSessionId(session.id);
+                          setEditTitle(session.title);
+                        }}
+                        className="p-1 hover:bg-background rounded"
+                      >
+                        <PenLine size={12} className="text-muted-foreground hover:text-foreground" />
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteSession(session.id);
+                        }}
+                        className="p-1 hover:bg-background rounded"
+                      >
+                        <Trash2 size={12} className="text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                  </div>
                 ))
               )}
+            </div>
+            
+            <div className="p-4 border-t border-border">
+              <button 
+                onClick={() => { handleNewChat(); setMenuOpen(false); }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+              >
+                <Plus size={18} />
+                New Chat
+              </button>
             </div>
           </SheetContent>
         </Sheet>
@@ -804,47 +1065,11 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                   onShare={handleShare} 
                   onReusePrompt={setPrompt} 
                   setViewerImage={setViewerImage} 
+                  onStop={handleStop}
+                  generating={generating}
                 />
               )
             ))}
-            {generating && (
-              <div className="flex justify-start">
-                <div className="bg-card rounded-2xl rounded-bl-sm p-4 max-w-[85%] border border-border/50 shadow-sm w-full">
-                  <div className="flex items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                          <Sparkles className="w-4 h-4 text-primary animate-pulse" />
-                        </div>
-                        <div className="absolute inset-0 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{attachedImage ? 'Editing image...' : 'Generating image...'}</p>
-                        <p className="text-xs text-muted-foreground">This usually takes 5-10 seconds</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={handleStop}
-                      className="px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-[10px] font-bold hover:bg-destructive/20 transition-colors"
-                    >
-                      Stop
-                    </button>
-                  </div>
-                  
-                  {/* Progress Bar */}
-                  <div className="w-full bg-secondary rounded-full h-1.5 overflow-hidden">
-                    <div 
-                      className="bg-primary h-1.5 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${generationProgress}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-[10px] text-muted-foreground font-mono mt-1.5">
-                    <span>Processing</span>
-                    <span>{generationProgress}%</span>
-                  </div>
-                </div>
-              </div>
-            )}
             <div ref={chatEndRef} />
           </div>
         )}
@@ -918,13 +1143,19 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
         {attachedPreview && (
           <div className="mb-2 relative inline-block">
-            <img src={attachedPreview} alt="Attached" className="h-20 rounded-xl object-cover border border-border" />
-            <button
-              onClick={removeAttachment}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
-            >
-              <X size={12} />
-            </button>
+            <img src={attachedPreview} alt="Attached" className={cn("h-20 rounded-xl object-cover border border-border", isUploadingAttachment && "opacity-50")} />
+            {isUploadingAttachment ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <RotateCcw size={20} className="text-primary animate-spin" />
+              </div>
+            ) : (
+              <button
+                onClick={removeAttachment}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
         )}
         <div className="bg-secondary search-glow rounded-2xl px-3 py-2 focus-within:border-primary transition-colors">
@@ -985,6 +1216,64 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         </div>
       </div>
     </div>
+
+    {showSessionActions && longPressSession && (
+      <div className="fixed inset-0 z-[110] bg-background/80 backdrop-blur-sm flex items-end justify-center sm:items-center p-4" onClick={() => setShowSessionActions(false)}>
+        <motion.div 
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          className="bg-card w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-border shadow-2xl overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="p-4 border-b border-border text-center">
+            <h3 className="font-bold text-foreground truncate px-4">{longPressSession.title}</h3>
+            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest font-bold">Chat Actions</p>
+          </div>
+          <div className="p-2 space-y-1">
+            <button 
+              onClick={() => {
+                setEditingSessionId(longPressSession.id);
+                setEditTitle(longPressSession.title);
+                setShowSessionActions(false);
+              }}
+              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-secondary transition-colors text-sm font-medium"
+            >
+              <PenLine size={18} className="text-primary" />
+              Rename Chat
+            </button>
+            <button 
+              onClick={() => {
+                handleShareSession(longPressSession);
+                setShowSessionActions(false);
+              }}
+              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-secondary transition-colors text-sm font-medium"
+            >
+              <Share2 size={18} className="text-blue-500" />
+              Share Chat
+            </button>
+            <button 
+              onClick={() => {
+                handleDeleteSession(longPressSession.id);
+                setShowSessionActions(false);
+              }}
+              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-secondary transition-colors text-sm font-medium text-destructive"
+            >
+              <Trash2 size={18} />
+              Delete Chat
+            </button>
+          </div>
+          <div className="p-4 bg-secondary/30">
+            <button 
+              onClick={() => setShowSessionActions(false)}
+              className="w-full py-3 rounded-xl bg-secondary text-foreground text-sm font-bold"
+            >
+              Cancel
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    )}
 
     {viewerImage && (
       <ImageViewer src={viewerImage} alt="Generated image" onClose={() => setViewerImage(null)} />

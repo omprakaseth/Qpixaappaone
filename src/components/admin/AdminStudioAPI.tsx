@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Zap } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function AdminStudioAPI() {
+export default function AdminStudioAPI({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [provider, setProvider] = useState('Lovable AI');
   const [endpoint, setEndpoint] = useState('https://api.lovable.dev/v1/generate');
   const [creditsPerGen, setCreditsPerGen] = useState(1);

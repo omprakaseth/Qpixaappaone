@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Mail, Lock, User, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { analytics } from '@/lib/analytics';
 
 interface AuthScreenProps {
   onBack: () => void;
@@ -40,9 +41,11 @@ export default function AuthScreen({ onBack, initialMode = 'login' }: AuthScreen
         if (error) throw error;
         
         if (data?.session) {
+          analytics.trackUserGrowth(data.session.user.id, data.session.user.email, 'email');
           toast.success('Account created successfully!');
           onBack(); // Close auth screen if auto-logged in
         } else {
+          analytics.track('User Signup Started', { method: 'email' });
           toast.success('Account created! Please check your email to confirm.');
           setMode('login'); // Switch to login mode
           setPassword(''); // Clear password for safety
@@ -55,10 +58,15 @@ export default function AuthScreen({ onBack, initialMode = 'login' }: AuthScreen
           }
         });
         if (error) throw error;
+        analytics.track('OTP Login Requested', { email });
         toast.success('Magic link sent! Check your email.');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        if (data?.user) {
+          analytics.identify(data.user.id, { $email: data.user.email });
+          analytics.track('User Login', { method: 'email' });
+        }
         toast.success('Welcome back!');
         onBack();
       }

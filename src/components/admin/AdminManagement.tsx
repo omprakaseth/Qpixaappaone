@@ -28,7 +28,7 @@ interface AdminRole {
   allowed_tabs?: string[];
 }
 
-export default function AdminManagement() {
+export default function AdminManagement({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [admins, setAdmins] = useState<AdminRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');

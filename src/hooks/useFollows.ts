@@ -3,7 +3,7 @@ import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { useAppState } from '@/context/AppContext';
 
 export function useFollows() {
-  const { user } = useAppState();
+  const { user, profile } = useAppState();
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
 
@@ -30,9 +30,19 @@ export function useFollows() {
     } else {
       await supabase.from('follows').insert({ follower_id: user.id, following_id: targetUserId });
       setFollowingIds(prev => new Set(prev).add(targetUserId));
+      
+      // Send notification to the user being followed
+      await (supabase as any).from('user_notifications').insert({
+        user_id: targetUserId,
+        actor_id: user.id,
+        type: 'follow',
+        title: 'New Follower! 👤',
+        message: `${profile?.display_name || 'Someone'} started following you`,
+        link: `/profile/${user.id}`
+      });
     }
     setLoading(false);
-  }, [user, followingIds]);
+  }, [user, profile, followingIds]);
 
   const isFollowing = useCallback((id: string) => followingIds.has(id), [followingIds]);
 

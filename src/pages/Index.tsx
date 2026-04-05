@@ -9,6 +9,7 @@ import StudioScreen from '@/screens/StudioScreen';
 import FavoritesScreen from '@/screens/FavoritesScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import ShortsScreen from '@/screens/ShortsScreen';
+import NotificationScreen from '@/screens/NotificationScreen';
 import PostDetail from '@/screens/PostDetail';
 import CreatePost from '@/screens/CreatePost';
 import SettingsScreen from '@/screens/SettingsScreen';
@@ -21,7 +22,7 @@ import RewardedAdModal from '@/components/ads/RewardedAdModal';
 import { useSmartScroll } from '@/hooks/useSmartScroll';
 import { useAdSettings } from '@/hooks/useAdSettings';
 import { Post } from '@/context/AppContext';
-import { Loader2, Sparkles, Key, RotateCcw, Upload, X } from 'lucide-react';
+import { Loader2, Sparkles, Key, RotateCcw, Upload, X, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 function AppShell() {
@@ -33,6 +34,7 @@ function AppShell() {
     if (path === '/market') return 'discover';
     if (path === '/shorts') return 'shorts';
     if (path === '/studio') return 'studio';
+    if (path === '/notifications') return 'notifications';
     if (path === '/favorites') return 'favorites';
     if (path === '/profile') return 'profile';
     return 'home';
@@ -42,7 +44,7 @@ function AppShell() {
   const { settings: adSettings } = useAdSettings();
   const [showRewardAd, setShowRewardAd] = useState(false);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
-  const upgradeTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const upgradeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
@@ -130,6 +132,7 @@ function AppShell() {
       discover: '/market',
       shorts: '/shorts',
       studio: '/studio',
+      notifications: '/notifications',
       favorites: '/favorites',
       profile: '/profile'
     };
@@ -189,7 +192,7 @@ function AppShell() {
           >
             {activeTab === 'home' && (
               <HomeScreen
-                scrollRef={scrollRef as React.RefObject<HTMLDivElement>}
+                scrollRef={scrollRef}
                 onPostTap={openPost}
                 onCreatePost={openCreatePost}
                 onGetPro={openSubscription}
@@ -201,7 +204,7 @@ function AppShell() {
             )}
             {activeTab === 'discover' && (
               <MarketplaceScreen
-                scrollRef={scrollRef as React.RefObject<HTMLDivElement>}
+                scrollRef={scrollRef}
                 onUsePrompt={handleUsePrompt}
                 onOpenAuth={openAuth}
                 onCreatorTap={openCreator}
@@ -240,8 +243,24 @@ function AppShell() {
                 </div>
               )
             )}
-            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenAuth={openAuth} navVisible={navVisible} />}
-            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef as React.RefObject<HTMLDivElement>} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
+            {activeTab === 'notifications' && (
+              isLoggedIn ? (
+                <NotificationScreen />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Bell size={36} className="text-primary" />
+                  </div>
+                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
+                  <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
+                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                    Sign In
+                  </button>
+                </div>
+              )
+            )}
+            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
+            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -346,8 +365,6 @@ function AppShell() {
 
 export default function Index() {
   return (
-    <AppProvider>
-      <AppShell />
-    </AppProvider>
+    <AppShell />
   );
 }

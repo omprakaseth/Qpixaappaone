@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 interface SettingRow { id: string; key: string; value: string; }
 
-export default function AdminSettings() {
+export default function AdminSettings({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [settings, setSettings] = useState<SettingRow[]>([]);
   const [loading, setLoading] = useState(true);
 

@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 interface Prompt { id: string; text: string; trending: boolean; featured: boolean; }
 
-export default function AdminPrompts() {
+export default function AdminPrompts({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [prompts, setPrompts] = useState<Prompt[]>([
     { id: '1', text: 'Cyberpunk city at night with neon lights', trending: true, featured: false },
     { id: '2', text: 'Fantasy landscape with floating islands', trending: false, featured: true },

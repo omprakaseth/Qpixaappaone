@@ -7,16 +7,16 @@ import { useAppState } from '@/context/AppContext';
 interface AdminTask {
   id: string;
   title: string;
-  description: string;
-  assigned_to: string;
-  assigned_by: string;
+  description: string | null;
+  assigned_to: string | null;
+  assigned_by: string | null;
   status: 'pending' | 'in_progress' | 'completed';
   priority: 'low' | 'medium' | 'high';
   created_at: string;
   assigned_to_email?: string;
 }
 
-export default function AdminTasks({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+export default function AdminTasks({ isSuperAdmin, setHasUnsavedChanges }: { isSuperAdmin: boolean; setHasUnsavedChanges?: (val: boolean) => void }) {
   const { user } = useAppState();
   const [tasks, setTasks] = useState<AdminTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +53,8 @@ export default function AdminTasks({ isSuperAdmin }: { isSuperAdmin: boolean }) 
           
         const enrichedTasks = data.map(task => ({
           ...task,
+          status: task.status as 'pending' | 'in_progress' | 'completed',
+          priority: task.priority as 'low' | 'medium' | 'high',
           assigned_to_email: profiles?.find(p => p.id === task.assigned_to)?.username || 'Unknown'
         }));
         setTasks(enrichedTasks);

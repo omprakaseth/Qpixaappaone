@@ -12,7 +12,7 @@ const mockGenerations = [
 
 const chartStyle = { background: 'hsl(240 10% 8%)', border: '1px solid hsl(0 0% 100% / 0.08)', borderRadius: '8px', color: 'white' };
 
-export default function AdminAnalytics() {
+export default function AdminAnalytics({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   return (
     <div>
       <h2 className="text-xl font-bold text-foreground mb-6">Analytics</h2>

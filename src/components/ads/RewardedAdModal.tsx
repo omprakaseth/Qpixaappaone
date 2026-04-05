@@ -16,7 +16,7 @@ export default function RewardedAdModal({ open, onClose, rewardCredits, publishe
   const [watching, setWatching] = useState(false);
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   useEffect(() => {
     if (!watching) return;
@@ -26,11 +26,11 @@ export default function RewardedAdModal({ open, onClose, rewardCredits, publishe
       elapsed += 0.1;
       setProgress(Math.min((elapsed / duration) * 100, 100));
       if (elapsed >= duration) {
-        clearInterval(timerRef.current);
+        if (timerRef.current) clearInterval(timerRef.current);
         handleRewardComplete();
       }
     }, 100);
-    return () => clearInterval(timerRef.current);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [watching]);
 
   const handleRewardComplete = async () => {
@@ -59,7 +59,7 @@ export default function RewardedAdModal({ open, onClose, rewardCredits, publishe
   };
 
   const handleClose = () => {
-    clearInterval(timerRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
     setWatching(false);
     setProgress(0);
     setCompleted(false);

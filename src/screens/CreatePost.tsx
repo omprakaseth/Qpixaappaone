@@ -243,19 +243,6 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
             </div>
           )}
 
-          {type === 'market' && (
-            <div>
-              <label className="text-[10px] font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">PRICE (CREDITS)</label>
-              <input
-                value={price}
-                onChange={e => setPrice(e.target.value)}
-                placeholder="e.g. 50"
-                type="number"
-                className="w-full bg-secondary rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none border border-transparent focus:border-primary/20 transition-colors"
-              />
-            </div>
-          )}
-
           <div>
             <label className="text-[10px] font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">TAGS</label>
             <input

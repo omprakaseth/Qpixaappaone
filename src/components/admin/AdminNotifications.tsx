@@ -11,7 +11,7 @@ interface Notification {
   created_at: string;
 }
 
-export default function AdminNotifications() {
+export default function AdminNotifications({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -28,12 +28,56 @@ export default function AdminNotifications() {
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) { toast.error('Fill in all fields'); return; }
     setSending(true);
-    const { error } = await supabase.from('notifications').insert({ title, message, target_audience: audience });
-    setSending(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success('Notification sent');
-    setTitle(''); setMessage(''); setAudience('all');
-    fetchNotifications();
+    
+    try {
+      // 1. Insert into global notifications table (for history/reference)
+      const { data: globalNotif, error: globalError } = await supabase
+        .from('notifications')
+        .insert({ title, message, target_audience: audience })
+        .select()
+        .single();
+
+      if (globalError) throw globalError;
+
+      // 2. Fetch target users
+      let query: any = (supabase as any).from('profiles').select('id');
+      
+      if (audience === 'creators') {
+        // Assuming creators have some flag or have posts
+        const { data: creatorIds } = await (supabase as any).from('posts').select('creator_id');
+        const uniqueIds = Array.from(new Set((creatorIds as any[])?.map(p => p.creator_id) || []));
+        query = query.in('id', uniqueIds);
+      } else if (audience === 'free') {
+        // Assuming free users don't have pro flag
+        query = query.eq('is_pro', false);
+      }
+
+      const { data: users, error: usersError } = await query;
+      if (usersError) throw usersError;
+
+      // 3. Insert into user_notifications for each user
+      if (users && users.length > 0) {
+        const userNotifs = users.map(u => ({
+          user_id: u.id,
+          type: 'system',
+          title: `📢 ${title}`,
+          message: message,
+          link: '/notifications'
+        }));
+
+        // Supabase allows bulk insert
+        const { error: bulkError } = await (supabase as any).from('user_notifications').insert(userNotifs);
+        if (bulkError) throw bulkError;
+      }
+
+      toast.success('Notification sent to ' + (users?.length || 0) + ' users');
+      setTitle(''); setMessage(''); setAudience('all');
+      fetchNotifications();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send notification');
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleDelete = async (id: string) => {

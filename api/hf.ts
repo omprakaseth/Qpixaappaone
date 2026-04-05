@@ -16,7 +16,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const response = await fetch(
-      `https://api-inference.huggingface.co/models/${modelId}`,
+      `https://router.huggingface.co/models/${modelId}`,
       {
         headers: { 
           Authorization: `Bearer ${token}`,

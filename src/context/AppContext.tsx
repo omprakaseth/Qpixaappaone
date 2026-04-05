@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
+import { analytics } from '@/lib/analytics';
 
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
@@ -87,7 +88,7 @@ interface AppState {
   installApp: () => Promise<void>;
 }
 
-const AppContext = createContext<AppState | null>(null);
+export const AppContext = createContext<AppState | null>(null);
 
 const MOCK_POSTS: Post[] = [
   {
@@ -480,23 +481,95 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setUploadingPost(prev => prev ? { ...prev, progress: 60 } : null);
         const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
         finalUrl = data.publicUrl;
+      } else if (finalUrl && finalUrl.startsWith('data:')) {
+        // If it's a base64 string (from AI generation), upload it to storage instead of storing base64 in DB
+        try {
+          setUploadingPost(prev => prev ? { ...prev, progress: 30 } : null);
+          const res = await fetch(finalUrl);
+          const blob = await res.blob();
+          const fileName = `ai-${Date.now()}.png`;
+          const bucket = 'prompt-images';
+          const filePath = `${user.id}/${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from(bucket)
+            .upload(filePath, blob, { contentType: 'image/png' });
+            
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(filePath);
+            finalUrl = publicUrl;
+          } else {
+            console.error('Failed to upload base64 to storage, falling back to direct URL:', uploadError);
+          }
+        } catch (e) {
+          console.error('Error processing base64 for storage:', e);
+        }
       }
 
+      // Prepare post data
       const postData: any = {
         creator_id: user.id,
-        title: upload.title.trim(),
         prompt: upload.prompt.trim(),
         image_url: finalUrl,
-        is_short: upload.type === 'short',
-        tags: upload.tags.split(',').map(t => t.trim()).filter(Boolean),
       };
 
-      const { error } = await supabase.from('posts').insert(postData);
-      if (error) throw error;
+      // Smart Category Logic: Check if tags match any known categories
+      const availableCategories = ['Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature', 'Shorts'];
+      const tagsArray = upload.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+      let detectedCategory = 'Trending';
+      
+      for (const cat of availableCategories) {
+        if (tagsArray.includes(cat.toLowerCase())) {
+          detectedCategory = cat;
+          break;
+        }
+      }
+
+      // Add optional fields only if they exist in the schema (we'll try to insert them and fallback if it fails)
+      const extendedData = {
+        ...postData,
+        title: upload.title.trim(),
+        is_short: upload.type === 'short',
+        tags: upload.tags.split(',').map(t => t.trim()).filter(Boolean),
+        category: detectedCategory, // Smart category detection
+        is_hidden: false,
+      };
+
+      console.log('Attempting to insert post:', extendedData);
+      const { data: insertedData, error } = await supabase.from('posts').insert(extendedData).select(`
+        *,
+        profiles:creator_id (*)
+      `).single();
+      
+      if (error) {
+        console.warn('Failed to insert with extended fields, trying minimal insert:', error);
+        // Fallback to minimal insert if columns are missing
+        const { data: retryData, error: retryError } = await supabase.from('posts').insert(postData).select(`
+          *,
+          profiles:creator_id (*)
+        `).single();
+        if (retryError) throw retryError;
+        
+        if (retryData) {
+          const newPost = formatPost(retryData);
+          setPosts(prev => [newPost, ...prev]);
+        }
+        toast.info('Post published (some metadata like title/tags might be missing due to DB schema)');
+      } else if (insertedData) {
+        const newPost = formatPost(insertedData);
+        setPosts(prev => [newPost, ...prev]);
+        analytics.trackPostPublished(upload.id, 'Trending', upload.type === 'short');
+        toast.success(`${upload.type === 'short' ? 'Short' : 'Post'} published!`);
+      }
 
       setUploadingPost(prev => prev ? { ...prev, progress: 100, status: 'success' } : null);
-      toast.success(`${upload.type === 'short' ? 'Short' : 'Post'} published!`);
-      fetchPosts();
+      
+      // Wait a bit for DB consistency before full refetch
+      setTimeout(() => {
+        fetchPosts();
+      }, 1500);
       
       // Auto clear after 3 seconds on success
       setTimeout(() => {
@@ -510,6 +583,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Helper to format a single post from DB
+  const formatPost = (p: any): Post => ({
+    id: p.id,
+    title: p.title || 'Untitled',
+    imageUrl: p.image_url || '',
+    creator: {
+      id: p.creator_id,
+      name: p.profiles?.display_name || 'Unknown',
+      username: p.profiles?.username ? `@${p.profiles.username}` : '@user',
+      avatar: p.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.creator_id}`,
+      initials: (p.profiles?.display_name || 'U').substring(0, 2).toUpperCase(),
+      isVerified: p.profiles?.is_verified || false,
+    },
+    prompt: p.prompt || '',
+    tags: p.tags || [],
+    category: p.category || 'General',
+    style: p.style || 'Standard',
+    aspectRatio: p.aspect_ratio || '1:1',
+    views: p.views || 0,
+    likes: p.likes || 0,
+    saves: p.saves || 0,
+    comments: p.comments || 0,
+    createdAt: p.created_at,
+    isLiked: false,
+    isSaved: false,
+    isShort: p.is_short || false,
+  });
+
   const fetchPosts = async () => {
     if (isPlaceholder) {
       setPosts(MOCK_POSTS);
@@ -517,62 +618,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
+      console.log('Fetching posts from Supabase...');
       // Fetch posts with creator profile
       const { data, error } = await supabase
         .from('posts')
         .select(`
           *,
-          profiles:creator_id (
-            username,
-            display_name,
-            avatar_url,
-            is_verified
-          )
+          profiles:creator_id (*)
         `)
+        .eq('is_hidden', false)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-
-      if (data) {
-        const formattedPosts: Post[] = data.map((p: any) => ({
-          id: p.id,
-          title: p.title,
-          imageUrl: p.image_url,
-          creator: {
-            id: p.creator_id,
-            name: p.profiles?.display_name || 'Unknown',
-            username: p.profiles?.username ? `@${p.profiles.username}` : '@user',
-            avatar: p.profiles?.avatar_url || '',
-            initials: (p.profiles?.display_name || 'U').substring(0, 2).toUpperCase(),
-            isVerified: p.profiles?.is_verified || false,
-          },
-          prompt: p.prompt,
-          tags: p.tags || [],
-          category: p.category || 'General',
-          style: p.style || 'Standard',
-          aspectRatio: p.aspect_ratio || '1:1',
-          views: p.views || 0,
-          likes: p.likes || 0,
-          saves: p.saves || 0,
-          comments: p.comments || 0,
-          createdAt: p.created_at,
-          isLiked: false,
-          isSaved: false,
-          isShort: p.is_short || false,
-        }));
+      if (error) {
+        console.warn('Error fetching posts with join, trying simple fetch:', error);
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('is_hidden', false)
+          .order('created_at', { ascending: false })
+          .limit(50);
+          
+        if (simpleError) {
+          console.error('Simple fetch also failed:', simpleError);
+          throw simpleError;
+        }
         
-        if (formattedPosts.length === 0) {
-          // If it's a real database but empty, keep it empty so we can show a welcome screen
-          // If it's placeholder mode, we use mock posts
-          setPosts(isPlaceholder ? MOCK_POSTS : []);
-        } else {
+        if (simpleData) {
+          console.log(`Fetched ${simpleData.length} posts (simple)`);
+          const formattedPosts: Post[] = simpleData.map(formatPost);
           setPosts(formattedPosts);
         }
+      } else if (data) {
+        console.log(`Fetched ${data.length} posts (with join)`);
+        const formattedPosts: Post[] = data.map(formatPost);
+        setPosts(formattedPosts);
       }
     } catch (err) {
       console.error('Error fetching posts:', err);
-      if (isPlaceholder) setPosts(MOCK_POSTS); // Only fallback to mock on error if in placeholder mode
+      if (isPlaceholder) setPosts(MOCK_POSTS);
     } finally {
       setInitialLoading(false);
     }
@@ -629,6 +713,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSession(sess);
       setUser(sess?.user ?? null);
       if (sess?.user) {
+        if (_event === 'SIGNED_IN') {
+          analytics.trackUserGrowth(sess.user.id, sess.user.email, sess.user.app_metadata.provider || 'email');
+        } else {
+          analytics.identify(sess.user.id, { $email: sess.user.email });
+        }
         fetchProfile(sess.user);
       } else {
         setProfile(null);
@@ -654,10 +743,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (post.isLiked) {
         // Unlike
         await supabase.from('post_likes').delete().match({ post_id: id, user_id: user.id });
-        // We skip server-side increment/decrement for now as the RPC doesn't exist in types
       } else {
         // Like
         await supabase.from('post_likes').insert({ post_id: id, user_id: user.id });
+        
+        // Send notification to post creator
+        if (post.creator.id !== user.id) {
+          await (supabase as any).from('user_notifications').insert({
+            user_id: post.creator.id,
+            actor_id: user.id,
+            type: 'like',
+            title: 'New Like! ❤️',
+            message: `${profile?.display_name || 'Someone'} liked your post "${post.title}"`,
+            link: `/post/${post.id}`
+          });
+        }
       }
     } catch (err) {
       console.error('Error toggling like:', err);
@@ -720,9 +820,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setProfile(null);
+      analytics.reset();
       return;
     }
     await supabase.auth.signOut();
+    analytics.reset();
     setUser(null);
     setSession(null);
     setProfile(null);

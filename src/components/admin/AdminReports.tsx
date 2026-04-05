@@ -12,7 +12,7 @@ interface Report {
   created_at: string;
 }
 
-export default function AdminReports() {
+export default function AdminReports({ setHasUnsavedChanges }: { setHasUnsavedChanges?: (val: boolean) => void }) {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
 
