@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { analytics } from '@/lib/analytics';
 import { GoogleGenAI } from '@google/genai';
+import { motion, AnimatePresence } from 'motion/react';
 
 const STYLE_PRESETS = [
   { id: 'none', name: 'None', prompt: '' },

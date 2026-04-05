@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert, Sparkles, Check, X } from 'lucide-react';
+import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert, Sparkles, Check, X, Edit2, Save } from 'lucide-react';
 import { formatNumber, cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Post } from '@/context/AppContext';
@@ -31,7 +31,7 @@ interface PostDetailProps {
 }
 
 export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: PostDetailProps) {
-  const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost } = useAppState();
+  const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost, updatePost } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
   const [zoomed, setZoomed] = useState(false);
   const [reviewText, setReviewText] = useState('');
@@ -40,6 +40,13 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   const [loadingReviews, setLoadingReviews] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReportConfirm, setShowReportConfirm] = useState(false);
+  
+  // Edit states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(post.title);
+  const [editedPrompt, setEditedPrompt] = useState(post.prompt);
+  const [editedTags, setEditedTags] = useState(post.tags.join(', '));
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const fetchReviews = async () => {
@@ -185,6 +192,31 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
     toast.success('Report submitted. Our team will review this content.');
   };
 
+  const handleUpdate = async () => {
+    if (!editedTitle.trim()) {
+      toast.error('Title cannot be empty');
+      return;
+    }
+    if (!editedPrompt.trim()) {
+      toast.error('Prompt cannot be empty');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await updatePost(post.id, {
+        title: editedTitle.trim(),
+        prompt: editedPrompt.trim(),
+        tags: editedTags.split(',').map(t => t.trim()).filter(Boolean)
+      });
+      setIsEditing(false);
+    } catch (err) {
+      // Error handled in AppContext
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide animate-in slide-in-from-bottom-4 fade-in duration-300">
       {/* Header */}
@@ -192,12 +224,57 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
         <button onClick={onBack} className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center active:scale-95 transition-transform">
           <ArrowLeft size={20} className="text-foreground" />
         </button>
-        <h1 className="text-sm font-bold text-foreground flex-1 truncate">{post.title}</h1>
+        <h1 className="text-sm font-bold text-foreground flex-1 truncate">
+          {isEditing ? (
+            <input
+              type="text"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              className="w-full bg-secondary/50 rounded-lg px-2 py-1 outline-none border border-primary/20 focus:border-primary"
+              placeholder="Post Title"
+              autoFocus
+            />
+          ) : (
+            post.title
+          )}
+        </h1>
         <div className="flex items-center gap-2">
           {isOwner ? (
-            <button onClick={() => setShowDeleteConfirm(true)} className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center active:scale-95 transition-transform text-destructive">
-              <Trash2 size={18} />
-            </button>
+            <>
+              {isEditing ? (
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setIsEditing(false)} 
+                    className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center text-muted-foreground"
+                  >
+                    <X size={16} />
+                  </button>
+                  <button 
+                    onClick={handleUpdate}
+                    disabled={isUpdating}
+                    className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20"
+                  >
+                    {isUpdating ? (
+                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Check size={16} />
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setIsEditing(true)} 
+                    className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center active:scale-95 transition-transform text-primary"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button onClick={() => setShowDeleteConfirm(true)} className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center active:scale-95 transition-transform text-destructive">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <button onClick={() => setShowReportConfirm(true)} className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center active:scale-95 transition-transform text-muted-foreground hover:text-destructive">
               <ShieldAlert size={18} />
@@ -303,25 +380,50 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Prompt</h3>
-            <button 
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
-            >
-              <Copy size={12} /> COPY
-            </button>
+            {!isEditing && (
+              <button 
+                onClick={handleCopy}
+                className="flex items-center gap-1.5 text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
+              >
+                <Copy size={12} /> COPY
+              </button>
+            )}
           </div>
-          <p className="text-sm text-foreground leading-relaxed font-medium bg-secondary/20 p-4 rounded-2xl border border-border/50">
-            {post.prompt}
-          </p>
+          {isEditing ? (
+            <textarea
+              value={editedPrompt}
+              onChange={(e) => setEditedPrompt(e.target.value)}
+              className="w-full bg-secondary/20 p-4 rounded-2xl border border-primary/20 focus:border-primary outline-none text-sm text-foreground leading-relaxed font-medium resize-none"
+              rows={4}
+              placeholder="Write your prompt..."
+            />
+          ) : (
+            <p className="text-sm text-foreground leading-relaxed font-medium bg-secondary/20 p-4 rounded-2xl border border-border/50">
+              {post.prompt}
+            </p>
+          )}
         </div>
 
         {/* Tags */}
-        <div className="flex flex-wrap gap-2 mb-8">
-          {post.tags.map(tag => (
-            <span key={tag} className="px-3 py-1.5 rounded-full bg-secondary/50 text-[10px] font-bold text-muted-foreground border border-border/30">
-              #{tag.toUpperCase()}
-            </span>
-          ))}
+        <div className="mb-8">
+          <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Tags</h3>
+          {isEditing ? (
+            <input
+              type="text"
+              value={editedTags}
+              onChange={(e) => setEditedTags(e.target.value)}
+              className="w-full bg-secondary/20 px-4 py-2 rounded-xl border border-primary/20 focus:border-primary outline-none text-xs text-foreground font-medium"
+              placeholder="comma, separated, tags"
+            />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {post.tags.map(tag => (
+                <span key={tag} className="px-3 py-1.5 rounded-full bg-secondary/50 text-[10px] font-bold text-muted-foreground border border-border/30">
+                  #{tag.toUpperCase()}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Reviews Section */}

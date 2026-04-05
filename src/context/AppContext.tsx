@@ -81,6 +81,7 @@ interface AppState {
   toggleSave: (id: string) => void;
   addPost: (post: Post) => void;
   deletePost: (id: string) => Promise<void>;
+  updatePost: (id: string, updates: Partial<Post>) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   fetchPosts: () => Promise<void>;
@@ -815,6 +816,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updatePost = async (id: string, updates: Partial<Post>) => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .update({
+          title: updates.title,
+          prompt: updates.prompt,
+          tags: updates.tags,
+        })
+        .eq('id', id)
+        .eq('creator_id', user.id);
+
+      if (error) throw error;
+
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+      toast.success('Post updated successfully');
+    } catch (err) {
+      console.error('Error updating post:', err);
+      toast.error('Failed to update post');
+    }
+  };
+
   const signOut = async () => {
     if (isPlaceholder) {
       setUser(null);
@@ -841,7 +865,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       posts, setPosts, initialLoading, user, session, profile, isLoggedIn, isPro, credits, setCredits,
       uploadingPost, startUpload, retryUpload, clearUpload,
-      toggleLike, toggleSave, addPost, deletePost, signOut, refreshProfile, fetchPosts,
+      toggleLike, toggleSave, addPost, deletePost, updatePost, signOut, refreshProfile, fetchPosts,
       deferredPrompt, installApp
     }}>
       {children}
