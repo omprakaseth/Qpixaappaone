@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, PlaySquare, Sparkles, Bell, User } from 'lucide-react';
+import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/context/NotificationContext';
 
@@ -13,7 +13,7 @@ const tabs = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'shorts', label: 'Shorts', icon: PlaySquare },
   { id: 'studio', label: 'Studio', icon: Sparkles },
-  { id: 'notifications', label: 'Alerts', icon: Bell },
+  { id: 'favorites', label: 'Favorites', icon: Heart },
   { id: 'profile', label: 'Profile', icon: User },
 ];
 
@@ -45,23 +45,19 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
                 onClick={() => onTabChange(id)}
                 className="flex flex-col items-center gap-0.5 flex-1 py-1 active:scale-95 transition-transform relative"
               >
-                <div className="relative">
+                <div className="relative group">
                   <Icon
-                    size={22}
-                    className="transition-all duration-200"
+                    size={24}
+                    className="transition-all duration-300"
                     style={{
                       color: isActive 
                         ? (isShortsTab ? '#fff' : 'hsl(var(--primary))') 
                         : (isShortsTab ? 'rgba(255,255,255,0.6)' : 'hsl(var(--muted-foreground))'),
-                      transform: isActive ? 'scale(1.1)' : 'scale(1)',
+                      transform: isActive ? 'scale(1.15)' : 'scale(1)',
+                      filter: isActive ? (isShortsTab ? 'drop-shadow(0 0 8px rgba(255,255,255,0.5))' : 'drop-shadow(0 0 8px rgba(139,92,246,0.5))') : 'none'
                     }}
-                    strokeWidth={isActive ? 2.5 : 1.8}
+                    strokeWidth={isActive ? 2.5 : 2}
                   />
-                  {id === 'notifications' && unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground border border-background">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
                 </div>
                 <span
                   className="text-[10px] font-medium transition-colors"

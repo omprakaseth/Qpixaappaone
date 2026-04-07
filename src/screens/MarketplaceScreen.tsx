@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useAppState } from '@/context/AppContext';
 import { useCart } from '@/hooks/useCart';
+import { LogoLoader } from '@/components/LogoLoader';
 import PromptDetailSheet from '@/components/marketplace/PromptDetailSheet';
 import SellPromptSheet from '@/components/marketplace/SellPromptSheet';
 import MarketplaceFilterPanel, { defaultFilters, type MarketplaceFilters } from '@/components/marketplace/MarketplaceFilterPanel';
@@ -441,17 +442,8 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
         style={{ paddingTop: topHeaderHeight + stickySectionHeight }}
       >
         {loading ? (
-          <div className="flex flex-col gap-8 px-4 pt-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="space-y-4">
-                <div className="h-6 w-32 bg-secondary/50 rounded-lg animate-pulse" />
-                <div className="flex gap-4 overflow-x-hidden">
-                  {[1, 2].map(j => (
-                    <div key={j} className="w-[85vw] max-w-[340px] h-[220px] rounded-[20px] bg-secondary/30 animate-pulse shrink-0" />
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="flex flex-col items-center justify-center py-20">
+            <LogoLoader size={80} text="Opening Marketplace..." />
           </div>
         ) : selectedCategory ? (
           <div>
@@ -574,7 +566,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       {showCart && (
         <>
           <div className="fixed inset-0 z-[80] bg-black/50" onClick={() => setShowCart(false)} />
-          <div className="fixed top-0 right-0 z-[81] w-80 max-w-[85vw] h-full bg-background border-l border-border animate-slide-in-right">
+          <div className="fixed top-0 right-0 z-[81] w-80 max-w-[85vw] h-full bg-background border-l border-border">
             <div className="flex items-center justify-between px-4 py-4 border-b border-border">
               <h2 className="text-base font-bold text-foreground">Cart ({cartCount})</h2>
               <button onClick={() => setShowCart(false)} className="p-1.5 rounded-full hover:bg-secondary">
@@ -633,7 +625,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       {showNotifications && (
         <>
           <div className="fixed inset-0 z-[80] bg-black/50" onClick={() => setShowNotifications(false)} />
-          <div className="fixed top-0 right-0 z-[81] w-80 max-w-[85vw] h-full bg-background border-l border-border animate-slide-in-right">
+          <div className="fixed top-0 right-0 z-[81] w-80 max-w-[85vw] h-full bg-background border-l border-border">
             <div className="flex items-center justify-between px-4 py-4 border-b border-border">
               <h2 className="text-base font-bold text-foreground">Notifications</h2>
               <button onClick={() => setShowNotifications(false)} className="p-1.5 rounded-full hover:bg-secondary">

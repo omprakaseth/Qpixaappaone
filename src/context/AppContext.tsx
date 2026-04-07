@@ -32,6 +32,7 @@ export interface Post {
   isLiked: boolean;
   isSaved: boolean;
   isShort: boolean;
+  isMock?: boolean;
 }
 
 interface Profile {
@@ -91,320 +92,7 @@ interface AppState {
 
 export const AppContext = createContext<AppState | null>(null);
 
-const MOCK_POSTS: Post[] = [
-  {
-    id: 'mock-1',
-    title: 'Cyberpunk Cityscape',
-    imageUrl: 'https://picsum.photos/seed/cyberpunk/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Qpixa AI',
-      username: '@qpixa',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qpixa',
-      initials: 'QA',
-      isVerified: true,
-    },
-    prompt: 'A futuristic cyberpunk city with neon lights, flying cars, and rainy streets, 8k resolution, cinematic lighting',
-    tags: ['cyberpunk', 'city', 'neon'],
-    category: 'Trending',
-    style: 'Cyberpunk',
-    aspectRatio: '4:5',
-    views: 1240,
-    likes: 450,
-    saves: 89,
-    comments: 12,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-2',
-    title: 'Ethereal Forest',
-    imageUrl: 'https://picsum.photos/seed/forest/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Nature Bot',
-      username: '@nature',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=nature',
-      initials: 'NB',
-      isVerified: true,
-    },
-    prompt: 'A magical forest with glowing plants and mystical creatures, soft sunlight filtering through trees',
-    tags: ['nature', 'fantasy', 'magic'],
-    category: 'Fantasy',
-    style: 'Digital Art',
-    aspectRatio: '4:5',
-    views: 850,
-    likes: 320,
-    saves: 45,
-    comments: 8,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-3',
-    title: 'Space Explorer',
-    imageUrl: 'https://picsum.photos/seed/space/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Cosmos',
-      username: '@cosmos',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=cosmos',
-      initials: 'CS',
-      isVerified: true,
-    },
-    prompt: 'Astronaut floating in deep space near a colorful nebula, stars and galaxies in background',
-    tags: ['space', 'astronaut', 'nebula'],
-    category: 'Sci-Fi',
-    style: 'Photorealistic',
-    aspectRatio: '4:5',
-    views: 2100,
-    likes: 780,
-    saves: 120,
-    comments: 25,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-4',
-    title: 'Ancient Temple',
-    imageUrl: 'https://picsum.photos/seed/temple/800/1000',
-    creator: {
-      id: 'system',
-      name: 'History Buff',
-      username: '@history',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=history',
-      initials: 'HB',
-      isVerified: false,
-    },
-    prompt: 'Overgrown ancient temple ruins in a jungle, sunlight breaking through canopy, cinematic atmosphere',
-    tags: ['history', 'temple', 'jungle'],
-    category: 'Architecture',
-    style: 'Cinematic',
-    aspectRatio: '4:5',
-    views: 1560,
-    likes: 540,
-    saves: 67,
-    comments: 15,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-5',
-    title: 'Vibrant Abstract',
-    imageUrl: 'https://picsum.photos/seed/abstract/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Artistic Soul',
-      username: '@art',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=art',
-      initials: 'AS',
-      isVerified: true,
-    },
-    prompt: 'Swirling colors of paint in water, abstract fluid art, vibrant pink and blue, high contrast',
-    tags: ['abstract', 'art', 'vibrant'],
-    category: 'Art',
-    style: 'Abstract',
-    aspectRatio: '4:5',
-    views: 3200,
-    likes: 1100,
-    saves: 230,
-    comments: 45,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-6',
-    title: 'Mountain Peak',
-    imageUrl: 'https://picsum.photos/seed/mountain/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Explorer',
-      username: '@explorer',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=explorer',
-      initials: 'EX',
-      isVerified: false,
-    },
-    prompt: 'Snow-capped mountain peaks at sunrise, orange and purple sky, reflection in a calm lake',
-    tags: ['mountain', 'nature', 'landscape'],
-    category: 'Nature',
-    style: 'Photography',
-    aspectRatio: '4:5',
-    views: 1890,
-    likes: 670,
-    saves: 95,
-    comments: 18,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-7',
-    title: 'Neon Samurai',
-    imageUrl: 'https://picsum.photos/seed/samurai/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Ronin',
-      username: '@ronin',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ronin',
-      initials: 'RN',
-      isVerified: true,
-    },
-    prompt: 'Futuristic samurai standing in a rainy Tokyo street, neon katana glowing, cyberpunk aesthetic',
-    tags: ['samurai', 'cyberpunk', 'neon'],
-    category: 'Trending',
-    style: 'Anime',
-    aspectRatio: '4:5',
-    views: 4500,
-    likes: 1800,
-    saves: 450,
-    comments: 89,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-8',
-    title: 'Underwater World',
-    imageUrl: 'https://picsum.photos/seed/ocean/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Diver',
-      username: '@diver',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=diver',
-      initials: 'DV',
-      isVerified: false,
-    },
-    prompt: 'Coral reef teeming with colorful fish, sunlight rays piercing through water surface, clear blue ocean',
-    tags: ['ocean', 'underwater', 'nature'],
-    category: 'Nature',
-    style: 'Photorealistic',
-    aspectRatio: '4:5',
-    views: 1340,
-    likes: 420,
-    saves: 56,
-    comments: 10,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-9',
-    title: 'Steampunk Airship',
-    imageUrl: 'https://picsum.photos/seed/steampunk/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Inventor',
-      username: '@inventor',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=inventor',
-      initials: 'IV',
-      isVerified: true,
-    },
-    prompt: 'Giant steampunk airship flying through golden clouds, brass gears and steam pipes, Victorian style',
-    tags: ['steampunk', 'airship', 'fantasy'],
-    category: 'Fantasy',
-    style: 'Digital Art',
-    aspectRatio: '4:5',
-    views: 2700,
-    likes: 950,
-    saves: 180,
-    comments: 32,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-10',
-    title: 'Desert Oasis',
-    imageUrl: 'https://picsum.photos/seed/desert/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Nomad',
-      username: '@nomad',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=nomad',
-      initials: 'NM',
-      isVerified: false,
-    },
-    prompt: 'Lush green oasis in the middle of a vast sand desert, palm trees and small pond, sunset lighting',
-    tags: ['desert', 'oasis', 'nature'],
-    category: 'Landscape',
-    style: 'Cinematic',
-    aspectRatio: '4:5',
-    views: 1100,
-    likes: 380,
-    saves: 42,
-    comments: 7,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-11',
-    title: 'Futuristic Lab',
-    imageUrl: 'https://picsum.photos/seed/lab/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Scientist',
-      username: '@science',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=science',
-      initials: 'SC',
-      isVerified: true,
-    },
-    prompt: 'Clean white futuristic laboratory with holographic displays and advanced technology, blue lighting',
-    tags: ['science', 'future', 'technology'],
-    category: 'Sci-Fi',
-    style: 'Minimalist',
-    aspectRatio: '4:5',
-    views: 1950,
-    likes: 610,
-    saves: 88,
-    comments: 21,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  },
-  {
-    id: 'mock-12',
-    title: 'Cozy Cabin',
-    imageUrl: 'https://picsum.photos/seed/cabin/800/1000',
-    creator: {
-      id: 'system',
-      name: 'Coziness',
-      username: '@cozy',
-      avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=cozy',
-      initials: 'CZ',
-      isVerified: false,
-    },
-    prompt: 'Small wooden cabin in a snowy forest at night, warm light glowing from windows, chimney smoke',
-    tags: ['cozy', 'cabin', 'winter'],
-    category: 'Lifestyle',
-    style: 'Photography',
-    aspectRatio: '4:5',
-    views: 3400,
-    likes: 1250,
-    saves: 310,
-    comments: 56,
-    createdAt: new Date().toISOString(),
-    isLiked: false,
-    isSaved: false,
-    isShort: false,
-  }
-];
+import { MOCK_POSTS } from './mock_posts';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -613,6 +301,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const fetchPosts = async () => {
+    console.log('fetchPosts called');
     if (isPlaceholder) {
       setPosts(MOCK_POSTS);
       setInitialLoading(false);
@@ -629,7 +318,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         `)
         .eq('is_hidden', false)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) {
         console.warn('Error fetching posts with join, trying simple fetch:', error);
@@ -638,7 +327,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .select('*')
           .eq('is_hidden', false)
           .order('created_at', { ascending: false })
-          .limit(50);
+          .limit(100);
           
         if (simpleError) {
           console.error('Simple fetch also failed:', simpleError);
@@ -647,17 +336,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         if (simpleData) {
           console.log(`Fetched ${simpleData.length} posts (simple)`);
-          const formattedPosts: Post[] = simpleData.map(formatPost);
+          let formattedPosts: Post[] = simpleData.map(formatPost);
+          
+          // Logic: If real posts < 50, append mock posts
+          if (formattedPosts.length < 50) {
+            formattedPosts = [...formattedPosts, ...MOCK_POSTS];
+          }
+          
           setPosts(formattedPosts);
+          console.log('setPosts called with', formattedPosts.length, 'posts');
         }
       } else if (data) {
         console.log(`Fetched ${data.length} posts (with join)`);
-        const formattedPosts: Post[] = data.map(formatPost);
+        let formattedPosts: Post[] = data.map(formatPost);
+        
+        // Logic: If real posts < 50, append mock posts
+        if (formattedPosts.length < 50) {
+          formattedPosts = [...formattedPosts, ...MOCK_POSTS];
+        }
+        
         setPosts(formattedPosts);
+        console.log('setPosts called with', formattedPosts.length, 'posts');
+      } else {
+        // Fallback if data is null but no error
+        console.log('No data and no error, setting mock posts');
+        setPosts(MOCK_POSTS);
       }
     } catch (err) {
       console.error('Error fetching posts:', err);
-      if (isPlaceholder) setPosts(MOCK_POSTS);
+      // Always fallback to mock posts on error
+      setPosts(MOCK_POSTS);
     } finally {
       setInitialLoading(false);
     }
@@ -732,15 +440,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleLike = async (id: string) => {
     if (!user || isPlaceholder) return; // Must be logged in
     
+    const post = posts.find(p => p.id === id);
+    if (!post) return;
+
     // Optimistic update
     setPosts(prev => prev.map(p =>
       p.id === id ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p
     ));
 
-    try {
-      const post = posts.find(p => p.id === id);
-      if (!post) return;
+    if (post.isMock) return; // Don't call Supabase for mock posts
 
+    try {
       if (post.isLiked) {
         // Unlike
         await supabase.from('post_likes').delete().match({ post_id: id, user_id: user.id });
@@ -749,7 +459,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await supabase.from('post_likes').insert({ post_id: id, user_id: user.id });
         
         // Send notification to post creator
-        if (post.creator.id !== user.id) {
+        if (post.creator.id !== user.id && post.creator.id !== 'system') {
           await (supabase as any).from('user_notifications').insert({
             user_id: post.creator.id,
             actor_id: user.id,
@@ -773,15 +483,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const toggleSave = async (id: string) => {
     if (!user || isPlaceholder) return; // Must be logged in
     
+    const post = posts.find(p => p.id === id);
+    if (!post) return;
+
     // Optimistic update
     setPosts(prev => prev.map(p =>
       p.id === id ? { ...p, isSaved: !p.isSaved, saves: p.isSaved ? p.saves - 1 : p.saves + 1 } : p
     ));
 
-    try {
-      const post = posts.find(p => p.id === id);
-      if (!post) return;
+    if (post.isMock) return; // Don't call Supabase for mock posts
 
+    try {
       if (post.isSaved) {
         // Unsave
         await supabase.from('favorites').delete().match({ image_url: post.imageUrl, user_id: user.id });
@@ -805,6 +517,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deletePost = async (id: string) => {
     if (!user) return;
+    if (id.startsWith('mock-')) {
+      setPosts(prev => prev.filter(p => p.id !== id));
+      toast.success('Sample post removed');
+      return;
+    }
     try {
       const { error } = await supabase.from('posts').delete().eq('id', id).eq('creator_id', user.id);
       if (error) throw error;
@@ -818,6 +535,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updatePost = async (id: string, updates: Partial<Post>) => {
     if (!user) return;
+    if (id.startsWith('mock-')) {
+      setPosts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+      toast.success('Sample post updated locally');
+      return;
+    }
     try {
       const { error } = await supabase
         .from('posts')

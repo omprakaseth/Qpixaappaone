@@ -26,7 +26,11 @@
     <meta name="twitter:description" content="Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community." />
     <meta name="twitter:image" content="/icons/pwa-icon-512.png" />
     
-    <!-- PWA Icons -->
+    <!-- PWA Icons & Favicons -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/pwa-icon-192.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/pwa-icon-192.png" />
     <link rel="icon" type="image/png" href="/icons/pwa-icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/pwa-icon-192.png" />
     <link rel="apple-touch-icon" sizes="152x152" href="/icons/pwa-icon-192.png" />
@@ -40,6 +44,34 @@
     <meta name="msapplication-TileColor" content="#000000" />
     <meta name="msapplication-TileImage" content="/icons/pwa-icon-192.png" />
     <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Structured Data for Sitelinks -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Qpixa",
+      "url": "https://www.qpixa.in/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.qpixa.in/marketplace?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Qpixa",
+      "url": "https://www.qpixa.in/",
+      "logo": "https://www.qpixa.in/icons/pwa-icon-512.png",
+      "sameAs": [
+        "https://twitter.com/qpixa",
+        "https://www.instagram.com/qpixa"
+      ]
+    }
+    </script>
     
     <title>Qpixa - AI Image & Video Generator</title>
     <style>
@@ -72,8 +104,48 @@
   </head>
   <body>
     <div id="splash-screen">
-      <img src="/icons/pwa-icon-192.png" alt="Qpixa Logo" />
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div id="splash-logo-container" style="margin-bottom: 12px;">
+          <svg width="120" height="72" viewBox="0 0 130 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logo-gradient-splash" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00E5FF" />
+                <stop offset="100%" stop-color="#7B61FF" />
+              </linearGradient>
+              <filter id="glow-splash" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feComponentTransfer in="blur" result="lowOpacityBlur">
+                  <feFuncA type="linear" slope="0.4" />
+                </feComponentTransfer>
+                <feMerge>
+                  <feMergeNode in="lowOpacityBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <path 
+              d="M 62 70 V 40 A 18 18 0 1 0 26 40 A 18 18 0 0 0 62 40 C 62 32 68 32 68 40 A 18 18 0 0 1 104 40 A 18 18 0 1 1 68 40 V 70"
+              stroke="url(#logo-gradient-splash)"
+              stroke-width="7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              filter="url(#glow-splash)"
+              style="stroke-dasharray: 500; stroke-dashoffset: 500; animation: draw 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;"
+            />
+          </svg>
+        </div>
+        <h1 style="color: white; font-family: 'Sora', sans-serif; font-weight: 600; margin-top: 0px; font-size: 28px; letter-spacing: 0.3px;">Qpixa</h1>
+      </div>
     </div>
+    <style>
+      @keyframes draw {
+        to { stroke-dashoffset: 0; }
+      }
+      @keyframes loading {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+    </style>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>

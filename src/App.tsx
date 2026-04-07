@@ -32,6 +32,8 @@ const App = () => (
               <Route path="/notifications" element={<Index />} />
               <Route path="/favorites" element={<Index />} />
               <Route path="/profile" element={<Index />} />
+              <Route path="/prompt/:id" element={<Index />} />
+              <Route path="/creator/:id" element={<Index />} />
               <Route path="/admin/qpixa-portal" element={<Admin />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />

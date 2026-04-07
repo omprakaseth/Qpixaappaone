@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert, Sparkles, Check, X, Edit2, Save } from 'lucide-react';
 import { formatNumber, cn } from '@/lib/utils';
+import { generateAltText } from '@/lib/seo-utils';
 import { Button } from '@/components/ui/button';
 import { Post } from '@/context/AppContext';
 import { useAppState } from '@/context/AppContext';
@@ -31,8 +32,29 @@ interface PostDetailProps {
 }
 
 export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: PostDetailProps) {
-  const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost, updatePost } = useAppState();
+  const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost, updatePost, posts } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
+  
+  const relatedPosts = useMemo(() => {
+    return posts
+      .filter(p => p.id !== post.id && (p.category === post.category || p.tags.some(t => post.tags.includes(t))))
+      .slice(0, 4);
+  }, [posts, post]);
+
+  const useCases = useMemo(() => {
+    const cases = [
+      "Digital Art & Illustration",
+      "Social Media Content",
+      "Website Hero Images",
+      "Marketing Materials",
+      "Creative Inspiration",
+      "Personal Projects"
+    ];
+    // Deterministic selection based on prompt
+    const seed = post.prompt.length;
+    return [cases[seed % cases.length], cases[(seed + 1) % cases.length]];
+  }, [post.prompt]);
+
   const [zoomed, setZoomed] = useState(false);
   const [reviewText, setReviewText] = useState('');
   const [rating, setRating] = useState(0);
@@ -288,7 +310,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
         <div className="cursor-pointer" onClick={() => setZoomed(!zoomed)}>
           <WatermarkedImage
             src={post.imageUrl}
-            alt={post.title}
+            alt={generateAltText(post.prompt, post.category)}
             className={cn(
               "w-full transition-transform duration-500 ease-out",
               zoomed ? 'scale-110' : 'scale-100'
@@ -425,6 +447,72 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
             </div>
           )}
         </div>
+
+        {/* About this Prompt Section */}
+        <div className="border-t border-border pt-6 mt-6">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
+            <Sparkles size={16} className="text-primary" />
+            About this Prompt
+          </h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            This high-quality AI prompt is designed to generate stunning {post.category.toLowerCase()} images. 
+            It uses advanced descriptive keywords to ensure consistent and professional results. 
+            Perfect for creators looking for inspiration in the {post.category} space.
+          </p>
+        </div>
+
+        {/* Use Cases Section */}
+        <div className="border-t border-border pt-6 mt-6">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-3">
+            <Check size={16} className="text-primary" />
+            Best Use Cases
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {useCases.map((uc, i) => (
+              <div key={i} className="px-3 py-1.5 rounded-xl bg-primary/5 text-[10px] font-medium text-primary border border-primary/10">
+                {uc}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Related Prompts Section (Internal Linking) */}
+        {relatedPosts.length > 0 && (
+          <div className="border-t border-border pt-6 mt-6">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2 mb-4">
+              <Sparkles size={16} className="text-primary" />
+              Related AI Prompts
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              {relatedPosts.map((rp) => (
+                <div 
+                  key={rp.id} 
+                  className="group cursor-pointer"
+                  onClick={() => {
+                    onBack();
+                    // We need a way to open the new post, but for now this is good for SEO
+                    // In a real app, this would navigate to /prompt/:id
+                    window.location.href = `/prompt/${rp.id}`;
+                  }}
+                >
+                  <div className="aspect-square rounded-xl overflow-hidden bg-secondary relative mb-2">
+                    <img 
+                      src={rp.imageUrl} 
+                      alt={generateAltText(rp.prompt, rp.category)}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Eye size={20} className="text-white" />
+                    </div>
+                  </div>
+                  <p className="text-[10px] font-bold text-foreground truncate">{rp.title}</p>
+                  <p className="text-[9px] text-muted-foreground">{rp.category}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Reviews Section */}
         <div className="border-t border-border pt-6">

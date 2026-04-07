@@ -1,11 +1,18 @@
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { SEO } from '@/components/SEO';
 
 export default function TermsPage() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO 
+        title="Terms of Service - Qpixa"
+        description="Read Qpixa's terms of service to understand the rules and guidelines for using our AI prompt marketplace."
+        canonical="/terms"
+        noindex={true}
+      />
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
         <button onClick={() => navigate('/')}><ArrowLeft size={22} /></button>
         <h1 className="text-base font-bold">Terms of Service</h1>

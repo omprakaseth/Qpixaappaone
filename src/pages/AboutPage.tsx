@@ -1,12 +1,18 @@
 import { ArrowLeft, Sparkles, Store, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Image } from 'lucide-react';
+import { SEO } from '@/components/SEO';
 
 export default function AboutPage() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SEO 
+        title="About Qpixa - AI Prompt Marketplace"
+        description="Learn more about Qpixa, the ultimate AI prompt marketplace for creators. Discover, create, and share amazing AI art."
+        canonical="/about"
+      />
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
         <button onClick={() => navigate('/')}><ArrowLeft size={22} /></button>
         <h1 className="text-base font-bold">About Qpixa</h1>

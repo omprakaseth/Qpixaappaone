@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { analytics } from '@/lib/analytics';
 import { GoogleGenAI } from '@google/genai';
-import { motion, AnimatePresence } from 'motion/react';
 
 const STYLE_PRESETS = [
   { id: 'none', name: 'None', prompt: '' },
@@ -184,7 +183,13 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to generate image with Hugging Face');
+          const errorMessage = errorData.error || 'Failed to generate image with Hugging Face';
+          
+          if (errorMessage.includes('Model is overloaded') || errorMessage.includes('currently loading')) {
+            throw new Error('Hugging Face model is currently busy or loading. Please wait a moment and try again.');
+          }
+          
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -216,7 +221,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         }
 
         if (!apiKey) {
-          throw new Error('No API key found. Please add GEMINI_API_KEY to your environment or select a key in AI Studio.');
+          throw new Error('Gemini API key is missing. Please add GEMINI_API_KEY to your environment variables or select a key in the settings.');
         }
 
         const ai = new GoogleGenAI({ apiKey });
@@ -963,7 +968,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
       {/* Report Modal */}
       {showReportModal && (
-        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-card w-full max-w-sm rounded-2xl border border-border shadow-xl overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h3 className="font-bold text-foreground flex items-center gap-2">
@@ -995,7 +1000,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
       {/* Feedback Modal */}
       {showFeedbackModal && (
-        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-card w-full max-w-sm rounded-2xl border border-border shadow-xl overflow-hidden">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h3 className="font-bold text-foreground flex items-center gap-2">
@@ -1088,7 +1093,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       {/* Input bar */}
       <div className="flex-shrink-0 bg-background border-t border-border px-3 py-2 z-20 mb-[2%]">
         {showAdvanced && (
-          <div className="mb-3 animate-in slide-in-from-bottom-2 duration-200">
+          <div className="mb-3">
             <div className="bg-secondary/30 rounded-xl p-2.5 border border-border/50 space-y-3">
               {/* Style Presets */}
               <div>
@@ -1220,10 +1225,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
     {showSessionActions && longPressSession && (
       <div className="fixed inset-0 z-[110] bg-background/80 backdrop-blur-sm flex items-end justify-center sm:items-center p-4" onClick={() => setShowSessionActions(false)}>
-        <motion.div 
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 100, opacity: 0 }}
+        <div 
           className="bg-card w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-border shadow-2xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
@@ -1272,7 +1274,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
               Cancel
             </button>
           </div>
-        </motion.div>
+        </div>
       </div>
     )}
 

@@ -23,6 +23,7 @@ import { Drawer } from 'vaul';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
+import { LogoLoader } from '@/components/LogoLoader';
 
 interface Reel {
   id: string;
@@ -220,9 +221,8 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
         className="flex-1 overflow-y-scroll snap-y snap-mandatory no-scrollbar"
       >
         {loading ? (
-          <div className="h-full w-full flex flex-col items-center justify-center text-white/40 gap-4">
-            <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-            <p className="text-sm font-medium">Loading AI Shorts...</p>
+          <div className="h-full w-full flex flex-col items-center justify-center bg-black">
+            <LogoLoader size={80} text="Opening Shorts..." />
           </div>
         ) : reels.length > 0 ? (
           reels.map((reel, index) => (
@@ -509,7 +509,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
               className="absolute inset-0 pointer-events-none z-20"
             >
               {/* Right Side Actions - AI Focused */}
-              <div className="absolute right-3 bottom-16 flex flex-col items-center gap-3 pointer-events-auto h-[300px] justify-end">
+              <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3 pointer-events-auto h-[300px] justify-end">
                 <div className="flex flex-col items-center gap-1">
                   <button 
                     onClick={() => {
@@ -587,7 +587,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
               </div>
 
               {/* Bottom Left Creator Section */}
-              <div className="absolute left-4 bottom-6 right-20 flex flex-col gap-3 pointer-events-auto">
+              <div className="absolute left-4 bottom-10 right-20 flex flex-col gap-3 pointer-events-auto">
                 <div className="flex items-center gap-3">
                   <div 
                     className="w-11 h-11 rounded-full border-2 border-white/30 overflow-hidden shadow-2xl flex-shrink-0 cursor-pointer"

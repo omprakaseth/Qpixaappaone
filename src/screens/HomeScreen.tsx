@@ -9,11 +9,13 @@ import SkeletonCard from '@/components/SkeletonCard';
 import FilterPanel, { FilterState } from '@/components/FilterPanel';
 import QuickActions from '@/components/QuickActions';
 import FeedAdCard from '@/components/ads/FeedAdCard';
+import { Logo } from '@/components/Logo';
+import { LogoLoader } from '@/components/LogoLoader';
 import { useAppState } from '@/context/AppContext';
 import { Post } from '@/context/AppContext';
 import { useFollows } from '@/hooks/useFollows';
 
-const categories = ['Trending', 'Following', 'Shorts', 'Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature'];
+const categories = ['Trending', 'Following', 'IPL 2026', 'Summer', '90s Retro', 'Professions', 'Fantasy', 'Luxury'];
 
 interface HomeScreenProps {
   scrollRef: React.RefObject<HTMLDivElement>;
@@ -35,6 +37,7 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro, navVisible = true }: HomeScreenProps) {
   const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user, initialLoading, uploadingPost, retryUpload, clearUpload } = useAppState();
+  console.log('HomeScreen: posts length', posts.length);
   const { followingIds } = useFollows();
   const [activeCategory, setActiveCategory] = useState('Trending');
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,10 +53,31 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
 
   // Filter posts
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications] = useState([
-    { id: '1', title: 'Welcome to Qpixa!', message: 'Start creating amazing AI art today.', created_at: new Date().toISOString() },
-    { id: '2', title: 'New Feature', message: 'Check out the new Shorts feed!', created_at: new Date().toISOString() },
-  ]);
+  const [visibleCount, setVisibleCount] = useState(10);
+
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [activeCategory, searchQuery, filters]);
+
+  const hasMockPosts = useMemo(() => posts.some(p => p.isMock), [posts]);
+  
+  const notificationsList = useMemo(() => {
+    const base = [
+      { id: '1', title: 'Welcome to Qpixa!', message: 'Start creating amazing AI art today.', created_at: new Date().toISOString() },
+      { id: '2', title: 'New Feature', message: 'Check out the new Shorts feed!', created_at: new Date().toISOString() },
+    ];
+    
+    if (hasMockPosts) {
+      base.unshift({
+        id: 'mock-info',
+        title: 'Sample Data Active',
+        message: 'We\'ve added some sample prompts to help you get started. Real user posts will always appear at the top!',
+        created_at: new Date().toISOString()
+      });
+    }
+    return base;
+  }, [hasMockPosts]);
 
   useEffect(() => {
     fetchPosts();
@@ -88,6 +112,8 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       // 1. Handle "Following" tab
       if (activeCategory === 'Following') {
         const creatorId = (p as any).creator_id;
+        // Mock posts don't have a real creator_id that we follow, so we hide them in Following tab
+        if (p.isMock) return false;
         if (!creatorId || (!followingIds.has(creatorId) && creatorId !== user?.id)) return false;
       } 
       // 2. Handle "Trending" (Default) - Show everything!
@@ -127,18 +153,21 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   }, [posts]);
 
   useEffect(() => {
+    const activePostsLength = filteredPosts.length > 0 ? filteredPosts.length : posts.length;
     const observer = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && !loading) {
-        // Mock loading more posts
-        setLoading(true);
-        setTimeout(() => {
-          setLoading(false);
-        }, 1500);
+        if (visibleCount < activePostsLength) {
+          setLoading(true);
+          setTimeout(() => {
+            setVisibleCount(prev => prev + 10);
+            setLoading(false);
+          }, 500);
+        }
       }
     }, { threshold: 0.1 });
     if (loadMoreRef.current) observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [loading]);
+  }, [loading, visibleCount, filteredPosts.length, posts.length]);
 
   const touchStart = useRef(0);
   const handleTouchStart = (e: React.TouchEvent) => { touchStart.current = e.touches[0].clientY; };
@@ -204,10 +233,10 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         >
           {/* R1: Logo & Actions */}
           <div className="flex items-center justify-between px-4 pb-3 h-[52px]">
-            <h1 className="text-xl font-bold">
-              <span className="text-primary">Q</span>
-              <span className="text-foreground">pixa</span>
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <Logo size={32} />
+              <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
+            </div>
             <div className="flex items-center gap-1">
               {uploadingPost && (
                 <div className="flex items-center gap-2 mr-2">
@@ -355,6 +384,18 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         )}
         style={{ paddingTop: topHeaderHeight + stickySectionHeight }}
       >
+        {hasMockPosts && (
+          <div className="mb-4 p-3 bg-primary/5 border border-primary/10 rounded-2xl flex items-start gap-3">
+            <Sparkles size={18} className="text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-foreground">Sample Data Active</p>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                We've added some sample prompts to help you get started. Real user posts will always appear at the top!
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeCategory === 'Trending' && topThisMonth.length > 0 && (
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">
@@ -383,7 +424,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
             <p className="text-sm font-semibold text-foreground">Following Feed</p>
             <p className="text-xs text-center mt-1 px-8">Follow creators from their profile to see their posts here</p>
           </div>
-        ) : filteredPosts.length === 0 && !initialLoading ? (
+        ) : filteredPosts.length === 0 && !initialLoading && posts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
               <Sparkles size={40} className="text-primary" />
@@ -417,10 +458,12 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           <>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
               {(initialLoading && posts.length === 0) ? (
-                Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={`sk-init-${i}`} />)
+                <div className="col-span-full flex flex-col items-center justify-center py-20">
+                  <LogoLoader size={80} text="Discovering masterpieces" />
+                </div>
               ) : (
                 <>
-                  {filteredPosts.map((post, index) => (
+                  {(filteredPosts.length > 0 ? filteredPosts : posts).slice(0, visibleCount).map((post, index) => (
                     <React.Fragment key={post.id}>
                       <ImageCard
                         post={post}
@@ -463,7 +506,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       {showNotifications && (
         <>
           <div className="fixed inset-0 z-[80] bg-black/50" onClick={() => setShowNotifications(false)} />
-          <div className="fixed top-0 right-0 z-[81] w-80 max-w-[85vw] h-full bg-background border-l border-border animate-in slide-in-from-right duration-300">
+          <div className="fixed top-0 right-0 z-[81] w-80 max-w-[85vw] h-full bg-background border-l border-border">
             <div className="flex items-center justify-between px-4 py-4 border-b border-border">
               <h2 className="text-base font-bold text-foreground">Notifications</h2>
               <button onClick={() => setShowNotifications(false)} className="p-1.5 rounded-full hover:bg-secondary">
@@ -471,18 +514,24 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
               </button>
             </div>
             <div className="overflow-y-auto h-[calc(100%-60px)] p-4 space-y-3">
-              {notifications.length === 0 ? (
+              {notificationsList.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
                   <Bell size={28} className="mb-2 opacity-40" />
                   <p className="text-sm">No notifications yet</p>
                 </div>
               ) : (
-                notifications.map(n => (
-                  <div key={n.id} className="p-3 rounded-xl bg-secondary/50 border border-border">
+                notificationsList.map(n => (
+                  <div key={n.id} className={cn(
+                    "p-3 rounded-xl border",
+                    n.id === 'mock-info' ? "bg-primary/10 border-primary/20" : "bg-secondary/50 border-border"
+                  )}>
                     <p className="text-sm font-semibold text-foreground">{n.title}</p>
                     <p className="text-xs text-muted-foreground mt-1">{n.message}</p>
                     <div className="flex items-center gap-1 mt-2 text-[10px] text-muted-foreground">
-                      <span className="w-1 h-1 rounded-full bg-primary" />
+                      <span className={cn(
+                        "w-1 h-1 rounded-full",
+                        n.id === 'mock-info' ? "bg-primary" : "bg-muted-foreground"
+                      )} />
                       {new Date(n.created_at).toLocaleDateString()}
                     </div>
                   </div>

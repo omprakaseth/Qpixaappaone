@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Logo } from './Logo';
 import { Download, X, Smartphone, Share } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -82,9 +83,7 @@ export default function PWAInstallPrompt() {
           </button>
 
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <img src="/icons/pwa-icon-192.png" alt="Qpixa" className="w-10 h-10 rounded-lg" />
-            </div>
+            <Logo size={48} />
             <div className="flex-1 pr-4">
               <h3 className="text-sm font-bold text-foreground">Install Qpixa</h3>
               <p className="text-xs text-muted-foreground mt-0.5">

@@ -93,6 +93,10 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
           )}
           loading="lazy"
           onLoad={() => setImgLoaded(true)}
+          onError={(e) => {
+            e.currentTarget.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${post.id}&backgroundColor=000000`;
+            setImgLoaded(true);
+          }}
         />
 
         {/* Loading spinner when clicking */}
@@ -103,9 +107,16 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
         )}
 
         {/* AI Badge - top left */}
-        <span className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
-          AI
-        </span>
+        <div className="absolute top-2 left-2 flex gap-1">
+          <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+            AI
+          </span>
+          {post.isMock && (
+            <span className="bg-primary/80 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
+              SAMPLE
+            </span>
+          )}
+        </div>
 
         {/* Heart burst animation */}
         {showHeart && (

@@ -300,7 +300,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
             {deferredPrompt && (
               <button
                 onClick={handleInstallApp}
-                className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold active:scale-[0.98] transition-transform animate-pulse"
+                className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold active:scale-[0.98] transition-transform"
               >
                 Install App
               </button>

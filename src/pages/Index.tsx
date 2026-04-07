@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AppProvider, useAppState } from '@/context/AppContext';
+import { SEO } from '@/components/SEO';
 import BottomNav from '@/components/BottomNav';
 import HomeScreen from '@/screens/HomeScreen';
 import MarketplaceScreen from '@/screens/MarketplaceScreen';
@@ -24,6 +25,7 @@ import { useAdSettings } from '@/hooks/useAdSettings';
 import { Post } from '@/context/AppContext';
 import { Loader2, Sparkles, Key, RotateCcw, Upload, X, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { generatePromptMeta } from '@/lib/seo-utils';
 
 function AppShell() {
   const location = useLocation();
@@ -57,6 +59,13 @@ function AppShell() {
   const [viewingCreator, setViewingCreator] = useState<string | null>(null);
 
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!visitedTabs.has(activeTab)) {
+      setVisitedTabs(prev => new Set(prev).add(activeTab));
+    }
+  }, [activeTab, visitedTabs]);
 
   useEffect(() => {
     if ('visualViewport' in window && window.visualViewport) {
@@ -69,9 +78,22 @@ function AppShell() {
     }
   }, []);
 
+  const { id } = useParams();
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/prompt/') && id) {
+      const post = posts.find(p => p.id === id);
+      if (post) {
+        setSelectedPost(post);
+      }
+    } else if (location.pathname.startsWith('/creator/') && id) {
+      setViewingCreator(id);
+    }
+  }, [location.pathname, id, posts]);
+
   // --- History-based back navigation ---
-  const pushHistory = useCallback((state: string) => {
-    window.history.pushState({ overlay: state }, '');
+  const pushHistory = useCallback((state: string, path?: string) => {
+    window.history.pushState({ overlay: state }, '', path);
   }, []);
 
   const closeOverlay = useCallback((setter: (v: any) => void, value: any = null) => {
@@ -83,8 +105,16 @@ function AppShell() {
       // Close overlays in priority order (topmost first)
       if (showAuth) { setShowAuth(false); return; }
       if (showCreatePost) { setShowCreatePost(false); setCreatePostData({}); return; }
-      if (selectedPost) { setSelectedPost(null); return; }
-      if (viewingCreator) { setViewingCreator(null); return; }
+      if (selectedPost) { 
+        setSelectedPost(null); 
+        if (location.pathname.startsWith('/prompt/')) navigate('/');
+        return; 
+      }
+      if (viewingCreator) { 
+        setViewingCreator(null); 
+        if (location.pathname.startsWith('/creator/')) navigate('/');
+        return; 
+      }
       if (showSettings) { setShowSettings(false); return; }
       if (showSubscription) { setShowSubscription(false); return; }
       // If on a non-home tab, go back to home
@@ -92,11 +122,11 @@ function AppShell() {
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [showAuth, showCreatePost, showSettings, showSubscription, viewingCreator, selectedPost, activeTab]);
+  }, [showAuth, showCreatePost, showSettings, showSubscription, viewingCreator, selectedPost, activeTab, navigate, location.pathname]);
 
   // Push history when overlays open
   const openPost = useCallback((post: Post) => {
-    pushHistory('post');
+    pushHistory('post', `/prompt/${post.id}`);
     setSelectedPost(post);
   }, [pushHistory]);
 
@@ -136,8 +166,12 @@ function AppShell() {
       favorites: '/favorites',
       profile: '/profile'
     };
+
+    // Mark tab as visited
+    // (Handled by useEffect now)
+
     navigate(paths[tab]);
-  }, [activeTab, navigate]);
+  }, [navigate]);
 
   const openCreator = useCallback((creatorName: string, creatorId?: string) => {
     if (user && creatorId === user.id) {
@@ -152,9 +186,9 @@ function AppShell() {
       handleTabChange('profile');
       return;
     }
-    pushHistory('creator');
+    pushHistory('creator', creatorId ? `/creator/${creatorId}` : undefined);
     setSelectedPost(null);
-    setViewingCreator(creatorName);
+    setViewingCreator(creatorId || creatorName);
   }, [pushHistory, user, profile, handleTabChange, selectedPost, viewingCreator]);
 
   // Close helpers that go back in history
@@ -164,6 +198,39 @@ function AppShell() {
 
   const smartScrollEnabled = activeTab === 'home' || activeTab === 'discover' || activeTab === 'favorites' || activeTab === 'profile';
   const { visible: navVisible, scrollRef } = useSmartScroll(smartScrollEnabled);
+
+  const seoMeta = useMemo(() => {
+    if (selectedPost) {
+      const meta = generatePromptMeta({
+        prompt: selectedPost.prompt,
+        category: selectedPost.category,
+        tags: selectedPost.tags
+      });
+      return {
+        ...meta,
+        image: selectedPost.imageUrl,
+        canonical: `/prompt/${selectedPost.id}`
+      };
+    }
+    
+    const tabTitles: Record<string, string> = {
+      discover: 'Marketplace - Buy & Sell AI Prompts',
+      shorts: 'AI Shorts - Watch Amazing AI Videos',
+      studio: 'AI Studio - Create Your Own AI Art',
+      notifications: 'Notifications',
+      favorites: 'Your Favorites',
+      profile: profile?.display_name || 'Your Profile'
+    };
+    
+    return {
+      title: tabTitles[activeTab] || undefined,
+      description: undefined,
+      image: undefined,
+      keywords: [],
+      isLowQuality: false,
+      canonical: location.pathname
+    };
+  }, [selectedPost, activeTab, profile, location.pathname]);
 
   // Keep scrollToTop in sync with scrollRef
   useEffect(() => {
@@ -180,89 +247,88 @@ function AppShell() {
 
   return (
     <div className="h-[100dvh] w-screen overflow-hidden bg-background flex flex-col">
+      <SEO 
+        title={seoMeta.title}
+        description={seoMeta.description}
+        image={seoMeta.image}
+        canonical={seoMeta.canonical}
+        noindex={seoMeta.isLowQuality}
+        keywords={seoMeta.keywords}
+      />
       <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0"
-          >
-            {activeTab === 'home' && (
-              <HomeScreen
-                scrollRef={scrollRef}
-                onPostTap={openPost}
-                onCreatePost={openCreatePost}
-                onGetPro={openSubscription}
-                onCreatorTap={openCreator}
-                adSettings={adSettings}
-                isPro={isPro}
-                navVisible={navVisible}
+        <div className="absolute inset-0">
+          {activeTab === 'home' && (
+            <HomeScreen
+              scrollRef={scrollRef}
+              onPostTap={openPost}
+              onCreatePost={openCreatePost}
+              onGetPro={openSubscription}
+              onCreatorTap={openCreator}
+              adSettings={adSettings}
+              isPro={isPro}
+              navVisible={navVisible}
+            />
+          )}
+          {activeTab === 'discover' && (
+            <MarketplaceScreen
+              scrollRef={scrollRef}
+              onUsePrompt={handleUsePrompt}
+              onOpenAuth={openAuth}
+              onCreatorTap={openCreator}
+              navVisible={navVisible}
+            />
+          )}
+          {activeTab === 'shorts' && (
+            <ShortsScreen 
+              onBack={() => handleTabChange('home')} 
+              onCreatorTap={openCreator}
+            />
+          )}
+          {activeTab === 'studio' && (
+            isLoggedIn ? (
+              <StudioScreen
+                initialPrompt={studioPrompt}
+                onClearInitialPrompt={() => setStudioPrompt('')}
+                onPublish={(imageUrl, prompt) => {
+                  setCreatePostData({ imageUrl, prompt });
+                  openCreatePost();
+                }}
               />
-            )}
-            {activeTab === 'discover' && (
-              <MarketplaceScreen
-                scrollRef={scrollRef}
-                onUsePrompt={handleUsePrompt}
-                onOpenAuth={openAuth}
-                onCreatorTap={openCreator}
-                navVisible={navVisible}
-              />
-            )}
-            {activeTab === 'shorts' && (
-              <ShortsScreen 
-                onBack={() => handleTabChange('home')} 
-                onCreatorTap={openCreator}
-              />
-            )}
-            {activeTab === 'studio' && (
-              isLoggedIn ? (
-                <StudioScreen
-                  initialPrompt={studioPrompt}
-                  onClearInitialPrompt={() => setStudioPrompt('')}
-                  onPublish={(imageUrl, prompt) => {
-                    setCreatePostData({ imageUrl, prompt });
-                    openCreatePost();
-                  }}
-                />
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                  </div>
-                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
-                  <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
-                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                    Sign In
-                  </button>
-                  <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
-                    Create Account
-                  </button>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
                 </div>
-              )
-            )}
-            {activeTab === 'notifications' && (
-              isLoggedIn ? (
-                <NotificationScreen />
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <Bell size={36} className="text-primary" />
-                  </div>
-                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
-                  <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
-                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                    Sign In
-                  </button>
+                <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
+                <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
+                <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                  Sign In
+                </button>
+                <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
+                  Create Account
+                </button>
+              </div>
+            )
+          )}
+          {activeTab === 'notifications' && (
+            isLoggedIn ? (
+              <NotificationScreen />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Bell size={36} className="text-primary" />
                 </div>
-              )
-            )}
-            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
-            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
-          </motion.div>
-        </AnimatePresence>
+                <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
+                <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
+                <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                  Sign In
+                </button>
+              </div>
+            )
+          )}
+          {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
+          {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
+        </div>
       </div>
 
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />

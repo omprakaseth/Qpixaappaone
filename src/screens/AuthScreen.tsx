@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Logo } from '@/components/Logo';
 import { ArrowLeft, Mail, Lock, User, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -87,18 +88,8 @@ export default function AuthScreen({ onBack, initialMode = 'login' }: AuthScreen
       </div>
 
       <div className="px-6 pt-8 pb-8 flex flex-col items-center">
-        <div className="w-24 h-24 rounded-full overflow-hidden mb-6 shadow-xl shadow-primary/20 bg-gradient-to-br from-[#9b27b0] to-[#1a237e] flex items-center justify-center relative">
-          {/* We use an img tag pointing to /logo.png in the public folder. 
-              If it fails to load, we show a fallback 'A' text. */}
-          <img 
-            src="/logo.png" 
-            alt="Qpixa Logo" 
-            className="w-full h-full object-cover absolute inset-0 z-10"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          <span className="text-white text-5xl font-bold font-sans z-0">A</span>
+        <div className="mb-6">
+          <Logo size={80} animated={false} />
         </div>
         <h2 className="text-xl font-bold text-foreground mb-1">
           {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Join Qpixa' : 'Login with OTP'}
