@@ -26,8 +26,29 @@ const NotificationScreen: React.FC = () => {
     }
   };
 
+  const touchStartX = React.useRef(0);
+  const touchStartY = React.useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+    
+    if (deltaX > 80 && deltaY < 50) {
+      window.history.back();
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div 
+      className="flex flex-col h-full bg-background"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">

@@ -128,7 +128,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     const file = e.target.files[0];
     
     // Check if it's a mock project
-    if (import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co') {
+    if (process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://placeholder-project.supabase.co') {
       toast.error('Avatar upload is not available in demo mode');
       return;
     }
@@ -158,7 +158,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   };
 
   const saveProfile = async () => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || !profile?.id) return;
     setSaving(true);
     try {
       const { error } = await supabase
@@ -227,8 +227,29 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     setActiveSection(activeSection === id ? null : id);
   };
 
+  const touchStartX = React.useRef(0);
+  const touchStartY = React.useRef(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+    
+    if (deltaX > 80 && deltaY < 50) {
+      onBack();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide">
+    <div 
+      className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <div className="flex items-center gap-3 px-4 py-3">
         <button onClick={onBack}><ArrowLeft size={22} className="text-foreground" /></button>
         <h1 className="text-base font-bold text-foreground">Settings</h1>

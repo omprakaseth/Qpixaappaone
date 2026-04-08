@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppContext } from '@/context/AppContext';
@@ -104,7 +106,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           });
 
           // Also trigger native notification if permission granted
-          if (Notification.permission === 'granted') {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             new Notification(newNotif.title, {
               body: newNotif.message,
               icon: '/icons/icon-192x192.png'
@@ -146,7 +148,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const requestPermission = async () => {
-    if (!('Notification' in window)) {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
       console.error('This browser does not support notifications');
       return false;
     }
@@ -164,10 +166,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       
       if (!vapidPublicKey) {
-        console.warn('VITE_VAPID_PUBLIC_KEY is not set. Push subscription skipped.');
+        console.warn('NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set. Push subscription skipped.');
         return;
       }
 

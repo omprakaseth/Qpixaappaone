@@ -163,17 +163,28 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       try {
         if (signal?.aborted) throw new Error('Aborted');
         
-        console.log(`Calling HF Proxy for model: ${modelId}, attempt: ${retryCount + 1}`);
-        const response = await fetch('/api/hf', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            modelId,
-            inputs: promptText,
-            options: { wait_for_model: true }
-          }),
-          signal
-        });
+        console.log(`Calling Hugging Face API for model: ${modelId}, attempt: ${retryCount + 1}`);
+        const token = process.env.NEXT_PUBLIC_HF_TOKEN;
+        
+        if (!token) {
+          throw new Error('Hugging Face API token is not configured.');
+        }
+
+        const response = await fetch(
+          `https://router.huggingface.co/models/${modelId}`,
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json"
+            },
+            method: "POST",
+            body: JSON.stringify({ 
+              inputs: promptText,
+              options: { wait_for_model: true }
+            }),
+            signal
+          }
+        );
 
         if (response.status === 503 && retryCount < 5) {
           setGenerationProgress(prev => Math.min(prev + 2, 98));
@@ -182,8 +193,15 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         }
 
         if (!response.ok) {
-          const errorData = await response.json();
-          const errorMessage = errorData.error || 'Failed to generate image with Hugging Face';
+          const errorText = await response.text();
+          let errorMessage = 'Failed to generate image with Hugging Face';
+          
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            errorMessage = errorText || errorMessage;
+          }
           
           if (errorMessage.includes('Model is overloaded') || errorMessage.includes('currently loading')) {
             throw new Error('Hugging Face model is currently busy or loading. Please wait a moment and try again.');
@@ -192,8 +210,12 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
           throw new Error(errorMessage);
         }
 
-        const data = await response.json();
-        return data.imageUrl;
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64 = buffer.toString('base64');
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
+
+        return `data:${contentType};base64,${base64}`;
       } catch (err: any) {
         if (err.name === 'AbortError' || err.message === 'Aborted') throw err;
         console.error('HF API Error:', err);

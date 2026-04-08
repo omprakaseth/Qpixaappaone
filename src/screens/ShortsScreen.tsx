@@ -351,7 +351,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
         setIsLiked(true);
         onUpdateReel({ ...reel, isLiked: true });
         // Background sync
-        if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+        if (!reel.id.startsWith('mock-') && process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
           (async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
@@ -518,7 +518,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
                       onUpdateReel({ ...reel, isLiked: newLikedState });
                       
                       // Background sync
-                      if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+                      if (!reel.id.startsWith('mock-') && process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
                         (async () => {
                           const { data: { user } } = await supabase.auth.getUser();
                           if (user) {

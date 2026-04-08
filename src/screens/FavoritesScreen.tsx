@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
 
 interface FavoritesScreenProps {
-  scrollRef?: React.RefObject<HTMLDivElement>;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   navVisible?: boolean;
 }

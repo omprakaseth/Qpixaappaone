@@ -45,7 +45,7 @@ export default function AdminTasks({ isSuperAdmin, setHasUnsavedChanges }: { isS
 
       // Fetch emails for assigned users
       if (data && data.length > 0) {
-        const userIds = [...new Set(data.map(t => t.assigned_to))];
+        const userIds = [...new Set(data.map(t => t.assigned_to))].filter((id): id is string => !!id);
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, username')

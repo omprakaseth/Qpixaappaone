@@ -10,7 +10,7 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
 
 interface ProfileScreenProps {
-  scrollRef?: React.RefObject<HTMLDivElement>;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
   onOpenSettings: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onPostTap?: (post: any) => void;
