@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
@@ -31,10 +33,14 @@ const ASPECT_RATIOS = [
 ];
 
 function useVisualViewport() {
-  const [viewport, setViewport] = useState({ height: window.innerHeight, offsetTop: 0 });
+  const [viewport, setViewport] = useState({ height: 0, offsetTop: 0 });
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    setViewport(prev => ({ ...prev, height: window.innerHeight }));
+
     const vv = window.visualViewport;
     if (!vv) return;
 

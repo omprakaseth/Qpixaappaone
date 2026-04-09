@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert, Sparkles, Check, X, Edit2, Save } from 'lucide-react';
 import { formatNumber, cn } from '@/lib/utils';

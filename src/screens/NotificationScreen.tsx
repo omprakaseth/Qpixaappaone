@@ -1,13 +1,15 @@
+"use client";
+
 import React from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import { Bell, Heart, MessageCircle, UserPlus, Info, Check, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 
 const NotificationScreen: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -22,33 +24,12 @@ const NotificationScreen: React.FC = () => {
   const handleNotificationClick = (notif: any) => {
     markAsRead(notif.id);
     if (notif.link) {
-      navigate(notif.link);
-    }
-  };
-
-  const touchStartX = React.useRef(0);
-  const touchStartY = React.useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-    
-    if (deltaX > 80 && deltaY < 50) {
-      window.history.back();
+      router.push(notif.link);
     }
   };
 
   return (
-    <div 
-      className="flex flex-col h-full bg-background"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="flex flex-col h-full bg-background">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-border sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <div className="flex items-center gap-3">

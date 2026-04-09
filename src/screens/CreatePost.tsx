@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Upload, X, Video, Store, Image as ImageIcon, Music } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';

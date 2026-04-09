@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect, useRef } from 'react';
 import { Gift, X, Play, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';

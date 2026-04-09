@@ -1,3 +1,5 @@
+"use client";
+
 import { ArrowLeft, User, Bell, Shield, Palette, Globe, CreditCard, HelpCircle, LogOut, ChevronRight, Info, FileText, Mail, Sun, Moon, Monitor, Save, Lock, Eye, EyeOff, Download } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '@/context/AppContext';

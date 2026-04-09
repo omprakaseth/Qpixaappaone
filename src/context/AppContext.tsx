@@ -97,13 +97,13 @@ export const AppContext = createContext<AppState | null>(null);
 import { MOCK_POSTS } from './mock_posts';
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
-  const [credits, setCredits] = useState(40);
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [uploadingPost, setUploadingPost] = useState<UploadingPost | null>(null);
+  const [posts, setPosts] = React.useState<Post[]>([]);
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  const [credits, setCredits] = React.useState(40);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [session, setSession] = React.useState<Session | null>(null);
+  const [profile, setProfile] = React.useState<Profile | null>(null);
+  const [uploadingPost, setUploadingPost] = React.useState<UploadingPost | null>(null);
 
   const { deferredPrompt, promptInstall: installApp } = usePWAInstall();
 

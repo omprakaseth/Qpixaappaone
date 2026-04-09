@@ -35,9 +35,9 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const appContext = useContext(AppContext);
   const user = appContext?.user;
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = React.useState(0);
+  const [isSubscribed, setIsSubscribed] = React.useState(false);
 
   useEffect(() => {
     if (!user) {

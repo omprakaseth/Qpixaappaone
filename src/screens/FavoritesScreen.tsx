@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, LogIn, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
