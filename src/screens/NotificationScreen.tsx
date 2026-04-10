@@ -4,12 +4,12 @@ import React from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import { Bell, Heart, MessageCircle, UserPlus, Info, Check, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 
 const NotificationScreen: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -24,7 +24,7 @@ const NotificationScreen: React.FC = () => {
   const handleNotificationClick = (notif: any) => {
     markAsRead(notif.id);
     if (notif.link) {
-      router.push(notif.link);
+      navigate(notif.link);
     }
   };
 

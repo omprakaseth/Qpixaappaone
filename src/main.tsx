@@ -1,6 +1,6 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
+import App from './App';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -11,7 +11,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // Initialize theme
-const mode = localStorage.getItem('qpixa-theme') || 'dark';
+const mode = localStorage.getItem('qpixa-theme') || 'light';
 const root = document.documentElement;
 let effectiveTheme = mode;
 

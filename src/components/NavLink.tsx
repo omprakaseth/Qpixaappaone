@@ -1,7 +1,4 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
@@ -13,15 +10,15 @@ interface NavLinkProps extends React.AnchorHTMLAttributes<HTMLAnchorElement> {
 
 const NavLink = forwardRef<HTMLAnchorElement, NavLinkProps>(
   ({ className, activeClassName, pendingClassName, href, ...props }, ref) => {
-    const pathname = usePathname();
-    const isActive = pathname === href;
+    const location = useLocation();
+    const isActive = location.pathname === href;
 
     return (
       <Link
         ref={ref}
-        href={href}
+        to={href}
         className={cn(className, isActive && activeClassName)}
-        {...props}
+        {...props as any}
       />
     );
   },

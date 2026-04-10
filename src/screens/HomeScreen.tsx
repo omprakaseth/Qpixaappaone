@@ -3,8 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store, Bell, X, Sparkles, Image as ImageIcon, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Link, useNavigate } from 'react-router-dom';
 import ScrollToTop from '@/components/ScrollToTop';
 import { toast } from 'sonner';
 import ImageCard from '@/components/ImageCard';
@@ -52,7 +51,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
   const [showTopHeader, setShowTopHeader] = useState(true);
-  const router = useRouter();
+  const navigate = useNavigate();
 
   // Filter posts
   const [showNotifications, setShowNotifications] = useState(false);
@@ -294,7 +293,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
                 </div>
               )}
               <button
-                onClick={() => router.push('/market')}
+                onClick={() => navigate('/market')}
                 className="p-1.5 transition-opacity active:opacity-60"
               >
                 <Store size={22} className="text-foreground" />
@@ -355,7 +354,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
                   key={cat}
                   onClick={() => {
                     if (cat === 'Shorts') {
-                      router.push('/shorts');
+                      navigate('/shorts');
                     } else {
                       setActiveCategory(cat);
                     }
