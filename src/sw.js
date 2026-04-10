@@ -1,3 +1,8 @@
+import { precacheAndRoute } from 'workbox-precaching';
+
+// Inject manifest for PWA caching
+precacheAndRoute(self.__WB_MANIFEST || []);
+
 self.addEventListener('push', function(event) {
   if (event.data) {
     const data = event.data.json();

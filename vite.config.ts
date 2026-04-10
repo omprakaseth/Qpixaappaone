@@ -11,15 +11,18 @@ export default defineConfig(({mode}) => {
       react(), 
       tailwindcss(),
       VitePWA({
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.js',
         registerType: 'autoUpdate',
         manifestFilename: 'manifest.json',
-        workbox: {
+        injectManifest: {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // Increase to 5MB
         },
         devOptions: {
           enabled: true
         },
-        includeAssets: ['favicon.ico', 'icons/pwa-icon-192.png', 'icons/pwa-icon-512.png'],
+        includeAssets: ['favicon.png', 'icons/pwa-icon-192.png', 'icons/pwa-icon-512.png'],
         manifest: {
           name: 'Qpixa - AI Image & Video Generator',
           short_name: 'Qpixa',
