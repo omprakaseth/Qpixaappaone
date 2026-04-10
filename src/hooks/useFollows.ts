@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { useAppState } from '@/context/AppContext';

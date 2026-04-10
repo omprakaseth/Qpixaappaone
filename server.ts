@@ -77,13 +77,11 @@ async function startServer() {
 
     app.get('*', async (req, res, next) => {
       const url = req.originalUrl;
-      console.log(`Incoming request: ${url}`);
       try {
         let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
         template = await vite.transformIndexHtml(url, template);
         res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
       } catch (e) {
-        console.error(`Error processing request for ${url}:`, e);
         vite.ssrFixStacktrace(e as Error);
         next(e);
       }

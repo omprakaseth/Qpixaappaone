@@ -1,5 +1,5 @@
 import { ArrowLeft, Star, ShoppingBag, Grid3X3, Info, UserPlus, UserMinus, Sparkles, Coins, SlidersHorizontal, MapPin, Calendar, Share2 } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Post } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,23 +39,6 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
   const creatorPosts = posts.filter(p => p.creator.name === creatorName);
   const totalLikes = creatorPosts.reduce((sum, p) => sum + p.likes, 0);
   const isOwner = user?.id === creatorUserId;
-
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-    
-    if (deltaX > 80 && deltaY < 50) {
-      onBack();
-    }
-  };
 
   const totalSales = creatorPrompts.reduce((s, p) => s + p.sales_count, 0);
   const avgRating = creatorPrompts.length > 0 ? creatorPrompts.reduce((s, p) => s + p.rating, 0) / creatorPrompts.length : 0;
@@ -99,11 +82,7 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
   ];
 
   return (
-    <div 
-      className="fixed inset-0 z-[60] bg-background flex flex-col animate-in slide-in-from-right duration-200"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="fixed inset-0 z-[60] bg-background flex flex-col animate-in slide-in-from-right duration-200">
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-3 pb-3 safe-top">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="p-1.5 rounded-full hover:bg-secondary">

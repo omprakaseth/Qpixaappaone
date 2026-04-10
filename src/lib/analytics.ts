@@ -1,11 +1,11 @@
 import mixpanel from 'mixpanel-browser';
 
-const MIXPANEL_TOKEN = process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
+const MIXPANEL_TOKEN = import.meta.env.VITE_MIXPANEL_TOKEN;
 
 // Initialize Mixpanel
-if (typeof window !== 'undefined' && MIXPANEL_TOKEN) {
+if (MIXPANEL_TOKEN) {
   mixpanel.init(MIXPANEL_TOKEN, {
-    debug: process.env.NODE_ENV === 'development',
+    debug: import.meta.env.DEV,
     track_pageview: true,
     persistence: 'localStorage',
   });

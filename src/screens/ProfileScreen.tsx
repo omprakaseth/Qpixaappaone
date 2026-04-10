@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield } from 'lucide-react';
@@ -12,7 +10,7 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
 
 interface ProfileScreenProps {
-  scrollRef?: React.RefObject<HTMLDivElement | null>;
+  scrollRef?: React.RefObject<HTMLDivElement>;
   onOpenSettings: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onPostTap?: (post: any) => void;

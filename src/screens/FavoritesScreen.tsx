@@ -1,12 +1,10 @@
-"use client";
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, LogIn, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
 
 interface FavoritesScreenProps {
-  scrollRef?: React.RefObject<HTMLDivElement | null>;
+  scrollRef?: React.RefObject<HTMLDivElement>;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   navVisible?: boolean;
 }

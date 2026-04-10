@@ -1,5 +1,3 @@
-"use client";
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppContext } from '@/context/AppContext';
@@ -35,9 +33,9 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const appContext = useContext(AppContext);
   const user = appContext?.user;
-  const [notifications, setNotifications] = React.useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = React.useState(0);
-  const [isSubscribed, setIsSubscribed] = React.useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -106,7 +104,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           });
 
           // Also trigger native notification if permission granted
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          if (Notification.permission === 'granted') {
             new Notification(newNotif.title, {
               body: newNotif.message,
               icon: '/icons/icon-192x192.png'
@@ -148,7 +146,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const requestPermission = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
+    if (!('Notification' in window)) {
       console.error('This browser does not support notifications');
       return false;
     }
@@ -166,10 +164,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
       
       if (!vapidPublicKey) {
-        console.warn('NEXT_PUBLIC_VAPID_PUBLIC_KEY is not set. Push subscription skipped.');
+        console.warn('VITE_VAPID_PUBLIC_KEY is not set. Push subscription skipped.');
         return;
       }
 

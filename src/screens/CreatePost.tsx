@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Upload, X, Video, Store, Image as ImageIcon, Music } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
@@ -99,29 +97,8 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
     { id: 'short', label: 'Short', icon: Video },
   ];
 
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-    
-    if (deltaX > 80 && deltaY < 50) {
-      onBack();
-    }
-  };
-
   return (
-    <div 
-      className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide">
       <div className="flex items-center gap-3 px-4 py-3 sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <button onClick={onBack}><ArrowLeft size={22} className="text-foreground" /></button>
         <h1 className="text-base font-bold text-foreground">Create</h1>

@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store, Bell, X, Sparkles, Image as ImageIcon, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -20,7 +18,7 @@ import { useFollows } from '@/hooks/useFollows';
 const categories = ['Trending', 'Following', 'IPL 2026', 'Summer', '90s Retro', 'Professions', 'Fantasy', 'Luxury'];
 
 interface HomeScreenProps {
-  scrollRef: React.RefObject<HTMLDivElement | null>;
+  scrollRef: React.RefObject<HTMLDivElement>;
   onPostTap: (post: Post) => void;
   onCreatePost: () => void;
   onGetPro: () => void;

@@ -27,11 +27,15 @@
     <meta name="twitter:image" content="/icons/pwa-icon-512.png" />
     
     <!-- PWA Icons & Favicons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/icons/pwa-icon-192.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/pwa-icon-192.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/pwa-icon-192.png" />
-    <link rel="shortcut icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/pwa-icon-512.png" />
+    <link rel="icon" type="image/png" href="/icons/pwa-icon-192.png" />
+    <link rel="apple-touch-icon" href="/icons/pwa-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/pwa-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/pwa-icon-192.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icons/pwa-icon-192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Qpixa" />
@@ -70,10 +74,92 @@
     </script>
     
     <title>Qpixa - AI Image & Video Generator</title>
+    <style>
+      #splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #000000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+      #splash-screen img {
+        width: 120px;
+        height: 120px;
+        border-radius: 24px;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.05); opacity: 0.8; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash-screen">
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div id="splash-logo-container" style="margin-bottom: 12px;">
+          <svg width="120" height="72" viewBox="0 0 130 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logo-gradient-splash" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#00E5FF" />
+                <stop offset="100%" stop-color="#7B61FF" />
+              </linearGradient>
+              <filter id="glow-splash" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feComponentTransfer in="blur" result="lowOpacityBlur">
+                  <feFuncA type="linear" slope="0.4" />
+                </feComponentTransfer>
+                <feMerge>
+                  <feMergeNode in="lowOpacityBlur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <path 
+              d="M 62 70 V 40 A 18 18 0 1 0 26 40 A 18 18 0 0 0 62 40 C 62 32 68 32 68 40 A 18 18 0 0 1 104 40 A 18 18 0 1 1 68 40 V 70"
+              stroke="url(#logo-gradient-splash)"
+              stroke-width="7"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              filter="url(#glow-splash)"
+              style="stroke-dasharray: 500; stroke-dashoffset: 500; animation: draw 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;"
+            />
+          </svg>
+        </div>
+        <h1 style="color: white; font-family: 'Sora', sans-serif; font-weight: 600; margin-top: 0px; font-size: 28px; letter-spacing: 0.3px;">Qpixa</h1>
+      </div>
+    </div>
+    <style>
+      @keyframes draw {
+        to { stroke-dashoffset: 0; }
+      }
+      @keyframes loading {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+    </style>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remove splash screen after a short delay or when window loads
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('splash-screen');
+          if (splash) {
+            splash.style.opacity = '0';
+            setTimeout(() => splash.remove(), 500);
+          }
+        }, 800);
+      });
+    </script>
   </body>
 </html>
 

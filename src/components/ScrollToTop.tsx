@@ -1,10 +1,8 @@
-"use client";
-
 import { ArrowUp } from 'lucide-react';
 import React, { useState, useEffect, useRef } from 'react';
 
 interface ScrollToTopProps {
-  scrollRef: React.RefObject<HTMLDivElement | null>;
+  scrollRef: React.RefObject<HTMLDivElement>;
 }
 
 export default function ScrollToTop({ scrollRef }: ScrollToTopProps) {

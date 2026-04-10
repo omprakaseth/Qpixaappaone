@@ -36,7 +36,7 @@ export function useReviews(promptId: string) {
         .in('id', userIds);
       
       const profileMap = new Map(profiles?.map(p => [p.id, p.display_name || p.username || 'User']) || []);
-      setReviews(data.map(r => ({ ...r, comment: r.comment || '', username: profileMap.get(r.user_id) || 'User' })));
+      setReviews(data.map(r => ({ ...r, username: profileMap.get(r.user_id) || 'User' })));
     } else {
       setReviews([]);
     }

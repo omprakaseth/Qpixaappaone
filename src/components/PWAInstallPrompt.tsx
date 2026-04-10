@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
 import { Download, X, Smartphone, Share } from 'lucide-react';

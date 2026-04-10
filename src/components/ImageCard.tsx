@@ -93,10 +93,6 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
           )}
           loading="lazy"
           onLoad={() => setImgLoaded(true)}
-          onError={(e) => {
-            e.currentTarget.src = `https://api.dicebear.com/7.x/shapes/svg?seed=${post.id}&backgroundColor=000000`;
-            setImgLoaded(true);
-          }}
         />
 
         {/* Loading spinner when clicking */}

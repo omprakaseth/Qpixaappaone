@@ -1,5 +1,3 @@
-"use client";
-
 import React from 'react';
 import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';

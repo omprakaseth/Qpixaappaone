@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Logo } from '@/components/Logo';
 import { ArrowLeft, Mail, Lock, User, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,23 +17,6 @@ export default function AuthScreen({ onBack, initialMode = 'login' }: AuthScreen
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
-    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
-    
-    if (deltaX > 80 && deltaY < 50) {
-      onBack();
-    }
-  };
 
   const handleSubmit = async () => {
     if (!email || !password) {
@@ -98,11 +79,7 @@ export default function AuthScreen({ onBack, initialMode = 'login' }: AuthScreen
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-[80] bg-background overflow-y-auto scrollbar-hide"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-    >
+    <div className="fixed inset-0 z-[80] bg-background overflow-y-auto scrollbar-hide">
       <div className="flex items-center gap-3 px-4 py-3">
         <button onClick={onBack}><ArrowLeft size={22} className="text-foreground" /></button>
         <h1 className="text-base font-bold text-foreground">

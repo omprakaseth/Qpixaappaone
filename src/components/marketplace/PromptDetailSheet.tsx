@@ -1,5 +1,3 @@
-"use client";
-
 import { X, Star, Coins, ShoppingCart, Sparkles, Copy, Check, Heart, Shield, Zap, RotateCcw, ChevronDown, Eye, Download, Share2, Bookmark } from 'lucide-react';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { Button } from '@/components/ui/button';

@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from 'react';
 import { useWatermarkSettings } from '@/hooks/useWatermarkSettings';
 import { cn } from '@/lib/utils';

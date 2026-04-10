@@ -3,24 +3,21 @@ import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
 // Safely get and validate the Supabase URL
-let SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+let SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 if (!SUPABASE_URL || !SUPABASE_URL.startsWith('http')) {
   SUPABASE_URL = 'https://placeholder-project.supabase.co';
 }
 
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key';
 
-export const isPlaceholder = !process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://placeholder-project.supabase.co' || SUPABASE_ANON_KEY === 'placeholder-anon-key';
+export const isPlaceholder = !import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || SUPABASE_ANON_KEY === 'placeholder-anon-key';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-// Safely handle storage for SSR
-const isBrowser = typeof window !== 'undefined';
-
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: isBrowser ? window.localStorage : undefined,
+    storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
   }

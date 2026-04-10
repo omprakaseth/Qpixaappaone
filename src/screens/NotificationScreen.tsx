@@ -1,5 +1,3 @@
-"use client";
-
 import React from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import { Bell, Heart, MessageCircle, UserPlus, Info, Check, Trash2 } from 'lucide-react';

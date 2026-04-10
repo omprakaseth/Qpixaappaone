@@ -3,7 +3,7 @@ import { Post } from './AppContext';
 const suffix = "Use the uploaded image as reference. Maintain same face, identity, hairstyle, and facial features. Apply the scene and style accurately. Ultra realistic, high detail, cinematic lighting, 4K quality.";
 
 // Using Pollinations AI with a fixed seed to maintain facial consistency across the generated templates
-const getImageUrl = (prompt: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=1000&nologo=true&enhance=false&seed=888`;
+const getImageUrl = (prompt: string) => `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=800&height=1000&nologo=true&seed=888`;
 
 // Character descriptions to maintain consistency across the template images
 // This matches the image you uploaded (Handsome Indian man with thick black beard and stylish hair)

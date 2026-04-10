@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
@@ -54,7 +52,7 @@ function groupByCategory(prompts: MarketplacePrompt[]): Record<string, Marketpla
 }
 
 interface MarketplaceScreenProps {
-  scrollRef?: React.RefObject<HTMLDivElement | null>;
+  scrollRef?: React.RefObject<HTMLDivElement>;
   onUsePrompt?: (prompt: string) => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onCreatorTap?: (creatorName: string, creatorId?: string) => void;
@@ -296,7 +294,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
 
   const handleUsePrompt = async (prompt: MarketplacePrompt) => {
     // If it's a mock prompt, just return a mock text
-    if (prompt.id.startsWith('mock-') || process.env.NEXT_PUBLIC_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    if (prompt.id.startsWith('mock-') || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !import.meta.env.VITE_SUPABASE_URL) {
       onUsePrompt?.(`A detailed prompt for ${prompt.title}, featuring high quality elements and cinematic lighting.`);
       return;
     }
