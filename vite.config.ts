@@ -22,7 +22,7 @@ export default defineConfig(({mode}) => {
         devOptions: {
           enabled: true
         },
-        includeAssets: ['favicon.png', 'icons/pwa-icon-192.png', 'icons/pwa-icon-512.png'],
+        includeAssets: ['favicon-v2.png', 'icons/pwa-icon-192-v2.png', 'icons/pwa-icon-512-v2.png'],
         manifest: {
           name: 'Qpixa - AI Image & Video Generator',
           short_name: 'Qpixa',
@@ -34,19 +34,19 @@ export default defineConfig(({mode}) => {
           scope: '/',
           icons: [
             {
-              src: '/icons/pwa-icon-192.png',
+              src: '/icons/pwa-icon-192-v2.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: '/icons/pwa-icon-512.png',
+              src: '/icons/pwa-icon-512-v2.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any'
             },
             {
-              src: '/icons/pwa-icon-512.png',
+              src: '/icons/pwa-icon-512-v2.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable'
