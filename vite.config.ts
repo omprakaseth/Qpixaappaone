@@ -22,7 +22,7 @@ export default defineConfig(({mode}) => {
         devOptions: {
           enabled: true
         },
-        includeAssets: ['favicon-v4.png', 'icons/pwa-icon-192-v4.png', 'icons/pwa-icon-512-v4.png'],
+        includeAssets: ['favicon-v4.png', 'favicon-48.png', 'favicon.ico', 'icons/pwa-icon-192-v4.png', 'icons/pwa-icon-512-v4.png'],
         manifest: {
           name: 'Qpixa - AI Image & Video Generator',
           short_name: 'Qpixa',
