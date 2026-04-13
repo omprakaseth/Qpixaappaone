@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Heart, LogIn, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
+import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 
 interface FavoritesScreenProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
@@ -13,12 +14,57 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(100);
   const [isMounted, setIsMounted] = useState(false);
-  const { isLoggedIn, posts } = useAppState();
+  const { isLoggedIn, user } = useAppState();
   const [activeTab, setActiveTab] = useState<'saved' | 'generated' | 'collections'>('saved');
+  const [savedItems, setSavedItems] = useState<any[]>([]);
+  const [generatedItems, setGeneratedItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      fetchFavorites();
+      fetchGenerations();
+    }
+  }, [isLoggedIn, user]);
+
+  const fetchFavorites = async () => {
+    if (!user || isPlaceholder) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setSavedItems(data || []);
+    } catch (err) {
+      console.error('Error fetching favorites:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchGenerations = async () => {
+    if (!user || isPlaceholder) return;
+    try {
+      const { data, error } = await supabase
+        .from('generations')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setGeneratedItems(data || []);
+    } catch (err) {
+      console.error('Error fetching generations:', err);
+    }
+  };
 
   useEffect(() => {
     if (!headerRef.current) return;
@@ -43,13 +89,13 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
         <p className="text-sm text-muted-foreground mb-6">Save your favorite AI creations and access them anytime</p>
         <button
           onClick={() => onOpenAuth?.('login')}
-          className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 mb-3"
+          className="px-8 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 mb-3"
         >
           <LogIn size={16} /> Sign In
         </button>
         <button
           onClick={() => onOpenAuth?.('signup')}
-          className="w-full py-3 rounded-xl bg-secondary text-secondary-foreground font-semibold text-sm flex items-center justify-center gap-2"
+          className="px-8 py-3 rounded-xl bg-secondary text-secondary-foreground font-semibold text-sm flex items-center justify-center gap-2"
         >
           <UserPlus size={16} /> Create Account
         </button>
@@ -57,7 +103,6 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
     );
   }
 
-  const savedPosts = posts.filter(p => p.isSaved);
   const tabs = [
     { id: 'saved' as const, label: 'Saved' },
     { id: 'generated' as const, label: 'Generated' },
@@ -98,15 +143,17 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
         style={{ paddingTop: headerHeight }}
       >
         {activeTab === 'saved' && (
-          savedPosts.length === 0 ? (
+          loading ? (
+            <p className="text-center text-sm text-muted-foreground py-12">Loading favorites...</p>
+          ) : savedItems.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-12">No saved items yet</p>
           ) : (
             <div className="grid grid-cols-2 gap-2.5">
-              {savedPosts.map(p => (
-                <div key={p.id} className="rounded-xl overflow-hidden bg-card">
-                  <img src={p.imageUrl} alt={p.title} className="w-full aspect-square object-cover" />
+              {savedItems.map(p => (
+                <div key={p.id} className="rounded-xl overflow-hidden bg-card border border-border">
+                  <img src={p.image_url} alt={p.prompt} className="w-full aspect-square object-cover" />
                   <div className="p-2">
-                    <p className="text-xs font-semibold text-foreground truncate">{p.title}</p>
+                    <p className="text-[10px] font-semibold text-foreground truncate">{p.prompt || 'Untitled'}</p>
                   </div>
                 </div>
               ))}
@@ -114,7 +161,20 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
           )
         )}
         {activeTab === 'generated' && (
-          <p className="text-center text-sm text-muted-foreground py-12">No generated images yet</p>
+          generatedItems.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-12">No generated images yet</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5">
+              {generatedItems.map(p => (
+                <div key={p.id} className="rounded-xl overflow-hidden bg-card border border-border">
+                  <img src={p.image_url} alt={p.prompt} className="w-full aspect-square object-cover" />
+                  <div className="p-2">
+                    <p className="text-[10px] font-semibold text-foreground truncate">{p.prompt || 'Untitled'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
         {activeTab === 'collections' && (
           <p className="text-center text-sm text-muted-foreground py-12">No collections yet</p>

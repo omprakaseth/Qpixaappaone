@@ -42,7 +42,7 @@ function AppShell() {
     return 'home';
   }, [location.pathname]);
 
-  const { posts, isPro, isLoggedIn, user, profile } = useAppState();
+  const { posts, isPro, isLoggedIn, user, profile, fetchPostById } = useAppState();
   const { settings: adSettings } = useAdSettings();
   const [showRewardAd, setShowRewardAd] = useState(false);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
@@ -81,15 +81,25 @@ function AppShell() {
   const { id } = useParams();
 
   useEffect(() => {
-    if (location.pathname.startsWith('/prompt/') && id) {
-      const post = posts.find(p => p.id === id);
-      if (post) {
-        setSelectedPost(post);
+    const handleDeepLink = async () => {
+      if (location.pathname.startsWith('/prompt/') && id) {
+        // First check local posts
+        const post = posts.find(p => p.id === id);
+        if (post) {
+          setSelectedPost(post);
+        } else {
+          // If not found, fetch from DB
+          const fetchedPost = await fetchPostById(id);
+          if (fetchedPost) {
+            setSelectedPost(fetchedPost);
+          }
+        }
+      } else if (location.pathname.startsWith('/creator/') && id) {
+        setViewingCreator(id);
       }
-    } else if (location.pathname.startsWith('/creator/') && id) {
-      setViewingCreator(id);
-    }
-  }, [location.pathname, id, posts]);
+    };
+    handleDeepLink();
+  }, [location.pathname, id, posts, fetchPostById]);
 
   // --- History-based back navigation ---
   const pushHistory = useCallback((state: string, path?: string) => {
@@ -107,12 +117,28 @@ function AppShell() {
       if (showCreatePost) { setShowCreatePost(false); setCreatePostData({}); return; }
       if (selectedPost) { 
         setSelectedPost(null); 
-        if (location.pathname.startsWith('/prompt/')) navigate('/');
+        // If we were on a deep link, go back to where we came from or home
+        if (location.pathname.startsWith('/prompt/')) {
+          // Check if we have history to go back to
+          if (window.history.length > 1) {
+            // We'll let the browser handle it or navigate to parent
+            // But since we are in a SPA with state-based overlays, 
+            // we might need to navigate manually if the URL changed
+            if (activeTab === 'discover') navigate('/market');
+            else if (activeTab === 'profile') navigate('/profile');
+            else navigate('/');
+          } else {
+            navigate('/');
+          }
+        }
         return; 
       }
       if (viewingCreator) { 
         setViewingCreator(null); 
-        if (location.pathname.startsWith('/creator/')) navigate('/');
+        if (location.pathname.startsWith('/creator/')) {
+          if (activeTab === 'discover') navigate('/market');
+          else navigate('/');
+        }
         return; 
       }
       if (showSettings) { setShowSettings(false); return; }

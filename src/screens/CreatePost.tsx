@@ -56,6 +56,10 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
   };
 
   const handlePost = async () => {
+    if (!title.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
     if (type === 'post' && !prompt.trim()) {
       toast.error('Please enter a prompt');
       return;
@@ -104,7 +108,7 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
         <h1 className="text-base font-bold text-foreground">Create</h1>
         <button
           onClick={handlePost}
-          disabled={publishing || (type === 'post' && !title.trim())}
+          disabled={publishing || !title.trim()}
           className="ml-auto px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50"
         >
           {publishing ? 'Starting...' : 'Publish'}

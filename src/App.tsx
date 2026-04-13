@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import Index from "./hooks/pages/Index";
@@ -27,6 +27,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/market" element={<Index />} />
+              <Route path="/marketplace" element={<Navigate to="/market" replace />} />
               <Route path="/shorts" element={<Index />} />
               <Route path="/studio" element={<Index />} />
               <Route path="/notifications" element={<Index />} />

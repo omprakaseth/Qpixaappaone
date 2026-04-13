@@ -86,6 +86,7 @@ interface AppState {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   fetchPosts: () => Promise<void>;
+  fetchPostById: (id: string) => Promise<Post | null>;
   deferredPrompt: any;
   installApp: () => Promise<void>;
 }
@@ -219,9 +220,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Add optional fields only if they exist in the schema (we'll try to insert them and fallback if it fails)
       const extendedData = {
         ...postData,
-        title: upload.title.trim(),
+        title: (upload.title || 'Untitled').trim(),
         is_short: upload.type === 'short',
-        tags: upload.tags.split(',').map(t => t.trim()).filter(Boolean),
+        tags: (upload.tags || '').split(',').map(t => t.trim()).filter(Boolean),
         category: detectedCategory, // Smart category detection
         is_hidden: false,
       };
@@ -368,6 +369,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPosts(MOCK_POSTS);
     } finally {
       setInitialLoading(false);
+    }
+  };
+
+  const fetchPostById = async (id: string): Promise<Post | null> => {
+    if (isPlaceholder) return MOCK_POSTS.find(p => p.id === id) || null;
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:creator_id (*)
+        `)
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      return data ? formatPost(data) : null;
+    } catch (err) {
+      console.error('Error fetching post by id:', err);
+      return null;
     }
   };
 
@@ -587,7 +608,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       posts, setPosts, initialLoading, user, session, profile, isLoggedIn, isPro, credits, setCredits,
       uploadingPost, startUpload, retryUpload, clearUpload,
-      toggleLike, toggleSave, addPost, deletePost, updatePost, signOut, refreshProfile, fetchPosts,
+      toggleLike, toggleSave, addPost, deletePost, updatePost, signOut, refreshProfile, fetchPosts, fetchPostById,
       deferredPrompt, installApp
     }}>
       {children}

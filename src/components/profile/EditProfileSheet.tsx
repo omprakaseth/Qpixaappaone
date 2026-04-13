@@ -107,18 +107,41 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
     }
     setSaving(true);
     try {
+      const updateData: any = {
+        id: profile.id,
+        username: username.trim(),
+        display_name: displayName.trim() || null,
+        bio: bio.trim() || null,
+        avatar_url: avatarUrl || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (coverUrl) {
+        updateData.cover_url = coverUrl;
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .upsert({
-          id: profile.id,
-          username: username.trim(),
-          display_name: displayName.trim() || null,
-          bio: bio.trim() || null,
-          avatar_url: avatarUrl || null,
-          cover_url: coverUrl || null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'id' });
-      if (error) throw error;
+        .upsert(updateData, { onConflict: 'id' });
+        
+      if (error) {
+        // If error is about updated_at or cover_url column, try again without them
+        if (
+          error.message?.includes('updated_at') || 
+          error.message?.includes('cover_url') || 
+          error.hint?.includes('updated_at') || 
+          error.hint?.includes('cover_url')
+        ) {
+          delete updateData.updated_at;
+          delete updateData.cover_url;
+          const { error: retryError } = await supabase
+            .from('profiles')
+            .upsert(updateData, { onConflict: 'id' });
+          if (retryError) throw retryError;
+        } else {
+          throw error;
+        }
+      }
       toast.success('Profile updated!');
       onSaved();
       onClose();

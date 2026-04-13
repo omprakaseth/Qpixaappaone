@@ -161,16 +161,32 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     if (!isLoggedIn) return;
     setSaving(true);
     try {
+      const updateData: any = {
+        username: editUsername.trim() || null,
+        display_name: editDisplayName.trim() || null,
+        bio: editBio.trim() || null,
+        avatar_url: editAvatarUrl || null,
+        updated_at: new Date().toISOString(),
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .update({
-          username: editUsername.trim() || null,
-          display_name: editDisplayName.trim() || null,
-          bio: editBio.trim() || null,
-          avatar_url: editAvatarUrl || null,
-        })
+        .update(updateData)
         .eq('id', profile?.id);
-      if (error) throw error;
+
+      if (error) {
+        // If error is about updated_at column, try again without it
+        if (error.message?.includes('updated_at')) {
+          delete updateData.updated_at;
+          const { error: retryError } = await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('id', profile?.id);
+          if (retryError) throw retryError;
+        } else {
+          throw error;
+        }
+      }
       await refreshProfile();
       toast.success('Profile updated!');
     } catch (err: any) {

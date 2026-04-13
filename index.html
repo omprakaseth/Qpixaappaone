@@ -107,34 +107,8 @@
   <body>
     <div id="splash-screen">
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-        <div id="splash-logo-container" style="margin-bottom: 12px;">
-          <svg width="120" height="72" viewBox="0 0 130 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="logo-gradient-splash" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#00E5FF" />
-                <stop offset="100%" stop-color="#7B61FF" />
-              </linearGradient>
-              <filter id="glow-splash" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="2.5" result="blur" />
-                <feComponentTransfer in="blur" result="lowOpacityBlur">
-                  <feFuncA type="linear" slope="0.4" />
-                </feComponentTransfer>
-                <feMerge>
-                  <feMergeNode in="lowOpacityBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-            <path 
-              d="M 62 70 V 40 A 18 18 0 1 0 26 40 A 18 18 0 0 0 62 40 C 62 32 68 32 68 40 A 18 18 0 0 1 104 40 A 18 18 0 1 1 68 40 V 70"
-              stroke="url(#logo-gradient-splash)"
-              stroke-width="7"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              filter="url(#glow-splash)"
-              style="stroke-dasharray: 500; stroke-dashoffset: 500; animation: draw 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;"
-            />
-          </svg>
+        <div id="splash-logo-container" style="margin-bottom: 20px;">
+          <img src="/icons/pwa-icon-192-v4.png" alt="Qpixa" style="width: 100px; height: 100px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
         </div>
         <h1 style="color: white; font-family: 'Sora', sans-serif; font-weight: 600; margin-top: 0px; font-size: 28px; letter-spacing: 0.3px;">Qpixa</h1>
       </div>

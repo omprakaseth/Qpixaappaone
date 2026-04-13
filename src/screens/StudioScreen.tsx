@@ -150,8 +150,9 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash-image');
+  const [selectedModel, setSelectedModel] = useState('pollinations');
   const MODELS = [
+    { id: 'pollinations', name: 'Pollinations AI (Free & Fast)', provider: 'Pollinations' },
     { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 (Free)', provider: 'Google' },
     { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 (High Quality)', provider: 'Google' },
     { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL (Free)', provider: 'HuggingFace' },
@@ -202,6 +203,24 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     };
 
     return callApi();
+  };
+
+  const generateWithPollinations = async (promptText: string, ratio: string) => {
+    const seed = Math.floor(Math.random() * 1000000);
+    const width = ratio === '16:9' ? 1280 : ratio === '9:16' ? 720 : 1024;
+    const height = ratio === '16:9' ? 720 : ratio === '9:16' ? 1280 : 1024;
+    
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?seed=${seed}&width=${width}&height=${height}&nologo=true&enhance=true`;
+    
+    // We fetch it to get a base64 so we can upload it to Supabase later if needed
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   };
 
   const generateWithGemini = async (modelId: string, promptText: string, imageBase64?: string | null, signal?: AbortSignal) => {
@@ -322,33 +341,58 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     }
   }, [prompt]);
 
-  // Load sessions from Local Storage
+  // Load sessions from Local Storage and Sync with DB
   useEffect(() => {
-    const loadSessions = () => {
+    const loadSessions = async () => {
       try {
         const savedSessions = localStorage.getItem('qpixa_studio_sessions');
+        let parsed: ChatSession[] = [];
         if (savedSessions) {
-          const parsed: ChatSession[] = JSON.parse(savedSessions);
+          parsed = JSON.parse(savedSessions);
+        }
+
+        // If logged in, also fetch from DB to ensure we have history
+        if (user && !isPlaceholder) {
+          const { data: dbGenerations } = await supabase
+            .from('generations')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          if (dbGenerations && dbGenerations.length > 0) {
+            // Create a "Cloud History" session if it doesn't exist or update it
+            const cloudMessages: ChatMessage[] = dbGenerations.map((g: any) => ({
+              id: g.id,
+              type: 'ai',
+              text: g.prompt,
+              imageUrl: g.image_url,
+              createdAt: g.created_at,
+              status: 'success'
+            }));
+
+            const cloudSession: ChatSession = {
+              id: 'cloud-history',
+              title: '☁️ Cloud History',
+              messages: cloudMessages,
+              createdAt: dbGenerations[dbGenerations.length - 1].created_at,
+              updatedAt: dbGenerations[0].created_at,
+            };
+
+            // Merge with local sessions
+            const otherSessions = parsed.filter(s => s.id !== 'cloud-history');
+            parsed = [cloudSession, ...otherSessions];
+          }
+        }
+
+        if (parsed.length > 0) {
           setSessions(parsed);
           
-          // If there are sessions, load the most recent one
-          if (parsed.length > 0 && !currentSessionId) {
+          // If there are sessions, load the most recent one if none selected
+          if (!currentSessionId) {
             const mostRecent = parsed[0];
             setCurrentSessionId(mostRecent.id);
             setMessages(mostRecent.messages);
-            
-            // Check for pending generations and resume if possible
-            const pendingMsg = mostRecent.messages.find(m => m.status === 'pending');
-            if (pendingMsg && !generating) {
-              // We can't easily auto-resume because we might lack context (like attached image)
-              // But we can mark it as error so user can retry, or just leave it.
-              // For now, let's just mark it as error so it doesn't stay stuck forever
-              const updatedMessages = mostRecent.messages.map(m => 
-                m.status === 'pending' ? { ...m, status: 'error' as const, text: 'Generation interrupted. Please try again.' } : m
-              );
-              setMessages(updatedMessages);
-              updateSessionMessages(mostRecent.id, updatedMessages);
-            }
           }
         }
       } catch (e) {
@@ -356,7 +400,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       }
     };
     loadSessions();
-  }, []);
+  }, [user, isLoggedIn]);
 
   // Helper to save sessions to local storage
   const saveSessionsToLocalStorage = (updatedSessions: ChatSession[]) => {
@@ -543,6 +587,8 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       const currentModel = MODELS.find(m => m.id === selectedModel);
       if (currentModel?.provider === 'HuggingFace') {
         generatedImageUrl = await generateWithHuggingFace(selectedModel, finalPrompt, controller.signal);
+      } else if (selectedModel === 'pollinations') {
+        generatedImageUrl = await generateWithPollinations(finalPrompt, selectedRatio);
       } else {
         generatedImageUrl = await generateWithGemini(selectedModel, finalPrompt, imageToSend, controller.signal);
       }
