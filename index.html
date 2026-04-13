@@ -89,39 +89,79 @@
         align-items: center;
         justify-content: center;
         z-index: 9999;
-        transition: opacity 0.5s ease-out;
+        transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
       }
-      #splash-screen img {
+      .splash-logo {
         width: 120px;
-        height: 120px;
-        border-radius: 24px;
-        animation: pulse 2s infinite;
+        height: auto;
+        filter: drop-shadow(0 0 15px rgba(123, 97, 255, 0.5));
+        animation: splash-pulse 2s ease-in-out infinite;
       }
-      @keyframes pulse {
-        0% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.05); opacity: 0.8; }
-        100% { transform: scale(1); opacity: 1; }
+      .splash-path {
+        stroke-dasharray: 500;
+        stroke-dashoffset: 500;
+        animation: splash-draw 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards, splash-glow 2s ease-in-out infinite 1.5s;
+      }
+      .flash-overlay {
+        position: absolute;
+        inset: 0;
+        background: white;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 10000;
+        animation: flash-anim 0.8s ease-out forwards;
+      }
+      @keyframes splash-draw {
+        to { stroke-dashoffset: 0; }
+      }
+      @keyframes splash-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      @keyframes splash-glow {
+        0%, 100% { filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.4)); }
+        50% { filter: drop-shadow(0 0 25px rgba(123, 97, 255, 0.8)); }
+      }
+      @keyframes flash-anim {
+        0% { opacity: 0.8; }
+        100% { opacity: 0; }
+      }
+      .splash-text {
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-weight: 700;
+        margin-top: 24px;
+        font-size: 32px;
+        letter-spacing: -0.02em;
+        opacity: 0;
+        animation: fade-in 0.8s ease-out forwards 0.5s;
+      }
+      @keyframes fade-in {
+        to { opacity: 1; }
       }
     </style>
   </head>
   <body>
     <div id="splash-screen">
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-        <div id="splash-logo-container" style="margin-bottom: 20px;">
-          <img src="/icons/pwa-icon-192-v4.png" alt="Qpixa" style="width: 100px; height: 100px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);" />
-        </div>
-        <h1 style="color: white; font-family: 'Sora', sans-serif; font-weight: 600; margin-top: 0px; font-size: 28px; letter-spacing: 0.3px;">Qpixa</h1>
-      </div>
+      <div class="flash-overlay"></div>
+      <svg width="130" height="80" viewBox="0 0 130 80" fill="none" xmlns="http://www.w3.org/2000/svg" class="splash-logo">
+        <defs>
+          <linearGradient id="splash-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00E5FF" />
+            <stop offset="100%" stop-color="#7B61FF" />
+          </linearGradient>
+        </defs>
+        <path 
+          d="M 62 70 V 40 A 18 18 0 1 0 26 40 A 18 18 0 0 0 62 40 C 62 32 68 32 68 40 A 18 18 0 0 1 104 40 A 18 18 0 1 1 68 40 V 70"
+          stroke="url(#splash-gradient)"
+          stroke-width="8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="splash-path"
+        />
+      </svg>
+      <h1 class="splash-text">Qpixa</h1>
     </div>
-    <style>
-      @keyframes draw {
-        to { stroke-dashoffset: 0; }
-      }
-      @keyframes loading {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-      }
-    </style>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
@@ -131,9 +171,12 @@
           const splash = document.getElementById('splash-screen');
           if (splash) {
             splash.style.opacity = '0';
-            setTimeout(() => splash.remove(), 500);
+            setTimeout(() => {
+              splash.remove();
+              document.body.style.overflow = 'auto';
+            }, 600);
           }
-        }, 800);
+        }, 2000); // Increased delay to show the animation
       });
     </script>
   </body>

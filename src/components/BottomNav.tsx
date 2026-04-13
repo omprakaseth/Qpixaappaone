@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, PlaySquare, Sparkles, Heart, User, Store } from 'lucide-react';
+import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/context/NotificationContext';
 
@@ -13,7 +13,6 @@ const tabs = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'shorts', label: 'Shorts', icon: PlaySquare },
   { id: 'studio', label: 'Studio', icon: Sparkles },
-  { id: 'discover', label: 'Market', icon: Store },
   { id: 'favorites', label: 'Favorites', icon: Heart },
   { id: 'profile', label: 'Profile', icon: User },
 ];
