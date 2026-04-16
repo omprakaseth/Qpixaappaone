@@ -107,24 +107,27 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
     }
     setSaving(true);
     try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) throw new Error('Not authenticated');
+
       const updateData: any = {
-        id: profile.id,
         username: username.trim(),
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
         avatar_url: avatarUrl || null,
-        updated_at: new Date().toISOString(),
+        cover_url: coverUrl || null,
       };
 
-      if (coverUrl) {
-        updateData.cover_url = coverUrl;
-      }
+      console.log('Updating profile for user:', currentUser.id, updateData);
 
-      const { error } = await supabase
+      // Try to update first
+      let { error } = await supabase
         .from('profiles')
-        .upsert(updateData, { onConflict: 'id' });
+        .update(updateData)
+        .eq('id', currentUser.id);
         
       if (error) {
+        console.warn('Profile update error, checking for missing columns:', error);
         // If error is about updated_at or cover_url column, try again without them
         if (
           error.message?.includes('updated_at') || 
@@ -132,16 +135,28 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
           error.hint?.includes('updated_at') || 
           error.hint?.includes('cover_url')
         ) {
-          delete updateData.updated_at;
           delete updateData.cover_url;
           const { error: retryError } = await supabase
             .from('profiles')
-            .upsert(updateData, { onConflict: 'id' });
-          if (retryError) throw retryError;
-        } else {
-          throw error;
+            .update(updateData)
+            .eq('id', currentUser.id);
+          error = retryError;
         }
       }
+
+      // If update failed with RLS error, it might be because the row doesn't exist yet
+      // (though it should have been created on login)
+      if (error && (error.message?.includes('row-level security') || error.code === '42501')) {
+        console.log('Update failed with RLS, trying upsert as fallback...');
+        const upsertData = { ...updateData, id: currentUser.id };
+        const { error: upsertError } = await supabase
+          .from('profiles')
+          .upsert(upsertData, { onConflict: 'id' });
+        error = upsertError;
+      }
+        
+      if (error) throw error;
+
       toast.success('Profile updated!');
       onSaved();
       onClose();

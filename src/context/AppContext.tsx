@@ -198,16 +198,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Prepare post data
+      // Prepare post data with absolute fallback to prevent NOT NULL constraint violations
+      const rawTitle = upload.title;
+      const rawPrompt = upload.prompt;
+      
+      const safeTitle = (typeof rawTitle === 'string' ? rawTitle : 'Untitled').trim() || 'Untitled';
+      const safePrompt = (typeof rawPrompt === 'string' ? rawPrompt : 'No prompt provided').trim() || 'No prompt provided';
+      
       const postData: any = {
         creator_id: user.id,
-        prompt: upload.prompt.trim(),
-        image_url: finalUrl,
+        title: safeTitle,
+        prompt: safePrompt,
+        image_url: finalUrl || '',
       };
 
       // Smart Category Logic: Check if tags match any known categories
       const availableCategories = ['Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature', 'Shorts'];
-      const tagsArray = upload.tags.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+      const tagsArray = (upload.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
       let detectedCategory = 'Trending';
       
       for (const cat of availableCategories) {
@@ -220,12 +227,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Add optional fields only if they exist in the schema (we'll try to insert them and fallback if it fails)
       const extendedData = {
         ...postData,
-        title: (upload.title || 'Untitled').trim(),
         is_short: upload.type === 'short',
         tags: (upload.tags || '').split(',').map(t => t.trim()).filter(Boolean),
         category: detectedCategory, // Smart category detection
         is_hidden: false,
       };
+
+      console.log('Final check before insert - Title:', extendedData.title);
+      if (!extendedData.title) {
+        console.error('CRITICAL: Title is still null or empty despite safeTitle logic!');
+        extendedData.title = 'Untitled Creation';
+      }
 
       console.log('Attempting to insert post:', extendedData);
       const { data: insertedData, error } = await supabase.from('posts').insert(extendedData).select(`
@@ -337,27 +349,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         if (simpleData) {
           console.log(`Fetched ${simpleData.length} posts (simple)`);
-          let formattedPosts: Post[] = simpleData.map(formatPost);
+          const formattedPosts: Post[] = simpleData.map(formatPost);
           
-          // Logic: If real posts < 50, append mock posts
-          if (formattedPosts.length < 50) {
-            formattedPosts = [...formattedPosts, ...MOCK_POSTS];
+          // Logic: Real posts first. Only add mock if real posts < 10
+          let finalPosts = formattedPosts;
+          if (formattedPosts.length < 10) {
+            finalPosts = [...formattedPosts, ...MOCK_POSTS];
           }
           
-          setPosts(formattedPosts);
-          console.log('setPosts called with', formattedPosts.length, 'posts');
+          setPosts(finalPosts);
+          console.log('setPosts called with', finalPosts.length, 'posts');
         }
       } else if (data) {
         console.log(`Fetched ${data.length} posts (with join)`);
-        let formattedPosts: Post[] = data.map(formatPost);
+        const formattedPosts: Post[] = data.map(formatPost);
         
-        // Logic: If real posts < 50, append mock posts
-        if (formattedPosts.length < 50) {
-          formattedPosts = [...formattedPosts, ...MOCK_POSTS];
+        // Logic: Real posts first. Only add mock if real posts < 10
+        let finalPosts = formattedPosts;
+        if (formattedPosts.length < 10) {
+          finalPosts = [...formattedPosts, ...MOCK_POSTS];
         }
         
-        setPosts(formattedPosts);
-        console.log('setPosts called with', formattedPosts.length, 'posts');
+        setPosts(finalPosts);
+        console.log('setPosts called with', finalPosts.length, 'posts');
       } else {
         // Fallback if data is null but no error
         console.log('No data and no error, setting mock posts');

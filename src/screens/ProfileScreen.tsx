@@ -74,17 +74,33 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
 
   const fetchMyShorts = async () => {
     if (!user || isPlaceholder) return;
-    const { data, error } = await (supabase
-      .from('shorts' as any) as any)
-      .select('*')
-      .eq('creator_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    if (error) {
+    try {
+      const { data, error } = await (supabase
+        .from('posts')
+        .select('*, profiles(username, avatar_url)')
+        .eq('creator_id', user.id)
+        .eq('is_short', true)
+        .order('created_at', { ascending: false }) as any);
+
+      if (error) throw error;
+      
+      if (data) {
+        const formattedShorts = data.map((p: any) => ({
+          id: p.id,
+          thumbnail: p.image_url,
+          views: p.views || 0,
+          likes: p.likes_count || 0,
+          prompt: p.prompt || '',
+          creator: {
+            username: p.profiles?.username || profile?.username || 'User',
+            avatar: p.profiles?.avatar_url || profile?.avatar_url || '',
+          }
+        }));
+        setMyShorts(formattedShorts);
+      }
+    } catch (error) {
       console.error('Error fetching shorts:', error);
       setMyShorts([]);
-    } else {
-      setMyShorts(data || []);
     }
   };
 

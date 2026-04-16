@@ -119,8 +119,8 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
           username: item.profiles?.username || 'anonymous',
           profilePic: item.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.id}`,
           description: item.title || '',
-          likes: item.likes_count?.toString() || '0',
-          comments: '0',
+          likes: item.likes?.toString() || '0',
+          comments: item.comments?.toString() || '0',
           shares: '0',
           audio: 'Original Audio',
           prompt: item.prompt || 'AI Generated Content',
@@ -128,11 +128,13 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
           isLiked: false,
           isSaved: false,
         }));
-        if (formattedReels.length === 0) {
-          setReels(MOCK_REELS);
-        } else {
-          setReels(formattedReels);
+        
+        // Show real shorts first, then mock shorts if needed
+        let finalReels = formattedReels;
+        if (formattedReels.length < 5) {
+          finalReels = [...formattedReels, ...MOCK_REELS];
         }
+        setReels(finalReels);
       }
     } catch (error) {
       // Suppress the console error to avoid cluttering when falling back to mock data

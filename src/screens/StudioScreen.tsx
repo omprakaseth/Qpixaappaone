@@ -150,13 +150,16 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('pollinations');
+  const [selectedModel, setSelectedModel] = useState('flux');
   const MODELS = [
-    { id: 'pollinations', name: 'Pollinations AI (Free & Fast)', provider: 'Pollinations' },
+    { id: 'flux', name: 'Flux.1 (High Quality)', provider: 'Pollinations' },
+    { id: 'flux-realism', name: 'Flux Realism', provider: 'Pollinations' },
+    { id: 'flux-anime', name: 'Flux Anime', provider: 'Pollinations' },
+    { id: 'flux-3d', name: 'Flux 3D', provider: 'Pollinations' },
+    { id: 'pollinations', name: 'Pollinations Standard', provider: 'Pollinations' },
     { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 (Free)', provider: 'Google' },
-    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 (High Quality)', provider: 'Google' },
-    { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL (Free)', provider: 'HuggingFace' },
-    { id: 'runwayml/stable-diffusion-v1-5', name: 'SD v1.5 (Fast & Free)', provider: 'HuggingFace' },
+    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 (Pro)', provider: 'Google' },
+    { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'SDXL (Free)', provider: 'HuggingFace' },
   ];
 
   const generateWithHuggingFace = async (modelId: string, promptText: string, signal?: AbortSignal) => {
@@ -205,94 +208,72 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     return callApi();
   };
 
-  const generateWithPollinations = async (promptText: string, ratio: string) => {
+  const generateWithPollinations = async (modelId: string, promptText: string, ratio: string) => {
     const seed = Math.floor(Math.random() * 1000000);
     const width = ratio === '16:9' ? 1280 : ratio === '9:16' ? 720 : 1024;
     const height = ratio === '16:9' ? 720 : ratio === '9:16' ? 1280 : 1024;
     
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptText)}?seed=${seed}&width=${width}&height=${height}&nologo=true&enhance=true`;
-    
-    // We fetch it to get a base64 so we can upload it to Supabase later if needed
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    try {
+      const response = await fetch('/api/pollinations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: promptText,
+          model: modelId,
+          width,
+          height,
+          seed,
+          nologo: true,
+          enhance: true
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image with Pollinations');
+      }
+
+      const data = await response.json();
+      return data.imageUrl;
+    } catch (err: any) {
+      console.error('Pollinations API Error:', err);
+      throw err;
+    }
   };
 
   const generateWithGemini = async (modelId: string, promptText: string, imageBase64?: string | null, signal?: AbortSignal) => {
-    // Create a timeout promise
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Generation timed out. Please try again or check your connection.')), 60000);
-    });
-
-    const generationPromise = (async () => {
-      try {
-        let apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
-        
-        if (!apiKey && (window as any).aistudio?.openSelectKey) {
-          toast.info('Please select an API key to continue with this model.');
-          await (window as any).aistudio.openSelectKey();
-          apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
-        }
-
-        if (!apiKey) {
-          throw new Error('Gemini API key is missing. Please add GEMINI_API_KEY to your environment variables or select a key in the settings.');
-        }
-
-        const ai = new GoogleGenAI({ apiKey });
-        const isGemini3 = modelId.includes('gemini-3');
-        
-        let contents: any;
-        if (imageBase64) {
-          const base64Data = imageBase64.split(',')[1];
-          const mimeType = imageBase64.split(';')[0].split(':')[1] || 'image/png';
-          contents = {
-            parts: [
-              { inlineData: { data: base64Data, mimeType } },
-              { text: promptText }
-            ]
-          };
-        } else {
-          contents = {
-            parts: [{ text: promptText }]
-          };
-        }
-
-        // Optimize config: Only send imageSize for Gemini 3 models
-        const config: any = {
-          imageConfig: {
-            aspectRatio: selectedRatio as any,
-          }
-        };
-
-        if (isGemini3) {
-          config.imageConfig.imageSize = "1K";
-        }
-
-        const response = await ai.models.generateContent({
+    try {
+      console.log(`Calling Gemini Proxy for model: ${modelId}`);
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt: promptText,
           model: modelId,
-          contents,
-          config
-        });
+          image: imageBase64,
+          type: 'image',
+          config: {
+            imageConfig: {
+              aspectRatio: selectedRatio,
+              imageSize: modelId.includes('gemini-3') ? "1K" : undefined
+            }
+          }
+        }),
+        signal
+      });
 
-        const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        if (part && part.inlineData) {
-          return `data:${part.inlineData.mimeType || 'image/png'};base64,${part.inlineData.data}`;
-        } else {
-          throw new Error("No image generated by AI. The model might have returned text instead or blocked the request.");
-        }
-      } catch (err: any) {
-        console.error('Gemini Client Error:', err);
-        throw err;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate image with Gemini');
       }
-    })();
 
-    // Race between generation and timeout
-    return Promise.race([generationPromise, timeoutPromise]) as Promise<string>;
+      const data = await response.json();
+      return data.imageUrl;
+    } catch (err: any) {
+      if (err.name === 'AbortError') throw err;
+      console.error('Gemini API Error:', err);
+      throw err;
+    }
   };
 
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -587,8 +568,8 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       const currentModel = MODELS.find(m => m.id === selectedModel);
       if (currentModel?.provider === 'HuggingFace') {
         generatedImageUrl = await generateWithHuggingFace(selectedModel, finalPrompt, controller.signal);
-      } else if (selectedModel === 'pollinations') {
-        generatedImageUrl = await generateWithPollinations(finalPrompt, selectedRatio);
+      } else if (currentModel?.provider === 'Pollinations') {
+        generatedImageUrl = await generateWithPollinations(selectedModel, finalPrompt, selectedRatio);
       } else {
         generatedImageUrl = await generateWithGemini(selectedModel, finalPrompt, imageToSend, controller.signal);
       }
@@ -672,24 +653,32 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     
     setEnhancing(true);
     try {
-      let apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
-      
-      if (!apiKey && (window as any).aistudio?.openSelectKey) {
-        await (window as any).aistudio.openSelectKey();
-        apiKey = (process.env as any).API_KEY || (process.env as any).GEMINI_API_KEY;
-      }
-
-      if (!apiKey) throw new Error('API Key missing');
-
-      const ai = new GoogleGenAI({ apiKey });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`
+      // Try backend Gemini first
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          prompt: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`,
+          type: 'text',
+          model: 'gemini-3-flash-preview'
+        })
       });
 
-      const enhanced = response.text?.trim();
+      let enhanced = '';
+      if (response.ok) {
+        const data = await response.json();
+        enhanced = data.text?.trim();
+      } else {
+        // Fallback to Pollinations Text AI (Free & No Key)
+        console.log('Gemini enhance failed, falling back to Pollinations');
+        const pollResponse = await fetch(`https://text.pollinations.ai/prompt/${encodeURIComponent(`Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`)}?model=openai`);
+        if (pollResponse.ok) {
+          enhanced = await pollResponse.text();
+        }
+      }
+      
       if (enhanced) {
-        setPrompt(enhanced);
+        setPrompt(enhanced.trim());
         toast.success('Prompt enhanced!');
       }
     } catch (err) {

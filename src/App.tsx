@@ -13,6 +13,7 @@ import TermsPage from "./hooks/pages/TermsPage";
 import ContactPage from "./hooks/pages/ContactPage";
 import AboutPage from "./hooks/pages/AboutPage";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
+import { SplashScreen } from "./components/SplashScreen";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
       <Sonner />
       <AppProvider>
         <NotificationProvider>
+          <SplashScreen />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
