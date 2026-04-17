@@ -49,8 +49,8 @@ self.addEventListener('push', function(event) {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: '/favicon-qpixa.png',
-      badge: '/favicon-qpixa.png',
+      icon: '/icons/pwa-icon-192-v2.png',
+      badge: '/icons/pwa-icon-192-v2.png',
       data: {
         url: data.url || '/'
       },

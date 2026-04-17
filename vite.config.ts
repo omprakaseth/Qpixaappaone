@@ -15,7 +15,7 @@ export default defineConfig(({mode}) => {
           srcDir: 'src',
           filename: 'sw.js',
           registerType: 'autoUpdate',
-          manifestFilename: 'manifest.webmanifest',
+          manifestFilename: 'manifest.json',
           injectManifest: {
             maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           },
@@ -23,7 +23,13 @@ export default defineConfig(({mode}) => {
             enabled: true,
             type: 'module'
           },
-          includeAssets: ['favicon-qpixa.png', 'favicon.ico', 'placeholder.svg'],
+          includeAssets: [
+            'favicon-qpixa.png', 
+            'favicon.ico', 
+            'placeholder.svg',
+            'icons/pwa-icon-192-v2.png',
+            'icons/pwa-icon-512-v2.png'
+          ],
           manifest: {
             name: 'Qpixa - AI Image & Video Generator',
             short_name: 'Qpixa',
@@ -36,19 +42,19 @@ export default defineConfig(({mode}) => {
             id: 'com.qpixa.app',
             icons: [
               {
-                src: '/favicon-qpixa.png',
+                src: '/icons/pwa-icon-192-v2.png',
                 sizes: '192x192',
                 type: 'image/png',
                 purpose: 'any'
               },
               {
-                src: '/favicon-qpixa.png',
+                src: '/icons/pwa-icon-512-v2.png',
                 sizes: '512x512',
                 type: 'image/png',
                 purpose: 'any'
               },
               {
-                src: '/favicon-qpixa.png',
+                src: '/icons/pwa-icon-512-v2.png',
                 sizes: '512x512',
                 type: 'image/png',
                 purpose: 'maskable'
