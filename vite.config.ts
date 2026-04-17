@@ -10,50 +10,52 @@ export default defineConfig(({mode}) => {
     plugins: [
       react(), 
       tailwindcss(),
-      VitePWA({
-        strategies: 'injectManifest',
-        srcDir: 'src',
-        filename: 'sw.js',
-        registerType: 'autoUpdate',
-        manifestFilename: 'manifest.json',
-        injectManifest: {
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // Increase to 5MB
-        },
-        devOptions: {
-          enabled: true
-        },
-        includeAssets: ['favicon-qpixa.png', 'favicon.ico', 'icons/pwa-icon-192-v4.png', 'icons/pwa-icon-512-v4.png'],
-        manifest: {
-          name: 'Qpixa - AI Image & Video Generator',
-          short_name: 'Qpixa',
-          description: 'Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community.',
-          theme_color: '#000000',
-          background_color: '#000000',
-          display: 'standalone',
-          start_url: '/',
-          scope: '/',
-          icons: [
-            {
-              src: '/favicon-qpixa.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: '/favicon-qpixa.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any'
-            },
-            {
-              src: '/favicon-qpixa.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'maskable'
-            }
-          ]
-        }
-      })
+        VitePWA({
+          strategies: 'injectManifest',
+          srcDir: 'src',
+          filename: 'sw.js',
+          registerType: 'autoUpdate',
+          manifestFilename: 'manifest.webmanifest',
+          injectManifest: {
+            maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+          },
+          devOptions: {
+            enabled: true,
+            type: 'module'
+          },
+          includeAssets: ['favicon-qpixa.png', 'favicon.ico', 'placeholder.svg'],
+          manifest: {
+            name: 'Qpixa - AI Image & Video Generator',
+            short_name: 'Qpixa',
+            description: 'Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community.',
+            theme_color: '#000000',
+            background_color: '#000000',
+            display: 'standalone',
+            start_url: '/',
+            scope: '/',
+            id: 'com.qpixa.app',
+            icons: [
+              {
+                src: '/favicon-qpixa.png',
+                sizes: '192x192',
+                type: 'image/png',
+                purpose: 'any'
+              },
+              {
+                src: '/favicon-qpixa.png',
+                sizes: '512x512',
+                type: 'image/png',
+                purpose: 'any'
+              },
+              {
+                src: '/favicon-qpixa.png',
+                sizes: '512x512',
+                type: 'image/png',
+                purpose: 'maskable'
+              }
+            ]
+          }
+        })
     ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
