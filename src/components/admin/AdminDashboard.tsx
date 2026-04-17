@@ -91,34 +91,122 @@ export default function AdminDashboard({ onNavigate }: DashboardProps) {
     return true;
   });
 
+  const chartData = [
+    { name: 'Mon', value: 400 },
+    { name: 'Tue', value: 300 },
+    { name: 'Wed', value: 600 },
+    { name: 'Thu', value: 800 },
+    { name: 'Fri', value: 700 },
+    { name: 'Sat', value: 900 },
+    { name: 'Sun', value: 1100 },
+  ];
+
   return (
-    <div>
-      <h2 className="text-xl font-bold text-foreground mb-6">Dashboard</h2>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xl font-bold text-foreground">Dashboard Overview</h2>
+        <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-full border border-border">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">System Live</span>
+        </div>
+      </div>
 
       {/* Stat Cards - clickable */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {cards.map(c => (
           <button
             key={c.label}
             onClick={() => c.tab && onNavigate?.(c.tab)}
-            className="bg-card border border-border rounded-xl p-4 text-left hover:border-primary/30 transition-colors group"
+            className="bg-card border border-border rounded-xl p-4 text-left hover:border-primary/30 transition-all hover:shadow-[0_0_15px_rgba(var(--primary),0.1)] group"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-muted-foreground">{c.label}</span>
-              <c.icon size={18} className={c.color} />
+              <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">{c.label}</span>
+              <c.icon size={16} className={c.color} />
             </div>
-            <p className="text-2xl font-bold text-foreground">{c.value}</p>
+            <p className="text-xl font-bold text-foreground">{c.value}</p>
             {c.tab && (
-              <span className="text-[10px] text-muted-foreground group-hover:text-primary flex items-center gap-1 mt-1">
-                View all <ArrowRight size={10} />
+              <span className="text-[9px] text-muted-foreground group-hover:text-primary flex items-center gap-1 mt-1 transition-colors">
+                View detail <ArrowRight size={8} />
               </span>
             )}
           </button>
         ))}
       </div>
 
-      {/* Recent Users with search & filter */}
-      <div className="bg-card border border-border rounded-xl p-4 mb-4">
+      {/* Activity Chart Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 bg-card border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-foreground">Creation Activity</h3>
+            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Last 7 Days</span>
+          </div>
+          <div className="h-48 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 10, fill: '#666' }} 
+                />
+                <YAxis 
+                  hide={true} 
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#111', border: 'none', borderRadius: '8px', fontSize: '12px' }}
+                  itemStyle={{ color: '#00E5FF' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#00E5FF" 
+                  strokeWidth={3} 
+                  dot={{ r: 4, fill: '#00E5FF', strokeWidth: 0 }} 
+                  activeDot={{ r: 6, strokeWidth: 0 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-4">Server Status</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">API Latency</span>
+              <span className="text-xs font-bold text-green-400">42ms</span>
+            </div>
+            <div className="w-full h-1 bg-secondary rounded-full overflow-hidden">
+              <div className="w-[15%] h-full bg-green-500" />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Storage Used</span>
+              <span className="text-xs font-bold text-blue-400">12.4 GB</span>
+            </div>
+            <div className="w-full h-1 bg-secondary rounded-full overflow-hidden">
+              <div className="w-[35%] h-full bg-blue-500" />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Generations Today</span>
+              <span className="text-xs font-bold text-purple-400">1,240</span>
+            </div>
+            <div className="w-full h-1 bg-secondary rounded-full overflow-hidden">
+              <div className="w-[65%] h-full bg-purple-500" />
+            </div>
+            
+            <button className="w-full mt-2 py-2 rounded-lg bg-secondary/50 text-muted-foreground text-[10px] font-bold uppercase tracking-widest hover:text-foreground">
+              Run System Diagnostics
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Recent Users with search & filter */}
+        <div className="bg-card border border-border rounded-xl p-4">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="text-sm font-semibold text-foreground">Recent Users</h3>
           <div className="flex items-center gap-2">
@@ -195,6 +283,7 @@ export default function AdminDashboard({ onNavigate }: DashboardProps) {
         <button onClick={() => onNavigate?.('content')} className="w-full mt-3 py-2 rounded-lg bg-secondary text-muted-foreground text-xs font-medium hover:text-foreground flex items-center justify-center gap-1">
           View All Posts <ArrowRight size={12} />
         </button>
+      </div>
       </div>
     </div>
   );

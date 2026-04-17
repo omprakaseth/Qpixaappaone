@@ -209,7 +209,6 @@ export default function AdminUsers({ setHasUnsavedChanges }: { setHasUnsavedChan
           </tbody>
         </table>
       </div>
-
       {creditsModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center" onClick={() => setCreditsModal(null)}>
           <div className="bg-card border border-border rounded-xl p-6 w-80" onClick={e => e.stopPropagation()}>

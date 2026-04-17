@@ -9,19 +9,19 @@
   "scope": "/",
   "icons": [
     {
-      "src": "/icons/IMG_20260404_064955.png",
+      "src": "/favicon-qpixa.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/IMG_20260404_064955.png",
+      "src": "/favicon-qpixa.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/IMG_20260404_064955.png",
+      "src": "/favicon-qpixa.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
