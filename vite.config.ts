@@ -24,11 +24,9 @@ export default defineConfig(({mode}) => {
             type: 'module'
           },
           includeAssets: [
-            'favicon-qpixa.png', 
+            'pwa-icon.png', 
             'favicon.ico', 
-            'placeholder.svg',
-            'icons/pwa-icon-192-v2.png',
-            'icons/pwa-icon-512-v2.png'
+            'placeholder.svg'
           ],
           manifest: {
             name: 'Qpixa - AI Image & Video Generator',
@@ -42,19 +40,19 @@ export default defineConfig(({mode}) => {
             id: 'com.qpixa.app',
             icons: [
               {
-                src: '/icons/pwa-icon-192-v2.png',
+                src: '/pwa-icon.png',
                 sizes: '192x192',
                 type: 'image/png',
                 purpose: 'any'
               },
               {
-                src: '/icons/pwa-icon-512-v2.png',
+                src: '/pwa-icon.png',
                 sizes: '512x512',
                 type: 'image/png',
                 purpose: 'any'
               },
               {
-                src: '/icons/pwa-icon-512-v2.png',
+                src: '/pwa-icon.png',
                 sizes: '512x512',
                 type: 'image/png',
                 purpose: 'maskable'
