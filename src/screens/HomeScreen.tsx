@@ -300,7 +300,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           >
             <SlidersHorizontal size={14} />
           </button>
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-1">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 ml-0.5">
             {categories.map(cat => (
               <button
                 key={cat}
