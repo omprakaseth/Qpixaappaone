@@ -65,6 +65,61 @@ async function startServer() {
     }
   });
 
+  // API Route for Pollinations Proxy
+  app.post("/api/pollinations", async (req, res) => {
+    try {
+      const { prompt, model, width, height, seed, nologo, enhance } = req.body;
+      const queryParams = new URLSearchParams({
+        prompt,
+        width: width?.toString() || '1024',
+        height: height?.toString() || '1024',
+        seed: seed?.toString() || Math.floor(Math.random() * 1000000).toString(),
+        nologo: nologo ? 'true' : 'false',
+        enhance: enhance ? 'true' : 'false',
+        model: model || 'flux'
+      });
+
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${queryParams.toString()}`;
+      
+      // We can just return the URL or fetch it to check if it's alive
+      // For speed, let's just return the URL after light validation
+      res.json({ imageUrl });
+    } catch (error: any) {
+      console.error("Pollinations Proxy Error:", error);
+      res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
+  });
+
+  // API Route for Gemini Proxy
+  app.post("/api/generate", async (req, res) => {
+    try {
+      const { prompt, model, image, type, config } = req.body;
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+      }
+
+      if (type === 'text') {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+          model: model || "gemini-3-flash-preview",
+          contents: [{ parts: [{ text: prompt }] }]
+        });
+        return res.json({ text: response.text });
+      }
+
+      // For image generation, Gemini direct API with @google/genai doesn't support Imagen 3 yet in standard SDK easily
+      // Usually it's Vertex AI. But if the user refers to text-to-image via a specific multimodal model, 
+      // we handle it. However, most free 'Gemini' image gen is via Pollinations or HF anyway.
+      // Let's implement a placeholder for text responses if they use it for enhancing prompts.
+      res.status(400).json({ error: "Image generation via direct Gemini SDK is not yet supported in this proxy. Use Pollinations or Hugging Face." });
+    } catch (error: any) {
+      console.error("Gemini Proxy Error:", error);
+      res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     console.log("Initializing Vite dev server...");

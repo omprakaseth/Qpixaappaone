@@ -66,6 +66,7 @@ interface ChatMessage {
   imageUrl?: string;
   attachedImageUrl?: string;
   createdAt: string;
+  aspectRatio?: string;
   status?: 'pending' | 'success' | 'error';
 }
 
@@ -83,9 +84,7 @@ interface StudioScreenProps {
   onPublish?: (imageUrl: string, prompt: string) => void;
 }
 
-function AiMessageBubble({ msg, isPro, onPublish, onBookmark, onDownload, onShare, onReusePrompt, setViewerImage, onStop, generating }: any) {
-  const [showPrompt, setShowPrompt] = useState(false);
-
+function AiMessageBubble({ msg, isPro, setViewerImage }: any) {
   if (msg.status === 'pending') {
     return (
       <div className="flex justify-start items-center gap-4">
@@ -108,39 +107,27 @@ function AiMessageBubble({ msg, isPro, onPublish, onBookmark, onDownload, onShar
     );
   }
 
+  const ratioClass = msg.aspectRatio === '16:9' ? 'aspect-video' : 
+                     msg.aspectRatio === '9:16' ? 'aspect-[9/16]' : 
+                     msg.aspectRatio === '4:3' ? 'aspect-4/3' : 
+                     msg.aspectRatio === '3:4' ? 'aspect-3/4' : 'aspect-square';
+
   return (
     <div className="flex justify-start">
-      <div className="bg-card rounded-2xl rounded-bl-sm overflow-hidden max-w-[85%] border border-border/50 shadow-sm">
+      <div className="bg-card rounded-2xl overflow-hidden max-w-[85%] border border-border/50 shadow-sm relative group">
         {msg.imageUrl && (
-          <button onClick={() => setViewerImage(msg.imageUrl!)} className="w-full relative group">
-            <WatermarkedImage src={msg.imageUrl} alt={msg.text || 'Generated image'} className="w-full aspect-square object-cover" isPro={isPro} />
+          <button 
+            onClick={() => setViewerImage(msg.imageUrl!, msg.text || '')} 
+            className="w-full relative block"
+          >
+            <WatermarkedImage 
+              src={msg.imageUrl} 
+              alt={msg.text || 'Generated image'} 
+              className={cn("w-full object-cover", ratioClass)} 
+              isPro={isPro} 
+            />
           </button>
         )}
-        <div className="p-3">
-          {showPrompt ? (
-            <div className="mb-3 bg-secondary/50 p-2 rounded-lg">
-              <p className="text-xs text-foreground mb-1.5 leading-relaxed">{msg.text}</p>
-              <button onClick={() => setShowPrompt(false)} className="text-[10px] font-semibold text-primary uppercase tracking-wider">Hide Prompt</button>
-            </div>
-          ) : (
-            <button onClick={() => setShowPrompt(true)} className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-3 bg-secondary/50 px-2 py-1 rounded-md">Show Prompt</button>
-          )}
-          <div className="flex items-center justify-between mt-1">
-            <div className="flex items-center gap-4">
-              <button onClick={() => msg.imageUrl && onBookmark(msg.imageUrl, msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors" title="Bookmark"><Bookmark size={16} /></button>
-              <button onClick={() => msg.imageUrl && onDownload(msg.imageUrl)} className="text-muted-foreground hover:text-foreground transition-colors" title="Download"><Download size={16} /></button>
-              <button onClick={() => msg.imageUrl && onShare(msg.imageUrl, msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors" title="Share"><Share2 size={16} /></button>
-              <button onClick={() => onReusePrompt(msg.text || '')} className="text-muted-foreground hover:text-foreground transition-colors" title="Reuse Prompt"><RotateCcw size={16} /></button>
-            </div>
-            <button 
-              onClick={() => msg.imageUrl && onPublish?.(msg.imageUrl, msg.text || '')} 
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all text-[10px] font-bold uppercase tracking-wider"
-            >
-              <Upload size={14} />
-              Post to Feed
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -299,7 +286,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const { height: vpHeight, offsetTop: vpOffsetTop, isKeyboardVisible } = useVisualViewport();
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [viewerImage, setViewerImage] = useState<string | null>(null);
+  const [viewerData, setViewerData] = useState<{ url: string; prompt: string } | null>(null);
   const [longPressSession, setLongPressSession] = useState<ChatSession | null>(null);
   const [showSessionActions, setShowSessionActions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -530,6 +517,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       type: 'ai',
       text: userPrompt,
       createdAt: new Date().toISOString(),
+      aspectRatio: selectedRatio,
       status: 'pending'
     };
 
@@ -582,6 +570,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         ...pendingAiMsg,
         id: `msg-a-${Date.now()}`,
         imageUrl: generatedImageUrl,
+        aspectRatio: selectedRatio,
         status: 'success'
       };
 
@@ -590,7 +579,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       updateSessionMessages(activeSessionId, finalMessages);
 
       // Deduct credit
-      if (user) {
+      if (user && user.email !== 'omprakashseth248@gmail.com') {
         await supabase.from('profiles').update({ credits: credits - 1 }).eq('id', user.id);
         setCredits(prev => prev - 1);
       }
@@ -1100,14 +1089,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                   key={msg.id} 
                   msg={msg} 
                   isPro={isPro} 
-                  onPublish={onPublish} 
-                  onBookmark={handleBookmark} 
-                  onDownload={handleDownload} 
-                  onShare={handleShare} 
-                  onReusePrompt={setPrompt} 
-                  setViewerImage={setViewerImage} 
-                  onStop={handleStop}
-                  generating={generating}
+                  setViewerImage={(url: string, prompt: string) => setViewerData({ url, prompt })} 
                 />
               )
             ))}
@@ -1143,6 +1125,24 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                       }`}
                     >
                       {style.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Aspect Ratio Selector */}
+              <div>
+                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Aspect Ratio</label>
+                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+                  {ASPECT_RATIOS.map(ratio => (
+                    <button
+                      key={ratio.id}
+                      onClick={() => setSelectedRatio(ratio.id)}
+                      className={`px-3 py-1.5 rounded-lg text-[9px] font-bold whitespace-nowrap transition-all ${
+                        selectedRatio === ratio.id ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm' : 'bg-background/50 text-muted-foreground border border-transparent'
+                      }`}
+                    >
+                      {ratio.name} ({ratio.id})
                     </button>
                   ))}
                 </div>
@@ -1313,8 +1313,26 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       </div>
     )}
 
-    {viewerImage && (
-      <ImageViewer src={viewerImage} alt="Generated image" onClose={() => setViewerImage(null)} />
+    {viewerData && (
+      <ImageViewer 
+        src={viewerData.url} 
+        alt={viewerData.prompt} 
+        onClose={() => setViewerData(null)} 
+        actions={{
+          onDownload: () => handleDownload(viewerData.url),
+          onShare: () => handleShare(viewerData.url, viewerData.prompt),
+          onBookmark: () => handleBookmark(viewerData.url, viewerData.prompt),
+          onReuse: () => {
+            setPrompt(viewerData.prompt);
+            setViewerData(null);
+            toast.success('Prompt copied to input');
+          },
+          onPublish: () => {
+            onPublish?.(viewerData.url, viewerData.prompt);
+            setViewerData(null);
+          }
+        }}
+      />
     )}
     </>
   );

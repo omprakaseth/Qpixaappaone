@@ -2,6 +2,7 @@ import React from 'react';
 import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/context/NotificationContext';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface BottomNavProps {
   activeTab: string;
@@ -25,50 +26,77 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
       <nav
         ref={ref}
         className={cn(
-          "fixed bottom-0 left-0 right-0 z-50 safe-bottom border-t border-border transition-all duration-300 ease-in-out",
-          !visible && "translate-y-full opacity-0 pointer-events-none"
+          "fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md transition-all duration-300 ease-in-out",
+          !visible && "translate-y-24 opacity-0"
         )}
-        style={{
-          backgroundColor: activeTab === 'shorts' ? 'black' : 'hsl(var(--background))',
-        }}
       >
         <div className={cn(
-          "flex items-center justify-around h-14 max-w-lg mx-auto transition-all duration-300",
-          activeTab === 'shorts' ? "bg-gradient-to-t from-black/60 to-transparent" : ""
+          "relative flex items-center justify-around h-16 px-4 rounded-2xl border border-white/10 shadow-2xl overflow-hidden",
+          activeTab === 'shorts' 
+            ? "bg-black/60 backdrop-blur-xl" 
+            : "bg-background/70 backdrop-blur-xl"
         )}>
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
             const isShortsTab = activeTab === 'shorts';
+            
             return (
               <button
                 key={id}
                 onClick={() => onTabChange(id)}
-                className="flex flex-col items-center gap-0.5 flex-1 py-1 active:scale-95 transition-transform relative"
+                className="relative flex flex-col items-center justify-center flex-1 h-full outline-none group"
               >
-                <div className="relative group">
+                {/* Top Indicator Line */}
+                {isActive && (
+                  <motion.div
+                    layoutId="navIndicator"
+                    className="absolute top-0 w-8 h-1 bg-primary rounded-b-full shadow-[0_2px_10px_rgba(139,92,246,0.5)]"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+
+                {/* Subtle Glow Effect */}
+                {isActive && (
+                  <motion.div
+                    layoutId="navGlow"
+                    className="absolute inset-0 bg-primary/5 rounded-xl blur-xl"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  />
+                )}
+
+                <motion.div
+                  animate={{
+                    scale: isActive ? 1.15 : 1,
+                    y: isActive ? -2 : 0
+                  }}
+                  transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                  className="relative z-10 flex flex-col items-center"
+                >
                   <Icon
-                    size={24}
-                    className="transition-all duration-300"
-                    style={{
-                      color: isActive 
-                        ? (isShortsTab ? '#fff' : 'hsl(var(--primary))') 
-                        : (isShortsTab ? 'rgba(255,255,255,0.6)' : 'hsl(var(--muted-foreground))'),
-                      transform: isActive ? 'scale(1.15)' : 'scale(1)',
-                      filter: isActive ? (isShortsTab ? 'drop-shadow(0 0 8px rgba(255,255,255,0.5))' : 'drop-shadow(0 0 8px rgba(139,92,246,0.5))') : 'none'
-                    }}
+                    size={22}
+                    className={cn(
+                      "transition-colors duration-300",
+                      isActive 
+                        ? (isShortsTab ? "text-white" : "text-primary") 
+                        : (isShortsTab ? "text-white/40" : "text-muted-foreground")
+                    )}
                     strokeWidth={isActive ? 2.5 : 2}
                   />
-                </div>
-                <span
-                  className="text-[10px] font-medium transition-colors"
-                  style={{ 
-                    color: isActive 
-                      ? (isShortsTab ? '#fff' : 'hsl(var(--primary))') 
-                      : (isShortsTab ? 'rgba(255,255,255,0.6)' : 'hsl(var(--muted-foreground))')
-                  }}
-                >
-                  {label}
-                </span>
+                  <span className={cn(
+                    "text-[9px] font-bold mt-1 transition-all duration-300 uppercase tracking-tighter",
+                    isActive 
+                      ? (isShortsTab ? "text-white opacity-100" : "text-primary opacity-100") 
+                      : "opacity-0 scale-75 translate-y-2"
+                  )}>
+                    {label}
+                  </span>
+                </motion.div>
+                
+                {id === 'studio' && unreadCount > 0 && !isActive && (
+                  <span className="absolute top-4 right-1/4 w-2 h-2 bg-primary rounded-full border-2 border-background/50 shadow-sm" />
+                )}
               </button>
             );
           })}

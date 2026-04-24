@@ -438,7 +438,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       setProfile(data as Profile);
-      setCredits(data.credits);
+      if (currentUser?.email === 'omprakashseth248@gmail.com') {
+        setCredits(999999);
+      } else {
+        setCredits(data.credits);
+      }
     }
   };
 

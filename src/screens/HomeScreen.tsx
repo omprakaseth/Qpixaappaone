@@ -288,11 +288,11 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         </div>
 
         {/* Row 3: Categories */}
-        <div className="flex items-center gap-2 px-4 pb-3">
+        <div className="flex items-center gap-0.5 px-4 pb-3">
           <button
             onClick={() => setFilterOpen(true)}
             className={cn(
-              "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all",
+              "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90",
               Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-secondary text-foreground'
@@ -300,14 +300,13 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           >
             <SlidersHorizontal size={14} />
           </button>
-          <div className="w-[1px] h-4 bg-border/50 mx-1 flex-shrink-0" />
-          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide flex-1">
             {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => cat === 'Shorts' ? navigate('/shorts') : setActiveCategory(cat)}
                 className={cn(
-                  "flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all active:scale-95",
+                  "flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95",
                   activeCategory === cat
                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
                     : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'
