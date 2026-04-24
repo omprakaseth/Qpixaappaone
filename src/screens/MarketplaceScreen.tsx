@@ -312,65 +312,64 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   };
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
+    <div 
+      ref={scrollRef} 
+      className="h-full overflow-y-auto bg-background scrollbar-hide"
+    >
+      {/* Header Container - Smart Sliding */}
       <div 
-        className="fixed top-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md border-b border-border transition-all duration-300 ease-in-out" 
+        className="fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out bg-background/95 backdrop-blur-md border-b border-border/50"
+        style={{ 
+          transform: showTopHeader ? 'translateY(0)' : `translateY(-${topHeaderHeight}px)`
+        }}
       >
-        {/* Top row: title + icons */}
+        {/* Row 1: Title & Actions (This row hides) */}
         <div 
           ref={topHeaderRef}
-          className={`transition-all duration-300 ease-in-out overflow-hidden px-4 ${
-            showTopHeader ? 'opacity-100 max-h-[100px]' : 'opacity-0 max-h-0 pointer-events-none'
-          }`}
-          style={{ 
-            paddingTop: showTopHeader ? 'max(env(safe-area-inset-top), 0.5rem)' : '0'
-          }}
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
         >
-          <div className="flex items-center justify-between h-[52px] mb-1">
-            <h1 className="text-lg font-bold text-foreground">Marketplace</h1>
-            <div className="flex items-center gap-2">
-              {isLoggedIn && (
-                <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
-                  <Coins size={13} className="text-primary" />
-                  <span className="text-xs font-semibold text-foreground">{credits}</span>
-                </div>
+          <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
+          <div className="flex items-center gap-2">
+            {isLoggedIn && (
+              <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
+                <Coins size={13} className="text-primary" />
+                <span className="text-xs font-semibold text-foreground">{credits}</span>
+              </div>
+            )}
+            <button
+              onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
+              className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <Plus size={16} />
+            </button>
+            <button
+              onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
+              className="p-1.5 transition-opacity active:opacity-60 relative"
+              title="Cart"
+            >
+              <ShoppingCart size={22} className="text-foreground" />
+              {cartCount > 0 && (
+                <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-background">
+                  {cartCount}
+                </span>
               )}
-              <button
-                onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
-                className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-              >
-                <Plus size={16} />
-              </button>
-              <button
-                onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
-                className="p-1.5 transition-opacity active:opacity-60 relative"
-                title="Cart"
-              >
-                <ShoppingCart size={22} className="text-foreground" />
-                {cartCount > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-background">
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setShowNotifications(true)}
-                className="p-1.5 transition-opacity active:opacity-60 relative"
-              >
-                <Bell size={22} className="text-foreground" />
-                {notifications.length > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
-                )}
-              </button>
-            </div>
+            </button>
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="p-1.5 transition-opacity active:opacity-60 relative"
+            >
+              <Bell size={22} className="text-foreground" />
+              {notifications.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Sticky Section: Always visible */}
-        <div ref={stickySectionRef} className="px-4 pb-3">
-          {/* Search bar */}
-          <div className="relative mb-3 flex items-center bg-secondary search-glow rounded-xl px-3 h-10">
+        {/* Row 2: Search bar */}
+        <div className="px-4 py-2">
+          <div className="relative flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">
             <Search size={16} className="text-muted-foreground mr-2" />
             <input
               value={search}
@@ -378,68 +377,64 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
               placeholder="Search prompts, models, creators..."
               type="search"
               autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
               className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
             />
           </div>
+        </div>
 
-          {/* Filters row */}
-          <div className="flex items-center justify-between">
+        {/* Row 3: Filters row */}
+        <div className="px-4 pb-3 flex items-center justify-between">
+          <button
+            onClick={() => setShowFilters(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground relative active:scale-95 transition-transform"
+          >
+            <SlidersHorizontal size={13} />
+            All Filters
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
+          <div className="relative">
             <button
-              onClick={() => setShowFilters(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-foreground relative"
+              onClick={() => setShowSort(!showSort)}
+              className="flex items-center gap-1 text-xs text-muted-foreground font-medium pr-1 active:opacity-60"
             >
-              <SlidersHorizontal size={13} />
-              All Filters
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
-              )}
+              Sort By
+              <ChevronDown size={14} />
             </button>
-
-            <div className="relative">
-              <button
-                onClick={() => setShowSort(!showSort)}
-                className="flex items-center gap-1 text-xs text-muted-foreground font-medium"
-              >
-                Sort By
-                <ChevronDown size={14} />
-              </button>
-              {showSort && (
-                <div className="absolute right-0 top-8 bg-card border border-border rounded-xl shadow-lg z-30 py-1 min-w-[140px]">
-                  {[
-                    { id: 'popular', label: 'Most Popular' },
-                    { id: 'rating', label: 'Highest Rated' },
-                    { id: 'newest', label: 'Newest' },
-                    { id: 'price_low', label: 'Price: Low' },
-                  ].map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => { setSortBy(opt.id); setShowSort(false); }}
-                      className={`w-full text-left px-4 py-2 text-xs transition-colors ${
-                        sortBy === opt.id ? 'text-primary font-semibold' : 'text-foreground hover:bg-secondary'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {showSort && (
+              <div className="absolute right-0 top-8 bg-card border border-border rounded-xl shadow-xl z-50 py-1 min-w-[140px] animate-in fade-in zoom-in-95 duration-200">
+                {[
+                  { id: 'popular', label: 'Most Popular' },
+                  { id: 'rating', label: 'Highest Rated' },
+                  { id: 'newest', label: 'Newest' },
+                  { id: 'price_low', label: 'Price: Low' },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { setSortBy(opt.id); setShowSort(false); }}
+                    className={`w-full text-left px-4 py-2 text-xs transition-colors ${
+                      sortBy === opt.id ? 'text-primary font-semibold' : 'text-foreground hover:bg-secondary'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Categories with horizontal scroll */}
+      {/* Main Content */}
       <div 
-        ref={scrollRef} 
         className={cn(
-          "flex-1 overflow-y-auto pb-safe-nav",
-          isMounted && "transition-all duration-300 ease-in-out"
+          "pt-[160px] pb-safe-nav",
+          isMounted && "transition-all duration-300"
         )}
-        style={{ paddingTop: topHeaderHeight + stickySectionHeight }}
       >
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">

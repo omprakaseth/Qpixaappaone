@@ -32,11 +32,34 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const headerRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(52);
   const [isMounted, setIsMounted] = useState(false);
+  const [showTopHeader, setShowTopHeader] = useState(true);
+  const lastScrollY = useRef(0);
   const { isLoggedIn, profile, user, refreshProfile } = useAppState();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    const el = scrollRef?.current;
+    if (!el) return;
+
+    const handleScroll = () => {
+      const currentScrollY = el.scrollTop;
+      if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
+
+      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        setShowTopHeader(false);
+      } else {
+        setShowTopHeader(true);
+      }
+      lastScrollY.current = currentScrollY;
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [scrollRef]);
+
   const { followingIds } = useFollows();
   const [activeTab, setActiveTab] = useState<'posts' | 'shorts' | 'prompts' | 'about'>('posts');
   const [myPrompts, setMyPrompts] = useState<UserPrompt[]>([]);
@@ -223,19 +246,18 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   return (
     <>
       <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
-        {/* Header */}
+        {/* Fixed Header - Slides on scroll */}
         <div 
           ref={headerRef}
-          className="fixed top-0 left-0 right-0 z-20 bg-background/95 backdrop-blur-md px-4 pt-2 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out" 
-          style={{ 
-            paddingTop: 'max(env(safe-area-inset-top), 0.5rem)',
-            transform: !navVisible ? 'translateY(-100%)' : 'translateY(0)',
-            opacity: !navVisible ? 0 : 1
-          }}
+          className={cn(
+            "fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md px-4 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out border-b border-border/50",
+            showTopHeader ? "translate-y-0" : "-translate-y-full"
+          )}
+          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
         >
-          <h1 className="text-lg font-bold text-foreground">@{username}</h1>
+          <h1 className="text-xl font-bold text-foreground">@{username}</h1>
           <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
-            <Settings size={20} className="text-muted-foreground" />
+            <Settings size={22} className="text-muted-foreground" />
           </button>
         </div>
 
@@ -243,9 +265,9 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         <div 
           className={cn(
             "relative w-full overflow-hidden bg-secondary",
-            isMounted && "transition-all duration-300 ease-in-out"
+            isMounted && "transition-all duration-300"
           )}
-          style={{ paddingTop: headerHeight, height: 160 + headerHeight }}
+          style={{ height: 200, marginTop: headerHeight }}
         >
           <img
             src={profile?.cover_url || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80'}
@@ -255,7 +277,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         </div>
 
         {/* Profile Hero */}
-        <div className="px-4 pb-2 -mt-12">
+        <div className="px-4 pb-2 -mt-12 relative z-10">
           <div className="flex flex-col items-center">
             <div className="relative">
               <div className="w-[96px] h-[96px] rounded-full p-[3px] bg-background">
