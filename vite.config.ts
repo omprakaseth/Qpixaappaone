@@ -24,9 +24,12 @@ export default defineConfig(({mode}) => {
             type: 'module'
           },
           includeAssets: [
-            'pwa-icon.png', 
             'favicon.ico', 
-            'placeholder.svg'
+            'apple-touch-icon.png',
+            'favicon-32x32.png',
+            'favicon-16x16.png',
+            'android-chrome-192x192.png',
+            'android-chrome-512x512.png'
           ],
           manifest: {
             name: 'Qpixa - AI Image & Video Generator',
@@ -40,19 +43,19 @@ export default defineConfig(({mode}) => {
             id: 'com.qpixa.app',
             icons: [
               {
-                src: '/pwa-icon.png',
+                src: '/android-chrome-192x192.png',
                 sizes: '192x192',
                 type: 'image/png',
                 purpose: 'any'
               },
               {
-                src: '/pwa-icon.png',
+                src: '/android-chrome-512x512.png',
                 sizes: '512x512',
                 type: 'image/png',
                 purpose: 'any'
               },
               {
-                src: '/pwa-icon.png',
+                src: '/android-chrome-512x512.png',
                 sizes: '512x512',
                 type: 'image/png',
                 purpose: 'maskable'

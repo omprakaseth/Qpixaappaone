@@ -49,8 +49,8 @@ self.addEventListener('push', function(event) {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: '/pwa-icon.png',
-      badge: '/pwa-icon.png',
+      icon: '/android-chrome-192x192.png',
+      badge: '/android-chrome-192x192.png',
       data: {
         url: data.url || '/'
       },
