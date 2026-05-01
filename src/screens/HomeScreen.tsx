@@ -53,7 +53,6 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   const lastScrollY = useRef(0);
   const router = useRouter();
   const navigate = (path: string) => router.push(path);
-  const topRowRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [columns, setColumns] = useState(2);
 
@@ -82,26 +81,22 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     return base;
   }, [hasMockPosts]);
 
+  const [showTopHeader, setShowTopHeader] = useState(true);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const handleScroll = () => {
       const currentScrollY = el.scrollTop;
-      // Threshold to avoid flickering
       if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
 
-      if (topRowRef.current) {
-        // Hide top header on scroll down, show on scroll up
-        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-          topRowRef.current.style.gridTemplateRows = '0fr';
-          topRowRef.current.style.opacity = '0';
-        } else {
-          topRowRef.current.style.gridTemplateRows = '1fr';
-          topRowRef.current.style.opacity = '1';
-        }
+      // Hide top row on scroll down (> 60px), show on scroll up
+      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        setShowTopHeader(false);
+      } else {
+        setShowTopHeader(true);
       }
-      
       lastScrollY.current = currentScrollY;
     };
 
@@ -217,57 +212,52 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Header Container - Fixed at top with safe area padding */}
+      {/* Header Container - Smooth sliding based on scroll */}
       <div 
-        className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50"
+        className={cn(
+          "fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 transition-all duration-300 ease-in-out",
+          !showTopHeader ? "-translate-y-[52px]" : "translate-y-0"
+        )}
         style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
       >
-        {/* Row 1: Logo & Actions (This row hides) */}
-        <div 
-          ref={topRowRef}
-          className="grid transition-all duration-300 ease-in-out origin-top"
-          style={{ gridTemplateRows: '1fr', opacity: 1 }}
-        >
-          <div className="overflow-hidden">
-            <div className="px-4 flex items-center justify-between h-[52px]">
-              <div className="flex items-center gap-2.5">
-                <Logo size={32} />
-                <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
-              </div>
-              <div className="flex items-center gap-1">
-                {uploadingPost && (
-                  <div className="flex items-center gap-2 mr-2">
-                    <div className="relative w-8 h-8 flex items-center justify-center">
-                      <svg className="w-8 h-8 -rotate-90">
-                        <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" className="text-secondary" />
-                        <circle
-                          cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2"
-                          strokeDasharray={88}
-                          strokeDashoffset={88 - (88 * uploadingPost.progress) / 100}
-                          className={cn("transition-all duration-300", uploadingPost.status === 'error' ? "text-destructive" : "text-primary")}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        {uploadingPost.status === 'uploading' && <Upload size={14} className="text-primary animate-bounce" />}
-                        {uploadingPost.status === 'success' && <Sparkles size={14} className="text-primary" />}
-                        {uploadingPost.status === 'error' && <button onClick={retryUpload} className="text-destructive"><X size={14} /></button>}
-                      </div>
-                    </div>
+        {/* Row 1: Logo & Actions (This row slides out of view) */}
+        <div className="px-4 flex items-center justify-between h-[52px]">
+          <div className="flex items-center gap-2.5">
+            <Logo size={32} />
+            <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
+          </div>
+          <div className="flex items-center gap-1">
+            {uploadingPost && (
+              <div className="flex items-center gap-2 mr-2">
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                  <svg className="w-8 h-8 -rotate-90">
+                    <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" className="text-secondary" />
+                    <circle
+                      cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2"
+                      strokeDasharray={88}
+                      strokeDashoffset={88 - (88 * uploadingPost.progress) / 100}
+                      className={cn("transition-all duration-300", uploadingPost.status === 'error' ? "text-destructive" : "text-primary")}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    {uploadingPost.status === 'uploading' && <Upload size={14} className="text-primary animate-bounce" />}
+                    {uploadingPost.status === 'success' && <Sparkles size={14} className="text-primary" />}
+                    {uploadingPost.status === 'error' && <button onClick={retryUpload} className="text-destructive"><X size={14} /></button>}
                   </div>
-                )}
-                <button onClick={() => navigate('/market')} className="p-1.5 transition-opacity active:opacity-60">
-                  <Store size={22} className="text-foreground" />
-                </button>
-                <button onClick={() => setShowNotifications(true)} className="p-1.5 transition-opacity active:opacity-60 relative">
-                  <Bell size={22} className="text-foreground" />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
-                </button>
+                </div>
               </div>
-            </div>
+            )}
+            <button onClick={() => navigate('/market')} className="p-1.5 transition-opacity active:opacity-60">
+              <Store size={22} className="text-foreground" />
+            </button>
+            <button onClick={() => setShowNotifications(true)} className="p-1.5 transition-opacity active:opacity-60 relative">
+              <Bell size={22} className="text-foreground" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+            </button>
           </div>
         </div>
 
-        {/* Row 2: Search Bar */}
+        {/* Row 2: Search Bar (This row moves to top) */}
         <div>
           <div className="px-4 py-2 flex gap-2">
             <div className="flex-1 flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">

@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  transpilePackages: ["lucide-react", "framer-motion", "next-themes"],
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -33,4 +33,4 @@ const nextConfig = {
   }
 };
 
-export default nextConfig;
+module.exports = nextConfig;

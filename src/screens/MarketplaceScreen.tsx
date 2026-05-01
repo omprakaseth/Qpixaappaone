@@ -111,7 +111,6 @@ const MOCK_MARKETPLACE_PROMPTS: MarketplacePrompt[] = [
 export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true }: MarketplaceScreenProps) {
   const [isMounted, setIsMounted] = useState(false);
   const lastScrollY = useRef(0);
-  const topRowRef = useRef<HTMLDivElement>(null);
   const { isLoggedIn, credits, refreshProfile } = useAppState();
   const { items: cartItems, addToCart, removeFromCart, isInCart, count: cartCount } = useCart();
   const [search, setSearch] = useState('');
@@ -199,6 +198,8 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     setIsMounted(true);
   }, []);
 
+  const [showTopHeader, setShowTopHeader] = useState(true);
+
   useEffect(() => {
     const el = scrollRef?.current;
     if (!el) return;
@@ -207,14 +208,11 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       const currentScrollY = el.scrollTop;
       if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
 
-      if (topRowRef.current) {
-        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-          topRowRef.current.style.gridTemplateRows = '0fr';
-          topRowRef.current.style.opacity = '0';
-        } else {
-          topRowRef.current.style.gridTemplateRows = '1fr';
-          topRowRef.current.style.opacity = '1';
-        }
+      // Hide top row on scroll down (> 60px), show on scroll up
+      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        setShowTopHeader(false);
+      } else {
+        setShowTopHeader(true);
       }
       lastScrollY.current = currentScrollY;
     };
@@ -300,60 +298,55 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       ref={scrollRef} 
       className="h-full overflow-y-auto bg-background scrollbar-hide"
     >
-      {/* Header Container - Fixed at top with safe area padding */}
+      {/* Header Container - Smooth sliding */}
       <div 
-        className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50"
+        className={cn(
+          "fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 transition-all duration-300 ease-in-out",
+          !showTopHeader ? "-translate-y-[52px]" : "translate-y-0"
+        )}
         style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
       >
-        {/* Row 1: Title & Actions (This row hides) */}
-        <div 
-          ref={topRowRef}
-          className="grid transition-all duration-300 ease-in-out origin-top"
-          style={{ gridTemplateRows: '1fr', opacity: 1 }}
-        >
-          <div className="overflow-hidden">
-            <div className="px-4 flex items-center justify-between h-[52px]">
-              <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
-              <div className="flex items-center gap-2">
-                {isLoggedIn && (
-                  <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
-                    <Coins size={13} className="text-primary" />
-                    <span className="text-xs font-semibold text-foreground">{credits}</span>
-                  </div>
-                )}
-                <button
-                  onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
-                  className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-                >
-                  <Plus size={16} />
-                </button>
-                <button
-                  onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
-                  className="p-1.5 transition-opacity active:opacity-60 relative"
-                  title="Cart"
-                >
-                  <ShoppingCart size={22} className="text-foreground" />
-                  {cartCount > 0 && (
-                    <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-background">
-                      {cartCount}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setShowNotifications(true)}
-                  className="p-1.5 transition-opacity active:opacity-60 relative"
-                >
-                  <Bell size={22} className="text-foreground" />
-                  {notifications.length > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
-                  )}
-                </button>
+        {/* Row 1: Title & Actions (This row slides out) */}
+        <div className="px-4 flex items-center justify-between h-[52px]">
+          <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
+          <div className="flex items-center gap-2">
+            {isLoggedIn && (
+              <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
+                <Coins size={13} className="text-primary" />
+                <span className="text-xs font-semibold text-foreground">{credits}</span>
               </div>
-            </div>
+            )}
+            <button
+              onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
+              className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <Plus size={16} />
+            </button>
+            <button
+              onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
+              className="p-1.5 transition-opacity active:opacity-60 relative"
+              title="Cart"
+            >
+              <ShoppingCart size={22} className="text-foreground" />
+              {cartCount > 0 && (
+                <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-background">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setShowNotifications(true)}
+              className="p-1.5 transition-opacity active:opacity-60 relative"
+            >
+              <Bell size={22} className="text-foreground" />
+              {notifications.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Row 2: Search bar */}
+        {/* Row 2: Search bar (This moves to top) */}
         <div className="px-4 py-2">
           <div className="relative flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">
             <Search size={16} className="text-muted-foreground mr-2" />

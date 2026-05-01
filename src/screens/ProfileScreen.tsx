@@ -36,7 +36,6 @@ interface UserPrompt {
 
 export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, onPostTap, navVisible = true }: ProfileScreenProps) {
   const headerRef = useRef<HTMLDivElement>(null);
-  const topRowRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(52);
   const [isMounted, setIsMounted] = useState(false);
   const lastScrollY = useRef(0);
@@ -46,6 +45,8 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     setIsMounted(true);
   }, []);
 
+  const [showTopHeader, setShowTopHeader] = useState(true);
+
   useEffect(() => {
     const el = scrollRef?.current;
     if (!el) return;
@@ -54,14 +55,10 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       const currentScrollY = el.scrollTop;
       if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
 
-      if (topRowRef.current) {
-        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-          topRowRef.current.style.gridTemplateRows = '0fr';
-          topRowRef.current.style.opacity = '0';
-        } else {
-          topRowRef.current.style.gridTemplateRows = '1fr';
-          topRowRef.current.style.opacity = '1';
-        }
+      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+        setShowTopHeader(false);
+      } else {
+        setShowTopHeader(true);
       }
       lastScrollY.current = currentScrollY;
     };
@@ -262,22 +259,17 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         {/* Fixed Header - Slides on scroll */}
         <div 
           ref={headerRef}
-          className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50"
+          className={cn(
+            "fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 transition-all duration-300 ease-in-out",
+            !showTopHeader ? "-translate-y-[52px]" : "translate-y-0"
+          )}
           style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
         >
-          <div 
-            ref={topRowRef}
-            className="grid transition-all duration-300 ease-in-out origin-top"
-            style={{ gridTemplateRows: '1fr', opacity: 1 }}
-          >
-            <div className="overflow-hidden">
-              <div className="px-4 pb-3 flex items-center justify-between h-[52px]">
-                <h1 className="text-xl font-bold text-foreground">@{username}</h1>
-                <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
-                  <Settings size={22} className="text-muted-foreground" />
-                </button>
-              </div>
-            </div>
+          <div className="px-4 pb-3 flex items-center justify-between h-[52px]">
+            <h1 className="text-xl font-bold text-foreground">@{username}</h1>
+            <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
+              <Settings size={22} className="text-muted-foreground" />
+            </button>
           </div>
         </div>
 
