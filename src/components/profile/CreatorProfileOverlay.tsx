@@ -1,11 +1,12 @@
 import { ArrowLeft, Star, ShoppingBag, Grid3X3, Info, UserPlus, UserMinus, Sparkles, Coins, SlidersHorizontal, MapPin, Calendar, Share2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Post } from '@/context/AppContext';
+import { Post } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
 import { useAppState } from '@/context/AppContext';
+import Image from 'next/image';
 
 interface CreatorProfileOverlayProps {
   creatorName: string;
@@ -94,7 +95,13 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
 
       <div className="flex-1 overflow-y-auto">
         <div className="relative h-[140px] w-full overflow-hidden">
-          <img src="/default-cover.jpg" alt="" className="w-full h-full object-cover" />
+          <Image 
+            src="/default-cover.jpg" 
+            alt="Cover" 
+            fill 
+            priority
+            className="object-cover" 
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
         </div>
 
@@ -211,9 +218,16 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
                   <button
                     key={p.id}
                     onClick={() => onPostTap(p)}
-                    className="aspect-square overflow-hidden active:opacity-80 transition-opacity"
+                    className="relative aspect-square overflow-hidden active:opacity-80 transition-opacity"
                   >
-                    <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
+                    <Image 
+                      src={p.imageUrl} 
+                      alt={p.title} 
+                      fill
+                      sizes="33vw"
+                      className="object-cover" 
+                      referrerPolicy="no-referrer"
+                    />
                   </button>
                 ))}
               </div>
@@ -248,7 +262,14 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
                   {filteredPrompts.map(p => (
                     <div key={p.id} className="flex-shrink-0 w-[130px] rounded-xl overflow-hidden bg-card border border-border">
                       <div className="relative aspect-[4/3] w-full overflow-hidden">
-                        <img src={p.preview_image || '/placeholder.svg'} alt="" className="w-full h-full object-cover" />
+                        <Image 
+                          src={p.preview_image || '/placeholder.svg'} 
+                          alt={p.title} 
+                          fill
+                          sizes="130px"
+                          className="object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
                         <div className="absolute top-1 left-1">
                           <span className="bg-primary/80 text-primary-foreground text-[7px] font-semibold px-1.5 py-0.5 rounded-full">{p.model_type}</span>
                         </div>

@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
@@ -8,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useAppState } from '@/context/AppContext';
 import { useCart } from '@/hooks/useCart';
 import { LogoLoader } from '@/components/LogoLoader';
+import { getEnv } from '@/lib/env';
 import PromptDetailSheet from '@/components/marketplace/PromptDetailSheet';
 import SellPromptSheet from '@/components/marketplace/SellPromptSheet';
 import MarketplaceFilterPanel, { defaultFilters, type MarketplaceFilters } from '@/components/marketplace/MarketplaceFilterPanel';
@@ -107,13 +109,9 @@ const MOCK_MARKETPLACE_PROMPTS: MarketplacePrompt[] = [
 ];
 
 export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true }: MarketplaceScreenProps) {
-  const [topHeaderHeight, setTopHeaderHeight] = useState(52);
-  const [stickySectionHeight, setStickySectionHeight] = useState(96);
   const [isMounted, setIsMounted] = useState(false);
-  const [showTopHeader, setShowTopHeader] = useState(true);
   const lastScrollY = useRef(0);
-  const topHeaderRef = useRef<HTMLDivElement>(null);
-  const stickySectionRef = useRef<HTMLDivElement>(null);
+  const topRowRef = useRef<HTMLDivElement>(null);
   const { isLoggedIn, credits, refreshProfile } = useAppState();
   const { items: cartItems, addToCart, removeFromCart, isInCart, count: cartCount } = useCart();
   const [search, setSearch] = useState('');
@@ -209,10 +207,14 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       const currentScrollY = el.scrollTop;
       if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
 
-      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        setShowTopHeader(false);
-      } else {
-        setShowTopHeader(true);
+      if (topRowRef.current) {
+        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+          topRowRef.current.style.gridTemplateRows = '0fr';
+          topRowRef.current.style.opacity = '0';
+        } else {
+          topRowRef.current.style.gridTemplateRows = '1fr';
+          topRowRef.current.style.opacity = '1';
+        }
       }
       lastScrollY.current = currentScrollY;
     };
@@ -220,22 +222,6 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     el.addEventListener('scroll', handleScroll);
     return () => el.removeEventListener('scroll', handleScroll);
   }, [scrollRef]);
-
-  useEffect(() => {
-    if (!topHeaderRef.current || !stickySectionRef.current) return;
-    const observer = new ResizeObserver(entries => {
-      for (let entry of entries) {
-        if (entry.target === topHeaderRef.current) {
-          setTopHeaderHeight(entry.contentRect.height + (showTopHeader ? 8 : 0));
-        } else if (entry.target === stickySectionRef.current) {
-          setStickySectionHeight(entry.contentRect.height);
-        }
-      }
-    });
-    observer.observe(topHeaderRef.current);
-    observer.observe(stickySectionRef.current);
-    return () => observer.disconnect();
-  }, [showTopHeader]);
 
   // Filter
   const filtered = prompts.filter(p => {
@@ -248,8 +234,6 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     if (filters.model !== 'all' && p.model_type !== filters.model) return false;
     return true;
   });
-
-  // Sort
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'popular') return b.sales_count - a.sales_count;
     if (sortBy === 'rating') return b.rating - a.rating;
@@ -294,7 +278,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
 
   const handleUsePrompt = async (prompt: MarketplacePrompt) => {
     // If it's a mock prompt, just return a mock text
-    if (prompt.id.startsWith('mock-') || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !import.meta.env.VITE_SUPABASE_URL) {
+    if (prompt.id.startsWith('mock-') || isPlaceholder) {
       onUsePrompt?.(`A detailed prompt for ${prompt.title}, featuring high quality elements and cinematic lighting.`);
       return;
     }
@@ -316,54 +300,56 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       ref={scrollRef} 
       className="h-full overflow-y-auto bg-background scrollbar-hide"
     >
-      {/* Header Container - Smart Sliding */}
+      {/* Header Container - Fixed at top with safe area padding */}
       <div 
-        className="fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out bg-background/95 backdrop-blur-md border-b border-border/50"
-        style={{ 
-          transform: showTopHeader ? 'translateY(0)' : `translateY(-${topHeaderHeight}px)`
-        }}
+        className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50"
+        style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
       >
         {/* Row 1: Title & Actions (This row hides) */}
         <div 
-          ref={topHeaderRef}
-          className="px-4 py-3 flex items-center justify-between"
-          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
+          ref={topRowRef}
+          className="grid transition-all duration-300 ease-in-out origin-top"
+          style={{ gridTemplateRows: '1fr', opacity: 1 }}
         >
-          <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
-          <div className="flex items-center gap-2">
-            {isLoggedIn && (
-              <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
-                <Coins size={13} className="text-primary" />
-                <span className="text-xs font-semibold text-foreground">{credits}</span>
+          <div className="overflow-hidden">
+            <div className="px-4 flex items-center justify-between h-[52px]">
+              <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
+              <div className="flex items-center gap-2">
+                {isLoggedIn && (
+                  <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">
+                    <Coins size={13} className="text-primary" />
+                    <span className="text-xs font-semibold text-foreground">{credits}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
+                  className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+                >
+                  <Plus size={16} />
+                </button>
+                <button
+                  onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
+                  className="p-1.5 transition-opacity active:opacity-60 relative"
+                  title="Cart"
+                >
+                  <ShoppingCart size={22} className="text-foreground" />
+                  {cartCount > 0 && (
+                    <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-background">
+                      {cartCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowNotifications(true)}
+                  className="p-1.5 transition-opacity active:opacity-60 relative"
+                >
+                  <Bell size={22} className="text-foreground" />
+                  {notifications.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+                  )}
+                </button>
               </div>
-            )}
-            <button
-              onClick={() => isLoggedIn ? setShowSell(true) : onOpenAuth?.('login')}
-              className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-            >
-              <Plus size={16} />
-            </button>
-            <button
-              onClick={() => isLoggedIn ? setShowCart(true) : onOpenAuth?.('login')}
-              className="p-1.5 transition-opacity active:opacity-60 relative"
-              title="Cart"
-            >
-              <ShoppingCart size={22} className="text-foreground" />
-              {cartCount > 0 && (
-                <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-primary-foreground text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-background">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setShowNotifications(true)}
-              className="p-1.5 transition-opacity active:opacity-60 relative"
-            >
-              <Bell size={22} className="text-foreground" />
-              {notifications.length > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
-              )}
-            </button>
+            </div>
           </div>
         </div>
 

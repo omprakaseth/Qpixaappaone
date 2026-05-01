@@ -1,7 +1,8 @@
+"use client";
 import React, { useState, useEffect } from 'react';
 import { Logo } from './Logo';
 import { Download, X, Smartphone, Share } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -97,7 +98,7 @@ export default function PWAInstallPrompt() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-secondary/50 p-2 rounded-lg">
                   <Smartphone size={12} />
-                  <span>Tap <Share size={10} className="inline mx-0.5" /> then "Add to Home Screen"</span>
+                  <span>Tap <Share size={10} className="inline mx-0.5" /> then &quot;Add to Home Screen&quot;</span>
                 </div>
               </div>
             ) : (

@@ -1,7 +1,9 @@
+"use client";
 import { ArrowLeft, User, Bell, Shield, Palette, Globe, CreditCard, HelpCircle, LogOut, ChevronRight, Info, FileText, Mail, Sun, Moon, Monitor, Save, Lock, Eye, EyeOff, Download } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getEnv } from '@/lib/env';
 import { toast } from 'sonner';
 interface SettingsScreenProps {
   onBack: () => void;
@@ -128,7 +130,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     const file = e.target.files[0];
     
     // Check if it's a mock project
-    if (import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co') {
+    if (getEnv('VITE_SUPABASE_URL') === 'https://placeholder-project.supabase.co') {
       toast.error('Avatar upload is not available in demo mode');
       return;
     }
@@ -158,7 +160,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   };
 
   const saveProfile = async () => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || !profile?.id) return;
     setSaving(true);
     try {
       const updateData: any = {
@@ -172,7 +174,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', profile?.id);
+        .eq('id', profile.id);
 
       if (error) {
         // If error is about updated_at column, try again without it
@@ -181,7 +183,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           const { error: retryError } = await supabase
             .from('profiles')
             .update(updateData)
-            .eq('id', profile?.id);
+            .eq('id', profile.id);
           if (retryError) throw retryError;
         } else {
           throw error;
@@ -601,7 +603,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-foreground">Show Activity Status</p>
-                    <p className="text-[10px] text-muted-foreground">Let others see when you're online</p>
+                    <p className="text-[10px] text-muted-foreground">Let others see when you&apos;re online</p>
                   </div>
                   <button
                     onClick={toggleActivity}

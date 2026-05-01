@@ -1,5 +1,6 @@
+"use client";
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Heart, 
   MessageSquare, 
@@ -24,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { LogoLoader } from '@/components/LogoLoader';
+import { getEnv } from '@/lib/env';
 
 interface Reel {
   id: string;
@@ -353,7 +355,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
         setIsLiked(true);
         onUpdateReel({ ...reel, isLiked: true });
         // Background sync
-        if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+        if (!reel.id.startsWith('mock-') && getEnv('VITE_SUPABASE_URL') !== 'https://placeholder-project.supabase.co') {
           (async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
@@ -520,7 +522,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
                       onUpdateReel({ ...reel, isLiked: newLikedState });
                       
                       // Background sync
-                      if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+                      if (!reel.id.startsWith('mock-') && !isPlaceholder) {
                         (async () => {
                           const { data: { user } } = await supabase.auth.getUser();
                           if (user) {

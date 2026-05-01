@@ -1,16 +1,18 @@
+"use client";
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { ArrowLeft, Download, Copy, UserPlus, UserMinus, Heart, Eye, Bookmark, ZoomIn, ZoomOut, Share2, Play, Star, MessageSquare, Trash2, ShieldAlert, Sparkles, Check, X, Edit2, Save } from 'lucide-react';
 import { formatNumber, cn } from '@/lib/utils';
 import { generateAltText } from '@/lib/seo-utils';
 import { Button } from '@/components/ui/button';
-import { Post } from '@/context/AppContext';
+import { Post } from '@/types';
 import { useAppState } from '@/context/AppContext';
 import { useFollows } from '@/hooks/useFollows';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
+import Image from 'next/image';
 
 interface Comment {
   id: string;
@@ -29,9 +31,10 @@ interface PostDetailProps {
   onBack: () => void;
   onUsePrompt?: (prompt: string) => void;
   onCreatorTap?: (creatorName: string, creatorId?: string) => void;
+  onPostTap?: (post: Post) => void;
 }
 
-export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: PostDetailProps) {
+export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, onPostTap }: PostDetailProps) {
   const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost, updatePost, posts } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
   
@@ -240,8 +243,9 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   };
 
   return (
-    <div className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide animate-in slide-in-from-bottom-4 fade-in duration-300">
-      {/* Header */}
+    <div className="h-full w-full bg-background overflow-y-auto scrollbar-hide">
+      <div className="min-h-full w-full bg-background">
+        {/* Header */}
       <div className="sticky top-0 z-50 flex items-center gap-3 px-4 py-3 bg-background/80 backdrop-blur-md safe-top">
         <button onClick={onBack} className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center active:scale-95 transition-transform">
           <ArrowLeft size={20} className="text-foreground" />
@@ -373,7 +377,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
           >
             <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center overflow-hidden border border-border">
               {post.creator.avatar ? (
-                <img src={post.creator.avatar} alt="" className="w-full h-full object-cover" />
+                <Image src={post.creator.avatar} alt="" width={40} height={40} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-sm font-bold text-foreground">{post.creator.initials}</span>
               )}
@@ -489,16 +493,18 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
                   key={rp.id} 
                   className="group cursor-pointer"
                   onClick={() => {
-                    onBack();
-                    // We need a way to open the new post, but for now this is good for SEO
-                    // In a real app, this would navigate to /prompt/:id
-                    window.location.href = `/prompt/${rp.id}`;
+                    if (onPostTap) {
+                      onPostTap(rp);
+                    } else {
+                      window.location.href = `/prompt/${rp.id}`;
+                    }
                   }}
                 >
                   <div className="aspect-square rounded-xl overflow-hidden bg-secondary relative mb-2">
-                    <img 
+                    <Image 
                       src={rp.imageUrl} 
                       alt={generateAltText(rp.prompt, rp.category)}
+                      fill
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       referrerPolicy="no-referrer"
                     />
@@ -559,7 +565,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-secondary overflow-hidden">
-                        {review.profiles?.avatar_url && <img src={review.profiles.avatar_url} alt="" className="w-full h-full object-cover" />}
+                        {review.profiles?.avatar_url && <Image src={review.profiles.avatar_url} alt="" width={24} height={24} className="w-full h-full object-cover" />}
                       </div>
                       <span className="text-xs font-bold text-foreground">{review.profiles?.display_name || 'User'}</span>
                     </div>
@@ -593,6 +599,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
           Use Prompt in Studio
         </Button>
       </div>
+    </div>
     </div>
   );
 }

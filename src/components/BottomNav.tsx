@@ -1,8 +1,10 @@
+"use client";
 import React from 'react';
 import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/context/NotificationContext';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 
 interface BottomNavProps {
   activeTab: string;
@@ -11,11 +13,11 @@ interface BottomNavProps {
 }
 
 const tabs = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'shorts', label: 'Shorts', icon: PlaySquare },
-  { id: 'studio', label: 'Studio', icon: Sparkles },
-  { id: 'favorites', label: 'Favorites', icon: Heart },
-  { id: 'profile', label: 'Profile', icon: User },
+  { id: 'home', label: 'Home', icon: Home, path: '/' },
+  { id: 'shorts', label: 'Shorts', icon: PlaySquare, path: '/shorts' },
+  { id: 'studio', label: 'Studio', icon: Sparkles, path: '/studio' },
+  { id: 'favorites', label: 'Favorites', icon: Heart, path: '/favorites' },
+  { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
 ];
 
 const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
@@ -32,14 +34,17 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
         )}
       >
         <div className="relative flex items-center justify-around h-16 max-w-lg mx-auto">
-          {tabs.map(({ id, label, icon: Icon }) => {
+          {tabs.map(({ id, label, icon: Icon, path }) => {
             const isActive = activeTab === id;
             const isShortsTab = activeTab === 'shorts';
             
             return (
               <button
                 key={id}
-                onClick={() => onTabChange(id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onTabChange(id);
+                }}
                 className="relative flex flex-col items-center justify-center flex-1 h-full outline-none group"
               >
                 {/* Top Indicator Line - Slides only */}

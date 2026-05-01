@@ -1,3 +1,4 @@
+"use client";
 import { ArrowLeft, Star, ShoppingBag, TrendingUp, MapPin, Calendar, Coins, Grid3X3, Info, UserPlus, Sparkles, Users } from 'lucide-react';
 import { useState } from 'react';
 import type { MarketplacePrompt } from '@/screens/MarketplaceScreen';

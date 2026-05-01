@@ -1,8 +1,9 @@
+"use client";
 import React, { useState } from 'react';
 import { Heart, MessageCircle, Share2, Bookmark, Eye, Search, TrendingUp, Sparkles, Trophy } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
 import { formatNumber } from '@/lib/utils';
-import { Post } from '@/context/AppContext';
+import { Post } from '@/types';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import QuickActions from '@/components/QuickActions';
 import ScrollToTop from '@/components/ScrollToTop';

@@ -1,67 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+"use client";
+
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { analytics } from '@/lib/analytics';
-
 import { usePWAInstall } from '@/hooks/usePWAInstall';
-
-// We redefine Post interface here to match Supabase schema
-export interface Post {
-  id: string;
-  title: string;
-  imageUrl: string;
-  creator: {
-    id: string;
-    name: string;
-    username: string;
-    avatar: string;
-    initials: string;
-    isVerified?: boolean;
-  };
-  prompt: string;
-  tags: string[];
-  category: string;
-  style: string;
-  aspectRatio: string;
-  views: number;
-  likes: number;
-  saves: number;
-  comments: number;
-  createdAt: string;
-  isLiked: boolean;
-  isSaved: boolean;
-  isShort: boolean;
-  isMock?: boolean;
-}
-
-interface Profile {
-  id: string;
-  username: string | null;
-  display_name: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-  credits: number;
-  is_banned: boolean;
-  is_verified: boolean;
-  subscription_plan: string;
-  role?: string;
-  created_at: string;
-  cover_url: string | null;
-}
-
-export interface UploadingPost {
-  id: string;
-  title: string;
-  prompt: string;
-  tags: string;
-  type: 'post' | 'short';
-  file: File | null;
-  previewUrl: string | null;
-  progress: number;
-  status: 'uploading' | 'error' | 'success';
-  error?: string;
-}
+import { Post, Profile, UploadingPost } from '@/types';
 
 interface AppState {
   posts: Post[];
@@ -286,7 +231,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Helper to format a single post from DB
-  const formatPost = (p: any): Post => ({
+  const formatPost = useCallback((p: any): Post => ({
     id: p.id,
     title: p.title || 'Untitled',
     imageUrl: p.image_url || '',
@@ -311,19 +256,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isLiked: false,
     isSaved: false,
     isShort: p.is_short || false,
-  });
+  }), []);
 
-  const fetchPosts = async () => {
-    console.log('fetchPosts called');
+  const hasFetchedPosts = useRef(false);
+  const fetchPosts = useCallback(async (force = false) => {
+    if (!force && hasFetchedPosts.current) {
+      setInitialLoading(false);
+      return;
+    }
+    
+    hasFetchedPosts.current = true;
+    console.log('fetchPosts: Actual fetch starting...');
     if (isPlaceholder) {
       setPosts(MOCK_POSTS);
       setInitialLoading(false);
       return;
     }
+
+    // Add a timeout to prevent infinite loading if Supabase hangs
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Supabase request timed out after 10s')), 10000)
+    );
+
     try {
       console.log('Fetching posts from Supabase...');
       // Fetch posts with creator profile
-      const { data, error } = await supabase
+      const fetchPromise = supabase
         .from('posts')
         .select(`
           *,
@@ -332,6 +290,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .eq('is_hidden', false)
         .order('created_at', { ascending: false })
         .limit(100);
+
+      const response: any = await Promise.race([fetchPromise, timeoutPromise]);
+      const { data, error } = response;
 
       if (error) {
         console.warn('Error fetching posts with join, trying simple fetch:', error);
@@ -384,7 +345,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setInitialLoading(false);
     }
-  };
+  }, [formatPost]);
 
   const fetchPostById = async (id: string): Promise<Post | null> => {
     if (isPlaceholder) return MOCK_POSTS.find(p => p.id === id) || null;
@@ -406,7 +367,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const fetchProfile = async (currentUser: User) => {
+  const fetchProfile = useCallback(async (currentUser: User) => {
     let { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -426,8 +387,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (data) {
-      // Auto-assign admin role to specific email
-      if (currentUser.email === 'omprakashseth248@gmail.com' && (data as any).role !== 'admin') {
+      // Auto-assign admin role to specific emails
+      const adminEmails = ['omprakashseth248@gmail.com', 'qpixerapp@gmail.com'];
+      if (adminEmails.includes(currentUser.email || '') && (data as any).role !== 'admin') {
         const { data: updatedProfile } = await supabase
           .from('profiles')
           .update({ role: 'admin' } as any)
@@ -438,13 +400,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       setProfile(data as Profile);
-      if (currentUser?.email === 'omprakashseth248@gmail.com') {
+      if (adminEmails.includes(currentUser?.email || '')) {
         setCredits(999999);
       } else {
         setCredits(data.credits);
       }
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (isPlaceholder) {
@@ -474,7 +436,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchPosts, fetchProfile]);
 
   const toggleLike = async (id: string) => {
     if (!user || isPlaceholder) return; // Must be logged in
@@ -601,18 +563,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear local storage items that might leak data between accounts
+    localStorage.removeItem('qpixa_studio_sessions');
+    localStorage.removeItem('qpixa_recent_models');
+    
     if (isPlaceholder) {
       setUser(null);
       setSession(null);
       setProfile(null);
+      setCredits(40);
+      setPosts([]);
       analytics.reset();
       return;
     }
+    
     await supabase.auth.signOut();
     analytics.reset();
     setUser(null);
     setSession(null);
     setProfile(null);
+    setCredits(40);
+    setPosts([]);
   };
 
   const refreshProfile = async () => {

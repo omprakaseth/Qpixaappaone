@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+"use client";
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield } from 'lucide-react';
+import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
@@ -8,12 +9,17 @@ import EditProfileSheet from '@/components/profile/EditProfileSheet';
 import DashboardSheet from '@/components/profile/DashboardSheet';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
+import useAdminAuth from '@/hooks/useAdminAuth';
+import { useRouter } from 'next/navigation';
+import { Post } from '@/types';
+
+import Image from 'next/image';
 
 interface ProfileScreenProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
   onOpenSettings: () => void;
   onOpenAuth?: (mode: 'login' | 'signup') => void;
-  onPostTap?: (post: any) => void;
+  onPostTap?: (post: Post) => void;
   navVisible?: boolean;
 }
 
@@ -30,9 +36,9 @@ interface UserPrompt {
 
 export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, onPostTap, navVisible = true }: ProfileScreenProps) {
   const headerRef = useRef<HTMLDivElement>(null);
+  const topRowRef = useRef<HTMLDivElement>(null);
   const [headerHeight, setHeaderHeight] = useState(52);
   const [isMounted, setIsMounted] = useState(false);
-  const [showTopHeader, setShowTopHeader] = useState(true);
   const lastScrollY = useRef(0);
   const { isLoggedIn, profile, user, refreshProfile } = useAppState();
 
@@ -48,10 +54,14 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       const currentScrollY = el.scrollTop;
       if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
 
-      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        setShowTopHeader(false);
-      } else {
-        setShowTopHeader(true);
+      if (topRowRef.current) {
+        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+          topRowRef.current.style.gridTemplateRows = '0fr';
+          topRowRef.current.style.opacity = '0';
+        } else {
+          topRowRef.current.style.gridTemplateRows = '1fr';
+          topRowRef.current.style.opacity = '1';
+        }
       }
       lastScrollY.current = currentScrollY;
     };
@@ -61,9 +71,11 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   }, [scrollRef]);
 
   const { followingIds } = useFollows();
+  const { isAdmin } = useAdminAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'posts' | 'shorts' | 'prompts' | 'about'>('posts');
   const [myPrompts, setMyPrompts] = useState<UserPrompt[]>([]);
-  const [myPosts, setMyPosts] = useState<any[]>([]);
+  const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [myShorts, setMyShorts] = useState<any[]>([]);
   const [followerCount, setFollowerCount] = useState(0);
   const [earnings, setEarnings] = useState({ totalSales: 0, totalEarnings: 0, avgRating: 0 });
@@ -72,15 +84,6 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const [promptFilter, setPromptFilter] = useState<string>('All');
   
   const { deferredPrompt, installApp: handleInstallApp } = useAppState();
-
-  useEffect(() => {
-    if (user) {
-      fetchMyPrompts();
-      fetchMyPosts();
-      fetchMyShorts();
-      fetchFollowerCount();
-    }
-  }, [user]);
 
   useEffect(() => {
     if (!headerRef.current) return;
@@ -95,7 +98,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     return () => observer.disconnect();
   }, []);
 
-  const fetchMyShorts = async () => {
+  const fetchMyShorts = useCallback(async () => {
     if (!user || isPlaceholder) return;
     try {
       const { data, error } = await (supabase
@@ -125,9 +128,9 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
       console.error('Error fetching shorts:', error);
       setMyShorts([]);
     }
-  };
+  }, [user, profile]);
 
-  const fetchMyPosts = async () => {
+  const fetchMyPosts = useCallback(async () => {
     if (!user || isPlaceholder) return;
     const { data, error } = await supabase
       .from('posts')
@@ -161,24 +164,25 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         },
         prompt: p.prompt || '',
         tags: p.tags || [],
+        category: p.category || 'General',
+        style: p.style || 'Standard',
+        aspectRatio: p.aspect_ratio || '1:1',
         likes: p.likes || 0,
         views: p.views || 0,
         saves: p.saves || 0,
         comments: p.comments || 0,
+        createdAt: p.created_at || new Date().toISOString(),
         isLiked: false,
         isSaved: false,
-        category: p.category,
-        style: p.style,
-        aspectRatio: p.aspect_ratio,
-        creator_id: p.creator_id
+        isShort: p.is_short || false,
       }));
       setMyPosts(formattedPosts);
     } else {
       setMyPosts([]);
     }
-  };
+  }, [user, profile]);
 
-  const fetchFollowerCount = async () => {
+  const fetchFollowerCount = useCallback(async () => {
     if (!user || isPlaceholder) return;
     const { count, error } = await supabase
       .from('follows')
@@ -189,9 +193,9 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     } else {
       setFollowerCount(count || 0);
     }
-  };
+  }, [user]);
 
-  const fetchMyPrompts = async () => {
+  const fetchMyPrompts = useCallback(async () => {
     if (!user || isPlaceholder) return;
     const { data, error } = await supabase
       .from('marketplace_prompts')
@@ -209,7 +213,16 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     } else {
       setMyPrompts([]);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchMyPrompts();
+      fetchMyPosts();
+      fetchMyShorts();
+      fetchFollowerCount();
+    }
+  }, [user, fetchMyPrompts, fetchMyPosts, fetchMyShorts, fetchFollowerCount]);
 
   if (!isLoggedIn) {
     return (
@@ -249,16 +262,23 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         {/* Fixed Header - Slides on scroll */}
         <div 
           ref={headerRef}
-          className={cn(
-            "fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md px-4 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out border-b border-border/50",
-            showTopHeader ? "translate-y-0" : "-translate-y-full"
-          )}
+          className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50"
           style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
         >
-          <h1 className="text-xl font-bold text-foreground">@{username}</h1>
-          <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
-            <Settings size={22} className="text-muted-foreground" />
-          </button>
+          <div 
+            ref={topRowRef}
+            className="grid transition-all duration-300 ease-in-out origin-top"
+            style={{ gridTemplateRows: '1fr', opacity: 1 }}
+          >
+            <div className="overflow-hidden">
+              <div className="px-4 pb-3 flex items-center justify-between h-[52px]">
+                <h1 className="text-xl font-bold text-foreground">@{username}</h1>
+                <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
+                  <Settings size={22} className="text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Cover Photo */}
@@ -269,10 +289,13 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           )}
           style={{ height: 200, marginTop: headerHeight }}
         >
-          <img
+          <Image
             src={profile?.cover_url || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80'}
             alt="Cover"
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
+            priority
+            referrerPolicy="no-referrer"
           />
         </div>
 
@@ -280,9 +303,9 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         <div className="px-4 pb-2 -mt-12 relative z-10">
           <div className="flex flex-col items-center">
             <div className="relative">
-              <div className="w-[96px] h-[96px] rounded-full p-[3px] bg-background">
+              <div className="w-[96px] h-[96px] rounded-full p-[3px] bg-background relative overflow-hidden">
                 {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                  <Image src={profile.avatar_url} alt="" fill className="rounded-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                   <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center">
                     <span className="text-3xl font-bold text-secondary-foreground">{initial}</span>
@@ -322,23 +345,36 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 mt-6">
-            <button
-              onClick={() => setShowEditProfile(true)}
-              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
-            >
-              Edit Profile
-            </button>
-            <button
-              onClick={() => setShowDashboard(true)}
-              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
-            >
-              Dashboard
-            </button>
+          <div className="flex flex-col gap-2 mt-6">
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowEditProfile(true)}
+                className="flex-1 py-2.5 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
+              >
+                Edit Profile
+              </button>
+              <button
+                onClick={() => setShowDashboard(true)}
+                className="flex-1 py-2.5 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
+              >
+                Dashboard
+              </button>
+            </div>
+            
+            {isAdmin && (
+              <button
+                onClick={() => router.push('/admin/qpixa-portal')}
+                className="w-full py-2.5 rounded-xl bg-primary/10 text-primary border border-primary/20 text-[13px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+              >
+                <ShieldCheck size={16} />
+                Admin Portal
+              </button>
+            )}
+
             {deferredPrompt && (
               <button
                 onClick={handleInstallApp}
-                className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold active:scale-[0.98] transition-transform"
+                className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold active:scale-[0.98] transition-transform"
               >
                 Install App
               </button>
@@ -369,7 +405,14 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
               <div className="grid grid-cols-3 gap-0.5">
                 {myPosts.map(p => (
                   <button key={p.id} onClick={() => onPostTap?.(p)} className="relative aspect-square overflow-hidden group active:opacity-80 transition-opacity">
-                    <img src={p.imageUrl || '/placeholder.svg'} alt={p.prompt} className="w-full h-full object-cover" />
+                    <Image 
+                      src={p.imageUrl || '/placeholder.svg'} 
+                      alt={p.prompt} 
+                      fill
+                      sizes="33vw"
+                      className="object-cover"
+                      referrerPolicy="no-referrer"
+                    />
                   </button>
                 ))}
               </div>

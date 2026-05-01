@@ -1,7 +1,9 @@
+"use client";
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Users, Search, SlidersHorizontal, Plus, TrendingUp, Store, Bell, X, Sparkles, Image as ImageIcon, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Link, useNavigate } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import ScrollToTop from '@/components/ScrollToTop';
 import { toast } from 'sonner';
 import ImageCard from '@/components/ImageCard';
@@ -12,8 +14,9 @@ import FeedAdCard from '@/components/ads/FeedAdCard';
 import { Logo } from '@/components/Logo';
 import { LogoLoader } from '@/components/LogoLoader';
 import { useAppState } from '@/context/AppContext';
-import { Post } from '@/context/AppContext';
+import { Post } from '@/types';
 import { useFollows } from '@/hooks/useFollows';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 const categories = ['Trending', 'Following', 'IPL 2026', 'Summer', '90s Retro', 'Professions', 'Fantasy', 'Luxury'];
 
@@ -48,8 +51,11 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   const [filters, setFilters] = useState<FilterState>({ style: 'All', popularity: 'All', time: 'All Time', category: 'All' });
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
-  const [showTopHeader, setShowTopHeader] = useState(true);
-  const navigate = useNavigate();
+  const router = useRouter();
+  const navigate = (path: string) => router.push(path);
+  const topRowRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [columns, setColumns] = useState(2);
 
   // Filter posts
   const [showNotifications, setShowNotifications] = useState(false);
@@ -63,10 +69,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   const hasMockPosts = useMemo(() => posts.some(p => p.isMock), [posts]);
   
   const notificationsList = useMemo(() => {
-    const base = [
-      { id: '1', title: 'Welcome to Qpixa!', message: 'Start creating amazing AI art today.', created_at: new Date().toISOString() },
-      { id: '2', title: 'New Feature', message: 'Check out the new Shorts feed!', created_at: new Date().toISOString() },
-    ];
+    const base: any[] = [];
     
     if (hasMockPosts) {
       base.unshift({
@@ -80,10 +83,6 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   }, [hasMockPosts]);
 
   useEffect(() => {
-    fetchPosts();
-  }, []);
-
-  useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
@@ -92,11 +91,15 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       // Threshold to avoid flickering
       if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
 
-      // Hide top header on scroll down, show on scroll up
-      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        setShowTopHeader(false);
-      } else {
-        setShowTopHeader(true);
+      if (topRowRef.current) {
+        // Hide top header on scroll down, show on scroll up
+        if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+          topRowRef.current.style.gridTemplateRows = '0fr';
+          topRowRef.current.style.opacity = '0';
+        } else {
+          topRowRef.current.style.gridTemplateRows = '1fr';
+          topRowRef.current.style.opacity = '1';
+        }
       }
       
       lastScrollY.current = currentScrollY;
@@ -152,22 +155,38 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       .slice(0, 5);
   }, [posts]);
 
-  useEffect(() => {
-    const activePostsLength = filteredPosts.length > 0 ? filteredPosts.length : posts.length;
-    const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && !loading) {
-        if (visibleCount < activePostsLength) {
-          setLoading(true);
-          setTimeout(() => {
-            setVisibleCount(prev => prev + 10);
-            setLoading(false);
-          }, 500);
+  const feedItems = useMemo(() => {
+    const arr: Array<{ type: 'post'; data: Post } | { type: 'ad'; id: string }> = [];
+    const source = filteredPosts.length > 0 ? filteredPosts : posts;
+    for (let i = 0; i < source.length; i++) {
+        arr.push({ type: 'post', data: source[i] });
+        if (adSettings?.enabled && adSettings.placementFeed && !isPro && (i + 1) % (adSettings.frequency * 2) === 0) {
+           arr.push({ type: 'ad', id: `ad-${i}` });
         }
-      }
-    }, { threshold: 0.1 });
-    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [loading, visibleCount, filteredPosts.length, posts.length]);
+    }
+    return arr;
+  }, [filteredPosts, posts, adSettings, isPro]);
+
+  useEffect(() => {
+    const updateCols = () => {
+      if (!containerRef.current) return;
+      const width = containerRef.current.offsetWidth;
+      // padding side is 0 since we measure inner container, gap is 12. min width 160.
+      const cols = Math.floor((width + 12) / (160 + 12));
+      setColumns(Math.max(2, cols));
+    };
+    updateCols();
+    window.addEventListener('resize', updateCols);
+    return () => window.removeEventListener('resize', updateCols);
+  }, []);
+
+  const rowCount = Math.ceil(feedItems.length / columns);
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 232, // 220px height + 12px gap
+    overscan: 4, // preload 4 rows
+  });
 
   const touchStart = useRef(0);
   const handleTouchStart = (e: React.TouchEvent) => { touchStart.current = e.touches[0].clientY; };
@@ -185,31 +204,11 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     }
   };
 
-  const topHeaderRef = useRef<HTMLDivElement>(null);
-  const stickySectionRef = useRef<HTMLDivElement>(null);
-  const [topHeaderHeight, setTopHeaderHeight] = useState(52);
-  const [stickySectionHeight, setStickySectionHeight] = useState(96);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!topHeaderRef.current || !stickySectionRef.current) return;
-    const observer = new ResizeObserver(entries => {
-      for (let entry of entries) {
-        if (entry.target === topHeaderRef.current) {
-          setTopHeaderHeight(entry.contentRect.height + (showTopHeader ? 8 : 0)); // Account for padding
-        } else if (entry.target === stickySectionRef.current) {
-          setStickySectionHeight(entry.contentRect.height);
-        }
-      }
-    });
-    observer.observe(topHeaderRef.current);
-    observer.observe(stickySectionRef.current);
-    return () => observer.disconnect();
-  }, [showTopHeader]);
 
   return (
     <div
@@ -218,103 +217,107 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Header Container - Slides Up by exactly the Top Row height */}
+      {/* Header Container - Fixed at top with safe area padding */}
       <div 
-        className="fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out bg-background/95 backdrop-blur-md border-b border-border/50"
-        style={{ 
-          transform: showTopHeader ? 'translateY(0)' : `translateY(-${topHeaderHeight}px)`
-        }}
+        className="fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50"
+        style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
       >
         {/* Row 1: Logo & Actions (This row hides) */}
         <div 
-          ref={topHeaderRef}
-          className="px-4 py-3 flex items-center justify-between"
-          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
+          ref={topRowRef}
+          className="grid transition-all duration-300 ease-in-out origin-top"
+          style={{ gridTemplateRows: '1fr', opacity: 1 }}
         >
-          <div className="flex items-center gap-2.5">
-            <Logo size={32} />
-            <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
-          </div>
-          <div className="flex items-center gap-1">
-            {uploadingPost && (
-              <div className="flex items-center gap-2 mr-2">
-                <div className="relative w-8 h-8 flex items-center justify-center">
-                  <svg className="w-8 h-8 -rotate-90">
-                    <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" className="text-secondary" />
-                    <circle
-                      cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2"
-                      strokeDasharray={88}
-                      strokeDashoffset={88 - (88 * uploadingPost.progress) / 100}
-                      className={cn("transition-all duration-300", uploadingPost.status === 'error' ? "text-destructive" : "text-primary")}
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    {uploadingPost.status === 'uploading' && <Upload size={14} className="text-primary animate-bounce" />}
-                    {uploadingPost.status === 'success' && <Sparkles size={14} className="text-primary" />}
-                    {uploadingPost.status === 'error' && <button onClick={retryUpload} className="text-destructive"><X size={14} /></button>}
-                  </div>
-                </div>
+          <div className="overflow-hidden">
+            <div className="px-4 flex items-center justify-between h-[52px]">
+              <div className="flex items-center gap-2.5">
+                <Logo size={32} />
+                <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
               </div>
-            )}
-            <button onClick={() => navigate('/market')} className="p-1.5 transition-opacity active:opacity-60">
-              <Store size={22} className="text-foreground" />
-            </button>
-            <button onClick={() => setShowNotifications(true)} className="p-1.5 transition-opacity active:opacity-60 relative">
-              <Bell size={22} className="text-foreground" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
-            </button>
+              <div className="flex items-center gap-1">
+                {uploadingPost && (
+                  <div className="flex items-center gap-2 mr-2">
+                    <div className="relative w-8 h-8 flex items-center justify-center">
+                      <svg className="w-8 h-8 -rotate-90">
+                        <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" className="text-secondary" />
+                        <circle
+                          cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2"
+                          strokeDasharray={88}
+                          strokeDashoffset={88 - (88 * uploadingPost.progress) / 100}
+                          className={cn("transition-all duration-300", uploadingPost.status === 'error' ? "text-destructive" : "text-primary")}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        {uploadingPost.status === 'uploading' && <Upload size={14} className="text-primary animate-bounce" />}
+                        {uploadingPost.status === 'success' && <Sparkles size={14} className="text-primary" />}
+                        {uploadingPost.status === 'error' && <button onClick={retryUpload} className="text-destructive"><X size={14} /></button>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <button onClick={() => navigate('/market')} className="p-1.5 transition-opacity active:opacity-60">
+                  <Store size={22} className="text-foreground" />
+                </button>
+                <button onClick={() => setShowNotifications(true)} className="p-1.5 transition-opacity active:opacity-60 relative">
+                  <Bell size={22} className="text-foreground" />
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Row 2: Search Bar */}
-        <div className="px-4 py-2 flex gap-2">
-          <div className="flex-1 flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">
-            <Search size={16} className="text-muted-foreground mr-2" />
-            <input
-              type="search"
-              autoComplete="off"
-              placeholder="Search prompts..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
-            />
+        <div>
+          <div className="px-4 py-2 flex gap-2">
+            <div className="flex-1 flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">
+              <Search size={16} className="text-muted-foreground mr-2" />
+              <input
+                type="search"
+                autoComplete="off"
+                placeholder="Search prompts..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
+              />
+            </div>
+            <button
+              onClick={onCreatePost}
+              className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+            >
+              <Plus size={20} />
+            </button>
           </div>
-          <button
-            onClick={onCreatePost}
-            className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-          >
-            <Plus size={20} />
-          </button>
-        </div>
 
-        {/* Row 3: Categories */}
-        <div className="flex items-center gap-0.5 px-4 pb-3">
-          <button
-            onClick={() => setFilterOpen(true)}
-            className={cn(
-              "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90",
-              Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-foreground'
-            )}
-          >
-            <SlidersHorizontal size={14} />
-          </button>
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 ml-0.5">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => cat === 'Shorts' ? navigate('/shorts') : setActiveCategory(cat)}
-                className={cn(
-                  "flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95",
-                  activeCategory === cat
-                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                    : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'
-                )}
-              >
-                {cat}
-              </button>
-            ))}
+          {/* Row 3: Categories */}
+          <div className="flex items-center gap-0.5 px-4 pb-3">
+            <button
+              onClick={() => setFilterOpen(true)}
+              className={cn(
+                "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90",
+                Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-foreground'
+              )}
+            >
+              <SlidersHorizontal size={14} />
+            </button>
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 ml-0.5">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => cat === 'Shorts' ? navigate('/shorts') : setActiveCategory(cat)}
+                  className={cn(
+                    "flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95",
+                    activeCategory === cat
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                      : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -338,7 +341,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
             <div>
               <p className="text-xs font-bold text-foreground">Sample Data Active</p>
               <p className="text-[10px] text-muted-foreground leading-relaxed">
-                We've added some sample prompts to help you get started. Real user posts will always appear at the top!
+                We&apos;ve added some sample prompts to help you get started. Real user posts will always appear at the top!
               </p>
             </div>
           </div>
@@ -366,75 +369,69 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           </div>
         )}
 
-        {activeCategory === 'Following' && filteredPosts.length === 0 ? (
+        {activeCategory === 'Following' && feedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
             <Users size={40} className="mb-3 opacity-40" />
             <p className="text-sm font-semibold text-foreground">Following Feed</p>
             <p className="text-xs text-center mt-1 px-8">Follow creators from their profile to see their posts here</p>
           </div>
-        ) : filteredPosts.length === 0 && !initialLoading && posts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
-              <Sparkles size={40} className="text-primary" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Welcome to Qpixa!</h2>
-            <p className="text-muted-foreground text-sm mb-8 max-w-[280px]">
-              You are the first one here! Start by generating and sharing your first AI masterpiece.
-            </p>
-            <button
-              onClick={onCreatePost}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
-            >
-              <Upload size={20} />
-              Create First Post
-            </button>
-            
-            <div className="mt-12 grid grid-cols-2 gap-4 w-full max-w-sm">
-              <div className="bg-secondary/50 p-4 rounded-2xl border border-border/50">
-                <ImageIcon size={20} className="text-primary mb-2" />
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Step 1</p>
-                <p className="text-xs font-semibold">Generate Image</p>
-              </div>
-              <div className="bg-secondary/50 p-4 rounded-2xl border border-border/50">
-                <TrendingUp size={20} className="text-primary mb-2" />
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Step 2</p>
-                <p className="text-xs font-semibold">Share with World</p>
-              </div>
-            </div>
-          </div>
         ) : (
-          <>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-              {(initialLoading && posts.length === 0) ? (
-                <div className="col-span-full flex flex-col items-center justify-center py-20">
-                  <LogoLoader size={80} text="Discovering masterpieces" />
-                </div>
-              ) : (
-                <>
-                  {(filteredPosts.length > 0 ? filteredPosts : posts).slice(0, visibleCount).map((post, index) => (
-                    <React.Fragment key={post.id}>
-                      <ImageCard
-                        post={post}
-                        onTap={() => onPostTap(post)}
-                        onDoubleTap={() => toggleLike(post.id)}
-                        onLongPress={() => setQuickActionsPost(post)}
-                        onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
-                      />
-                      {adSettings?.enabled && adSettings.placementFeed && !isPro &&
-                        (index + 1) % (adSettings.frequency * 2) === 0 && (
-                        <FeedAdCard
-                          publisherId={adSettings.adsensePublisherId}
-                          slotId={adSettings.adsenseFeedSlot}
-                        />
-                      )}
-                    </React.Fragment>
-                  ))}
-                  {loading && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`sk-${i}`} />)}
-                </>
-              )}
-            </div>
+          <div ref={containerRef} className="w-full">
+            {(initialLoading && (posts.length === 0 || refreshing)) ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <LogoLoader size={80} text="Discovering masterpieces" />
+              </div>
+            ) : (
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const startIndex = virtualRow.index * columns;
+                  const rowItems = feedItems.slice(startIndex, startIndex + columns);
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `220px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                      className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3"
+                    >
+                      {rowItems.map((item, idx) => (
+                        <div key={item.type === 'post' ? item.data.id : item.id} className="w-full flex-shrink-0">
+                          {item.type === 'post' ? (
+                            <ImageCard
+                              post={item.data}
+                              onTap={() => onPostTap(item.data)}
+                              onDoubleTap={() => toggleLike(item.data.id)}
+                              onLongPress={() => setQuickActionsPost(item.data)}
+                              onCreatorTap={() => onCreatorTap?.(item.data.creator.name, item.data.creator.id)}
+                            />
+                          ) : (
+                            <FeedAdCard
+                              publisherId={adSettings?.adsensePublisherId || ''}
+                              slotId={adSettings?.adsenseFeedSlot || ''}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {/* Load More trigger is no longer needed since virtualizer renders all via DOM, 
+                but we can keep loadMoreRef for API pagination if implemented later */}
             <div ref={loadMoreRef} className="h-4" />
-          </>
+          </div>
         )}
       </div>
 

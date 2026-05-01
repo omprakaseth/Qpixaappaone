@@ -1,4 +1,5 @@
-import { Post } from './AppContext';
+"use client";
+import { Post } from '@/types';
 
 const suffix = "Use the uploaded image as reference. Maintain same face, identity, hairstyle, and facial features. Apply the scene and style accurately. Ultra realistic, high detail, cinematic lighting, 4K quality.";
 

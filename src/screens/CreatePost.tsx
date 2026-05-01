@@ -1,10 +1,11 @@
+"use client";
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Upload, X, Video, Store, Image as ImageIcon, Music } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Post } from '@/context/AppContext';
-import { motion, AnimatePresence } from 'motion/react';
+import { Post } from '@/types';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface CreatePostProps {

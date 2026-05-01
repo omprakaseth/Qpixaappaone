@@ -33,24 +33,16 @@ registerRoute(
   new NetworkOnly()
 );
 
-// Fallback for SPA routing
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      caches.match('/index.html').then((response) => {
-        return response || fetch(event.request);
-      })
-    );
-  }
-});
+// Fallback for SPA routing - Not needed for Next.js in this way
+// Self-managed routing is already handled by Workbox if configured correctly.
 
 self.addEventListener('push', function(event) {
   if (event.data) {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: '/android-chrome-192x192.png',
-      badge: '/android-chrome-192x192.png',
+      icon: '/pwa-icon-192.png',
+      badge: '/pwa-icon-192.png',
       data: {
         url: data.url || '/'
       },

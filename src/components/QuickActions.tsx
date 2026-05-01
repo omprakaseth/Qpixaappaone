@@ -1,3 +1,4 @@
+"use client";
 import { Save, Share2, Copy, Flag } from 'lucide-react';
 import { useSwipeDismiss } from '@/hooks/useSwipeDismiss';
 

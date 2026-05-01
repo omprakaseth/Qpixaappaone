@@ -1,13 +1,15 @@
+"use client";
 import React from 'react';
 import { useNotifications } from '@/context/NotificationContext';
 import { Bell, Heart, MessageCircle, UserPlus, Info, Check, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const NotificationScreen: React.FC = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications();
-  const navigate = useNavigate();
+  const router = useRouter();
+  const navigate = (path: string) => router.push(path);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -58,7 +60,7 @@ const NotificationScreen: React.FC = () => {
             </div>
             <h2 className="text-lg font-bold text-foreground mb-1">No notifications yet</h2>
             <p className="text-sm text-muted-foreground">
-              When someone likes your posts or follows you, you'll see it here.
+              When someone likes your posts or follows you, you&apos;ll see it here.
             </p>
           </div>
         ) : (

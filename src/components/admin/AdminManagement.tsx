@@ -174,7 +174,7 @@ export default function AdminManagement({ setHasUnsavedChanges }: { setHasUnsave
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden ${a.role === 'super_admin' ? 'bg-primary/20' : 'bg-secondary'}`}>
                     {a.avatar_url ? (
-                      <img src={a.avatar_url} className="w-full h-full object-cover" />
+                      <img src={a.avatar_url} alt={a.display_name || a.email || 'Admin'} className="w-full h-full object-cover" />
                     ) : a.role === 'super_admin' ? (
                       <ShieldCheck size={18} className="text-primary" />
                     ) : (

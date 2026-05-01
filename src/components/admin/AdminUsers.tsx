@@ -168,7 +168,7 @@ export default function AdminUsers({ setHasUnsavedChanges }: { setHasUnsavedChan
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-foreground overflow-hidden">
-                      {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : (u.display_name || u.username || '?')[0]?.toUpperCase()}
+                      {u.avatar_url ? <img src={u.avatar_url} alt={u.username || 'User'} className="w-full h-full object-cover" /> : (u.display_name || u.username || '?')[0]?.toUpperCase()}
                     </div>
                     <div>
                       <p className="text-foreground font-medium">{u.display_name || u.username || 'Unknown'}</p>

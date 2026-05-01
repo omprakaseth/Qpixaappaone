@@ -1,4 +1,5 @@
-import { motion } from 'motion/react';
+"use client";
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface AILoaderProps {

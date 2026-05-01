@@ -1,3 +1,4 @@
+"use client";
 import { ArrowLeft, Check, Sparkles, Zap } from 'lucide-react';
 
 interface SubscriptionScreenProps {

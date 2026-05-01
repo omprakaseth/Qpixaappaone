@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+"use client";
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import ImageViewer from '@/components/ImageViewer';
@@ -309,66 +310,67 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     }
   }, [prompt]);
 
+  const loadSessions = useCallback(async () => {
+    try {
+      const savedSessions = localStorage.getItem('qpixa_studio_sessions');
+      let parsed: ChatSession[] = [];
+      if (savedSessions) {
+        parsed = JSON.parse(savedSessions);
+      }
+
+      // If logged in, also fetch from DB to ensure we have history
+      if (user && !isPlaceholder) {
+        const { data: dbGenerations } = await supabase
+          .from('generations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (dbGenerations && dbGenerations.length > 0) {
+          // Create a "Cloud History" session if it doesn't exist or update it
+          const cloudMessages: ChatMessage[] = dbGenerations.map((g: any) => ({
+            id: g.id,
+            type: 'ai',
+            text: g.prompt,
+            imageUrl: g.image_url,
+            createdAt: g.created_at,
+            status: 'success'
+          }));
+
+          const cloudSession: ChatSession = {
+            id: 'cloud-history',
+            title: '☁️ Cloud History',
+            messages: cloudMessages,
+            createdAt: dbGenerations[dbGenerations.length - 1].created_at,
+            updatedAt: dbGenerations[0].created_at,
+          };
+
+          // Merge with local sessions
+          const otherSessions = parsed.filter(s => s.id !== 'cloud-history');
+          parsed = [cloudSession, ...otherSessions];
+        }
+      }
+
+      if (parsed.length > 0) {
+        setSessions(parsed);
+        
+        // If there are sessions, load the most recent one if none selected
+        if (!currentSessionId) {
+          const mostRecent = parsed[0];
+          setCurrentSessionId(mostRecent.id);
+          setMessages(mostRecent.messages);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load sessions', e);
+    }
+  }, [user, currentSessionId]);
+
   // Load sessions from Local Storage and Sync with DB
   useEffect(() => {
-    const loadSessions = async () => {
-      try {
-        const savedSessions = localStorage.getItem('qpixa_studio_sessions');
-        let parsed: ChatSession[] = [];
-        if (savedSessions) {
-          parsed = JSON.parse(savedSessions);
-        }
-
-        // If logged in, also fetch from DB to ensure we have history
-        if (user && !isPlaceholder) {
-          const { data: dbGenerations } = await supabase
-            .from('generations')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(20);
-
-          if (dbGenerations && dbGenerations.length > 0) {
-            // Create a "Cloud History" session if it doesn't exist or update it
-            const cloudMessages: ChatMessage[] = dbGenerations.map((g: any) => ({
-              id: g.id,
-              type: 'ai',
-              text: g.prompt,
-              imageUrl: g.image_url,
-              createdAt: g.created_at,
-              status: 'success'
-            }));
-
-            const cloudSession: ChatSession = {
-              id: 'cloud-history',
-              title: '☁️ Cloud History',
-              messages: cloudMessages,
-              createdAt: dbGenerations[dbGenerations.length - 1].created_at,
-              updatedAt: dbGenerations[0].created_at,
-            };
-
-            // Merge with local sessions
-            const otherSessions = parsed.filter(s => s.id !== 'cloud-history');
-            parsed = [cloudSession, ...otherSessions];
-          }
-        }
-
-        if (parsed.length > 0) {
-          setSessions(parsed);
-          
-          // If there are sessions, load the most recent one if none selected
-          if (!currentSessionId) {
-            const mostRecent = parsed[0];
-            setCurrentSessionId(mostRecent.id);
-            setMessages(mostRecent.messages);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load sessions', e);
-      }
-    };
     loadSessions();
-  }, [user, isLoggedIn]);
+  }, [loadSessions, isLoggedIn]);
 
   // Helper to save sessions to local storage
   const saveSessionsToLocalStorage = (updatedSessions: ChatSession[]) => {
@@ -414,14 +416,37 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     setEditingSessionId(null);
   };
 
-  const handleDeleteSession = (id: string) => {
-    setSessions(prev => {
-      const updated = prev.filter(s => s.id !== id);
-      saveSessionsToLocalStorage(updated);
-      return updated;
-    });
-    if (currentSessionId === id) {
-      handleNewChat();
+  const handleDeleteSession = async (id: string) => {
+    try {
+      if (id === 'cloud-history' && user && !isPlaceholder) {
+        const confirmDelete = window.confirm('Are you sure you want to permanently delete ALL your cloud history? This cannot be undone.');
+        if (!confirmDelete) return;
+        
+        toast.promise(
+          async () => {
+            const { error } = await supabase.from('generations').delete().eq('user_id', user.id);
+            if (error) throw error;
+          },
+          {
+            loading: 'Clearing cloud history...',
+            success: 'Cloud history permanently deleted',
+            error: 'Failed to clear cloud history'
+          }
+        );
+      }
+
+      setSessions(prev => {
+        const updated = prev.filter(s => s.id !== id);
+        saveSessionsToLocalStorage(updated);
+        return updated;
+      });
+      
+      if (currentSessionId === id) {
+        handleNewChat();
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete history');
     }
   };
 

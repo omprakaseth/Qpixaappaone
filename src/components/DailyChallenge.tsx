@@ -1,3 +1,4 @@
+"use client";
 import React from 'react';
 import { Trophy, Sparkles, ChevronRight, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';

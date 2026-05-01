@@ -1,9 +1,10 @@
+"use client";
 import React, { useState, useCallback, useRef } from 'react';
 import { Heart } from 'lucide-react';
 import { formatNumber, cn } from '@/lib/utils';
-import { Post } from '@/context/AppContext';
+import { Post } from '@/types';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
-import { Loader2 } from 'lucide-react';
+import Image from 'next/image';
 
 interface ImageCardProps {
   post: Post;
@@ -16,28 +17,25 @@ interface ImageCardProps {
 export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCreatorTap }: ImageCardProps) {
   const [showHeart, setShowHeart] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
-  const [isClicking, setIsClicking] = useState(false);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const longPressTriggered = useRef(false);
   const isScrolling = useRef(false);
   const touchStartY = useRef(0);
 
-  const handleTap = useDoubleTap(
-    () => {
-      if (!longPressTriggered.current) {
-        setIsClicking(true);
-        onTap();
-        // Reset clicking state after a short delay or when component unmounts/remounts
-        setTimeout(() => setIsClicking(false), 2000);
-      }
-    },
-    () => {
-      if (longPressTriggered.current) return;
-      onDoubleTap();
-      setShowHeart(true);
-      setTimeout(() => setShowHeart(false), 600);
+  const handleTapAction = useCallback(() => {
+    if (!longPressTriggered.current) {
+      onTap();
     }
-  );
+  }, [onTap]);
+
+  const handleDoubleTapAction = useCallback(() => {
+    if (longPressTriggered.current) return;
+    onDoubleTap();
+    setShowHeart(true);
+    setTimeout(() => setShowHeart(false), 600);
+  }, [onDoubleTap]);
+
+  const handleTapEvents = useDoubleTap(handleTapAction, handleDoubleTapAction);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     longPressTriggered.current = false;
@@ -65,13 +63,12 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
 
   return (
     <div
-      className={cn(
-        "relative rounded-[20px] overflow-hidden bg-card cursor-pointer h-[220px] w-full transition-all active:scale-[0.98]",
-        isClicking && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-      )}
-      onClick={() => {
+      className="relative rounded-[20px] overflow-hidden bg-card cursor-pointer h-[220px] w-full transition-all active:scale-[0.98]"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
         if (longPressTriggered.current) return;
-        handleTap();
+        handleTapEvents();
       }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -83,27 +80,21 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
         {!imgLoaded && (
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
-        <img
+        <Image
           src={post.imageUrl}
           alt={post.title}
+          fill
+          sizes="(max-width: 768px) 50vw, 33vw"
           className={cn(
-            "w-full h-full object-cover transition-all duration-500",
-            imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
-            isClicking && "brightness-50 scale-110"
+            "object-cover transition-all duration-500",
+            imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
           )}
-          loading="lazy"
-          onLoad={() => setImgLoaded(true)}
+          onLoadingComplete={() => setImgLoaded(true)}
+          referrerPolicy="no-referrer"
         />
 
-        {/* Loading spinner when clicking */}
-        {isClicking && (
-          <div className="absolute inset-0 flex items-center justify-center z-20">
-            <Loader2 className="w-8 h-8 text-white animate-spin" />
-          </div>
-        )}
-
         {/* AI Badge - top left */}
-        <div className="absolute top-2 left-2 flex gap-1">
+        <div className="absolute top-2 left-2 z-10 flex gap-1">
           <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
             AI
           </span>
