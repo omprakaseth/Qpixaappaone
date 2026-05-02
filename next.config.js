@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["lucide-react", "framer-motion", "next-themes"],
+  transpilePackages: ["framer-motion", "next-themes"],
   eslint: {
     ignoreDuringBuilds: true,
   },

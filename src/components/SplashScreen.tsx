@@ -3,13 +3,13 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const SplashScreen: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState<boolean | null>(null);
 
   useEffect(() => {
     let hasShown = false;
     try {
       if (typeof window !== 'undefined') {
-        hasShown = !!sessionStorage.getItem('hasShownSplash');
+        hasShown = !!sessionStorage.getItem('has_shown_splash_v2');
       }
     } catch (e) {
       console.warn('Session storage access denied', e);
@@ -20,11 +20,13 @@ export const SplashScreen: React.FC = () => {
       return;
     }
 
+    setIsVisible(true);
+
     const timer = setTimeout(() => {
       setIsVisible(false);
       try {
         if (typeof window !== 'undefined') {
-          sessionStorage.setItem('hasShownSplash', 'true');
+          sessionStorage.setItem('has_shown_splash_v2', 'true');
         }
       } catch (e) {
         console.warn('Session storage access denied', e);
@@ -33,6 +35,8 @@ export const SplashScreen: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, []);
+
+  if (isVisible === null) return null;
 
   return (
     <AnimatePresence>

@@ -83,7 +83,7 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
   ];
 
   return (
-    <div className="fixed inset-0 z-[60] bg-background flex flex-col animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-0 z-[60] bg-background flex flex-col">
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-3 pb-3 safe-top">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="p-1.5 rounded-full hover:bg-secondary">

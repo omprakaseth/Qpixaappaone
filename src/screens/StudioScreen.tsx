@@ -140,14 +140,13 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const [negativePrompt, setNegativePrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('flux');
   const MODELS = [
-    { id: 'flux', name: 'Flux.1 (High Quality)', provider: 'Pollinations' },
+    { id: 'flux', name: 'Flux.1 (Hyper)', provider: 'Pollinations' },
     { id: 'flux-realism', name: 'Flux Realism', provider: 'Pollinations' },
     { id: 'flux-anime', name: 'Flux Anime', provider: 'Pollinations' },
     { id: 'flux-3d', name: 'Flux 3D', provider: 'Pollinations' },
-    { id: 'pollinations', name: 'Pollinations Standard', provider: 'Pollinations' },
-    { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 (Free)', provider: 'Google' },
-    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 (Pro)', provider: 'Google' },
-    { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'SDXL (Free)', provider: 'HuggingFace' },
+    { id: 'flux-pro', name: 'Flux Pro (Best HQ)', provider: 'Pollinations' },
+    { id: 'pollinations', name: 'Standard AI', provider: 'Pollinations' },
+    { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'SDXL 1.0 (Free)', provider: 'HuggingFace' },
   ];
 
   const generateWithHuggingFace = async (modelId: string, promptText: string, signal?: AbortSignal) => {

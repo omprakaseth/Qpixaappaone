@@ -1,9 +1,9 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
-import { X, Clock, ShoppingCart, ArrowLeft, Trash2 } from 'lucide-react';
-import { Search, SlidersHorizontal, ChevronRight, Star, ChevronDown, Coins, Plus, Bell, Menu } from 'lucide-react';
+import { X, Clock, ShoppingCart, ArrowLeft, Trash2, Search, SlidersHorizontal, ChevronRight, Star, ChevronDown, Coins, Plus, Bell, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useAppState } from '@/context/AppContext';
@@ -271,6 +271,40 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     } catch (err) {
       console.error('Purchase error', err);
       toast.error('An unexpected error occurred during purchase');
+    }
+  };
+
+  const handlePurchaseAll = async () => {
+    if (!isLoggedIn) {
+      onOpenAuth?.('login');
+      return;
+    }
+    if (cartItems.length === 0) return;
+
+    const totalCost = cartItems.reduce((s, i) => s + (i.prompt?.price || 0), 0);
+    if (credits < totalCost) {
+      toast.error('Insufficient credits for entire cart');
+      return;
+    }
+
+    const toastId = toast.loading('Purchasing cart items...');
+    let successCount = 0;
+    
+    try {
+      for (const item of cartItems) {
+        const { data, error } = await supabase.rpc('purchase_prompt', { p_prompt_id: item.prompt_id });
+        if (!error && data === true) {
+          successCount++;
+          setPurchasedIds(prev => new Set(prev).add(item.prompt_id));
+        }
+      }
+      
+      await refreshProfile();
+      toast.success(`Successfully purchased ${successCount} items!`, { id: toastId });
+      setShowCart(false);
+    } catch (err) {
+      console.error('Batch purchase error', err);
+      toast.error('Some items failed to purchase', { id: toastId });
     }
   };
 
@@ -556,11 +590,15 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
               ) : (
                 cartItems.map(item => (
                   <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50 border border-border">
-                    <img
-                      src={item.prompt?.preview_image || '/placeholder.svg'}
-                      alt=""
-                      className="w-12 h-12 rounded-lg object-cover"
-                    />
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0">
+                      <Image
+                        src={item.prompt?.preview_image || '/placeholder.svg'}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{item.prompt?.title || 'Prompt'}</p>
                       <span className="flex items-center gap-0.5 text-xs font-bold text-primary">
@@ -586,7 +624,10 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
                     {cartItems.reduce((s, i) => s + (i.prompt?.price || 0), 0)}
                   </span>
                 </div>
-                <button className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.97] transition-transform">
+                <button 
+                  onClick={handlePurchaseAll}
+                  className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.97] transition-transform"
+                >
                   Purchase All
                 </button>
               </div>
@@ -658,8 +699,15 @@ const PromptPackCard: React.FC<{
       {/* Multi-image grid preview */}
       <div className="relative h-[70%] w-full overflow-hidden flex flex-row rounded-t-[20px]" onContextMenu={(e) => e.preventDefault()}>
         {imgs.map((img, i) => (
-          <div key={i} className="flex-1 overflow-hidden border-r border-background/20 last:border-r-0">
-            <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
+          <div key={i} className="flex-1 overflow-hidden border-r border-background/20 last:border-r-0 relative">
+            <Image 
+              src={img} 
+              alt="" 
+              fill
+              className="object-cover pointer-events-none" 
+              loading="lazy" 
+              referrerPolicy="no-referrer"
+            />
           </div>
         ))}
 

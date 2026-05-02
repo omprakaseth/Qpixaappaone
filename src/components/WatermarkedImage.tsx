@@ -3,14 +3,17 @@ import { useEffect, useRef, useState } from 'react';
 import { useWatermarkSettings } from '@/hooks/useWatermarkSettings';
 import { cn } from '@/lib/utils';
 
+import { motion } from 'framer-motion';
+
 interface WatermarkedImageProps {
   src: string;
   alt?: string;
   className?: string;
   isPro?: boolean;
+  layoutId?: string;
 }
 
-export default function WatermarkedImage({ src, alt, className, isPro = false }: WatermarkedImageProps) {
+export default function WatermarkedImage({ src, alt, className, isPro = false, layoutId }: WatermarkedImageProps) {
   const watermark = useWatermarkSettings();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [watermarkedSrc, setWatermarkedSrc] = useState<string | null>(null);
@@ -89,17 +92,19 @@ export default function WatermarkedImage({ src, alt, className, isPro = false }:
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Failed to load image</p>
         </div>
       ) : (
-        <img
-          src={watermarkedSrc || src}
-          alt={alt}
-          className={cn(
-            className,
-            "transition-opacity duration-500",
-            loading ? 'opacity-0' : 'opacity-100'
-          )}
-          draggable={false}
-          onContextMenu={(e) => e.preventDefault()}
-        />
+        <motion.div layoutId={layoutId} className="w-full h-full relative">
+          <img
+            src={watermarkedSrc || src}
+            alt={alt}
+            className={cn(
+              className,
+              "transition-opacity duration-500",
+              loading ? 'opacity-0' : 'opacity-100'
+            )}
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+        </motion.div>
       )}
     </div>
   );

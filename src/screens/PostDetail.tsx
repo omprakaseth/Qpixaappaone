@@ -38,6 +38,19 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
   const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost, updatePost, posts } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
   
+  const contentVariants: any = {
+    hidden: { opacity: 0, y: 20 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: 0.2 + i * 0.1,
+        duration: 0.4,
+        ease: [0.22, 1, 0.36, 1]
+      }
+    })
+  };
+
   const relatedPosts = useMemo(() => {
     return posts
       .filter(p => p.id !== post.id && (p.category === post.category || p.tags.some(t => post.tags.includes(t))))
@@ -243,14 +256,20 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
   };
 
   return (
-    <div className="h-full w-full bg-background overflow-y-auto scrollbar-hide">
-      <div className="min-h-full w-full bg-background">
+    <div className="h-full w-full bg-background overflow-y-auto scrollbar-hide flex flex-col">
+      <div className="flex-1 w-full bg-background">
         {/* Header */}
       <div className="sticky top-0 z-50 flex items-center gap-3 px-4 py-3 bg-background/80 backdrop-blur-md safe-top">
         <button onClick={onBack} className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center active:scale-95 transition-transform">
           <ArrowLeft size={20} className="text-foreground" />
         </button>
-        <h1 className="text-sm font-bold text-foreground flex-1 truncate">
+        <motion.h1 
+          custom={0}
+          variants={contentVariants}
+          initial="hidden"
+          animate="visible"
+          className="text-sm font-bold text-foreground flex-1 truncate"
+        >
           {isEditing ? (
             <input
               type="text"
@@ -263,12 +282,12 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
           ) : (
             post.title
           )}
-        </h1>
+        </motion.h1>
         <div className="flex items-center gap-2">
           {isOwner ? (
-            <>
+            <div className="flex items-center gap-1">
               {isEditing ? (
-                <div className="flex items-center gap-1">
+                <>
                   <button 
                     onClick={() => setIsEditing(false)} 
                     className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center text-muted-foreground"
@@ -286,9 +305,9 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
                       <Check size={16} />
                     )}
                   </button>
-                </div>
+                </>
               ) : (
-                <div className="flex items-center gap-1">
+                <>
                   <button 
                     onClick={() => setIsEditing(true)} 
                     className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center active:scale-95 transition-transform text-primary"
@@ -298,9 +317,9 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
                   <button onClick={() => setShowDeleteConfirm(true)} className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center active:scale-95 transition-transform text-destructive">
                     <Trash2 size={18} />
                   </button>
-                </div>
+                </>
               )}
-            </>
+            </div>
           ) : (
             <button onClick={() => setShowReportConfirm(true)} className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center active:scale-95 transition-transform text-muted-foreground hover:text-destructive">
               <ShieldAlert size={18} />
@@ -370,7 +389,13 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
 
       <div className="px-5 pt-5 pb-32">
         {/* Creator Row */}
-        <div className="flex items-center justify-between mb-6">
+        <motion.div 
+          custom={1}
+          variants={contentVariants}
+          initial="hidden"
+          animate="visible"
+          className="flex items-center justify-between mb-6"
+        >
           <button
             onClick={() => onCreatorTap?.(post.creator.name, post.creator.id)}
             className="flex items-center gap-3 active:opacity-70 transition-opacity"
@@ -400,10 +425,16 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
           >
             {following ? 'Following' : 'Follow'}
           </button>
-        </div>
+        </motion.div>
 
         {/* Prompt Section */}
-        <div className="mb-6">
+        <motion.div 
+          custom={2}
+          variants={contentVariants}
+          initial="hidden"
+          animate="visible"
+          className="mb-6"
+        >
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Prompt</h3>
             {!isEditing && (
@@ -428,10 +459,16 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
               {post.prompt}
             </p>
           )}
-        </div>
+        </motion.div>
 
         {/* Tags */}
-        <div className="mb-8">
+        <motion.div 
+          custom={3}
+          variants={contentVariants}
+          initial="hidden"
+          animate="visible"
+          className="mb-8"
+        >
           <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Tags</h3>
           {isEditing ? (
             <input
@@ -450,7 +487,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
               ))}
             </div>
           )}
-        </div>
+        </motion.div>
 
         {/* About this Prompt Section */}
         <div className="border-t border-border pt-6 mt-6">
@@ -588,6 +625,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
           </div>
         </div>
       </div>
+      </div>
 
       {/* Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-background via-background to-transparent pt-10 z-50">
@@ -599,7 +637,6 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap, on
           Use Prompt in Studio
         </Button>
       </div>
-    </div>
     </div>
   );
 }

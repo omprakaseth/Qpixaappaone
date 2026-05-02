@@ -6,6 +6,8 @@ import { Post } from '@/types';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import Image from 'next/image';
 
+import { motion } from 'framer-motion';
+
 interface ImageCardProps {
   post: Post;
   onTap: () => void;
@@ -22,7 +24,12 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
   const isScrolling = useRef(false);
   const touchStartY = useRef(0);
 
+  const lastTapTime = useRef(0);
   const handleTapAction = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapTime.current < 500) return;
+    lastTapTime.current = now;
+    
     if (!longPressTriggered.current) {
       onTap();
     }
@@ -80,18 +87,26 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
         {!imgLoaded && (
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
-        <Image
-          src={post.imageUrl}
-          alt={post.title}
-          fill
-          sizes="(max-width: 768px) 50vw, 33vw"
-          className={cn(
-            "object-cover transition-all duration-500",
-            imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
-          )}
-          onLoadingComplete={() => setImgLoaded(true)}
-          referrerPolicy="no-referrer"
-        />
+        <div 
+          className="w-full h-full"
+        >
+          <div
+            className="w-full h-full relative"
+          >
+            <Image
+              src={post.imageUrl}
+              alt={post.title}
+              fill
+              sizes="(max-width: 768px) 50vw, 33vw"
+              className={cn(
+                "object-cover transition-all duration-500",
+                imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
+              )}
+              onLoadingComplete={() => setImgLoaded(true)}
+              referrerPolicy="no-referrer"
+            />
+          </div>
+        </div>
 
         {/* AI Badge - top left */}
         <div className="absolute top-2 left-2 z-10 flex gap-1">
