@@ -18,7 +18,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ text: response.text() });
     }
 
-    return NextResponse.json({ error: "Image generation via direct Gemini SDK is not yet supported in this proxy. Use Pollinations or Hugging Face." }, { status: 400 });
+    if (type === 'image') {
+      // NOTE: Direct Imagen 3 support via @google/genai might require special access or specific methods.
+      // For now, we will return an error suggesting Pollinations/HF, 
+      // but we will allow the frontend to call this if they have a working implementation.
+      return NextResponse.json({ 
+        error: "Imagen 3 is currently under maintenance. Please use Flux.1 or SDXL models for now.",
+        suggestedModels: ["flux", "stabilityai/stable-diffusion-xl-base-1.0"] 
+      }, { status: 400 });
+    }
   } catch (error: any) {
     console.error("Gemini Proxy Error:", error);
     return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 });

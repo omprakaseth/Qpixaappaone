@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 
 import { motion } from 'framer-motion';
 
+import Image from 'next/image';
+
 interface WatermarkedImageProps {
   src: string;
   alt?: string;
@@ -23,7 +25,7 @@ export default function WatermarkedImage({ src, alt, className, isPro = false, l
   useEffect(() => {
     if (!watermark.enabled || isPro) {
       // For non-watermarked images, we still want to track loading state
-      const img = new Image();
+      const img = new window.Image();
       img.onload = () => {
         setWatermarkedSrc(null);
         setLoading(false);
@@ -36,7 +38,7 @@ export default function WatermarkedImage({ src, alt, className, isPro = false, l
       return;
     }
 
-    const img = new Image();
+    const img = new window.Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = canvasRef.current;
@@ -92,19 +94,21 @@ export default function WatermarkedImage({ src, alt, className, isPro = false, l
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Failed to load image</p>
         </div>
       ) : (
-        <motion.div layoutId={layoutId} className="w-full h-full relative">
-          <img
+        <div className="w-full h-full relative">
+          <Image
             src={watermarkedSrc || src}
-            alt={alt}
+            alt={alt || "Image"}
+            unoptimized={!!watermarkedSrc}
+            fill
             className={cn(
-              className,
-              "transition-opacity duration-500",
+              "object-cover transition-opacity duration-500",
               loading ? 'opacity-0' : 'opacity-100'
             )}
             draggable={false}
             onContextMenu={(e) => e.preventDefault()}
+            referrerPolicy="no-referrer"
           />
-        </motion.div>
+        </div>
       )}
     </div>
   );

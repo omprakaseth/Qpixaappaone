@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Sora } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import OverlayManager from "@/components/OverlayManager";
 
 const sora = Sora({ subsets: ["latin"], weight: ['400', '600'] });
 
@@ -37,7 +38,10 @@ export default function RootLayout({
         />
       </head>
       <body className={sora.className}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <OverlayManager />
+        </Providers>
       </body>
     </html>
   );

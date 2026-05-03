@@ -360,10 +360,26 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         )}
 
         {activeCategory === 'Following' && feedItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-60 text-muted-foreground">
+          <div className="flex flex-col items-center justify-center h-60 text-muted-foreground animate-in fade-in zoom-in duration-300">
             <Users size={40} className="mb-3 opacity-40" />
             <p className="text-sm font-semibold text-foreground">Following Feed</p>
             <p className="text-xs text-center mt-1 px-8">Follow creators from their profile to see their posts here</p>
+          </div>
+        ) : feedItems.length === 0 && !initialLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in zoom-in duration-500">
+            <div className="w-20 h-20 rounded-full bg-secondary flex items-center justify-center mb-4">
+              <Sparkles size={32} className="text-muted-foreground opacity-30" />
+            </div>
+            <h3 className="text-lg font-bold text-foreground">No posts found</h3>
+            <p className="text-sm text-muted-foreground mt-1 px-10 max-w-sm">
+              We couldn't find any posts. Try switching back to Trending.
+            </p>
+            <button
+              onClick={() => setActiveCategory('Trending')}
+              className="mt-6 px-6 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold active:scale-95 transition-transform"
+            >
+              Back to Trending
+            </button>
           </div>
         ) : (
           <div ref={containerRef} className="w-full">

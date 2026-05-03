@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["framer-motion", "next-themes"],
+  transpilePackages: ["framer-motion", "next-themes", "recharts", "lucide-react", "@google/genai"],
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -21,6 +21,14 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: '*.supabase.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.gstatic.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
       },
     ],
     unoptimized: true,

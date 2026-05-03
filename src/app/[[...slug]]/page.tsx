@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { usePathname, useRouter, useParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-
+import { useRouter, useParams } from 'next/navigation';
+import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
 import { SEO } from '@/components/SEO';
 import BottomNav from '@/components/BottomNav';
@@ -14,23 +13,15 @@ import FavoritesScreen from '@/screens/FavoritesScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import ShortsScreen from '@/screens/ShortsScreen';
 import NotificationScreen from '@/screens/NotificationScreen';
-import PostDetail from '@/screens/PostDetail';
-import CreatePost from '@/screens/CreatePost';
-import SettingsScreen from '@/screens/SettingsScreen';
-import SubscriptionScreen from '@/screens/SubscriptionScreen';
-import AuthScreen from '@/screens/AuthScreen';
-import CreatorProfileOverlay from '@/components/profile/CreatorProfileOverlay';
-import BannerAd from '@/components/ads/BannerAd';
-import RewardButton from '@/components/ads/RewardButton';
-import RewardedAdModal from '@/components/ads/RewardedAdModal';
-import { useSmartScroll } from '@/hooks/useSmartScroll';
-import { useAdSettings } from '@/hooks/useAdSettings';
-import { Post } from '@/types';
 import { Bell } from 'lucide-react';
 import { generatePromptMeta } from '@/lib/seo-utils';
 import { useAppNavigation } from '@/hooks/useAppNavigation';
-
-export const dynamic = 'force-dynamic';
+import { useSmartScroll } from '@/hooks/useSmartScroll';
+import { useAdSettings } from '@/hooks/useAdSettings';
+import BannerAd from '@/components/ads/BannerAd';
+import RewardButton from '@/components/ads/RewardButton';
+import RewardedAdModal from '@/components/ads/RewardedAdModal';
+import { Post } from '@/types';
 
 export default function CatchAllPage() {
   const { navigateBack, navigateToTab, activePath: pathname } = useAppNavigation();
@@ -44,30 +35,38 @@ export default function CatchAllPage() {
     }
   }, []);
 
-  const activeTab = useMemo(() => {
-    if (pathname === '/market') return 'discover';
-    if (pathname === '/shorts') return 'shorts';
-    if (pathname === '/studio') return 'studio';
-    if (pathname === '/notifications') return 'notifications';
-    if (pathname === '/favorites') return 'favorites';
-    if (pathname === '/profile') return 'profile';
-    return 'home';
+  const [baseTab, setBaseTab] = useState<'home' | 'discover' | 'shorts' | 'studio' | 'notifications' | 'favorites' | 'profile'>('home');
+
+  useEffect(() => {
+    const mainTabs: Record<string, typeof baseTab> = {
+      '/': 'home',
+      '/market': 'discover',
+      '/shorts': 'shorts',
+      '/studio': 'studio',
+      '/notifications': 'notifications',
+      '/favorites': 'favorites',
+      '/profile': 'profile'
+    };
+    if (mainTabs[pathname]) {
+      setBaseTab(mainTabs[pathname]);
+    }
   }, [pathname]);
 
-  const { posts, isPro, isLoggedIn, user, profile, fetchPostById } = useAppState();
+  const activeTab = baseTab;
+
+  const { 
+    posts, isPro, isLoggedIn, user, profile, fetchPostById, 
+    selectedPost, setSelectedPost, 
+    viewingCreator, setViewingCreator,
+    setShowCreatePost, setCreatePostData,
+    setShowSettings, setShowSubscription, 
+    setShowAuth, setAuthMode
+  } = useAppState();
   const { settings: adSettings } = useAdSettings();
   
   const [showRewardAd, setShowRewardAd] = useState(false);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [showCreatePost, setShowCreatePost] = useState(false);
-  const [createPostData, setCreatePostData] = useState<{ imageUrl?: string; prompt?: string }>({});
-  const [showSettings, setShowSettings] = useState(false);
-  const [showSubscription, setShowSubscription] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [studioPrompt, setStudioPrompt] = useState('');
-  const [viewingCreator, setViewingCreator] = useState<string | null>(null);
 
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
@@ -89,135 +88,35 @@ export default function CatchAllPage() {
     }
   }, []);
 
-  // Ref to track planned navigation to prevent sync logic from fighting it
-  const pendingNavigationRef = useRef<{ type: 'prompt' | 'creator'; id: string } | null>(null);
-  const navigationLockRef = useRef<boolean>(false);
-
-  // Sync state with URL only if not already matched
-  useEffect(() => {
-    const syncWithUrl = async () => {
-      // Use activePath from useAppNavigation to avoid stale closures
-      const pathParts = pathname.split('/').filter(Boolean);
-      const urlType = pathParts[0];
-      const urlId = pathParts[1];
-
-      const isPromptUrl = urlType === 'prompt' && !!urlId;
-      const isCreatorUrl = urlType === 'creator' && !!urlId;
-
-      // 1. Handle Prompt URL
-      if (isPromptUrl) {
-        // Clear creator if switching to prompt
-        if (viewingCreator) setViewingCreator(null);
-
-        // If we are already showing this post, do nothing
-        if (selectedPost && selectedPost.id === urlId) {
-          pendingNavigationRef.current = null;
-          return;
-        }
-        
-        // If we just manually navigated to this post, update the ref and stop
-        if (pendingNavigationRef.current?.type === 'prompt' && pendingNavigationRef.current?.id === urlId) {
-          pendingNavigationRef.current = null;
-          return;
-        }
-
-        const post = posts.find(p => p.id === urlId);
-        if (post) {
-          setSelectedPost(post);
-        } else {
-          try {
-            const fetched = await fetchPostById(urlId);
-            if (fetched) setSelectedPost(fetched);
-          } catch (e) {
-            console.error("Failed to fetch post for URL sync", e);
-          }
-        }
-      } else if (isCreatorUrl) {
-        // 2. Handle Creator URL
-        // Clear prompt if switching to creator
-        if (selectedPost) setSelectedPost(null);
-
-        if (viewingCreator === urlId) {
-          pendingNavigationRef.current = null;
-          return;
-        }
-        
-        if (pendingNavigationRef.current?.type === 'creator' && pendingNavigationRef.current?.id === urlId) {
-          pendingNavigationRef.current = null;
-          return;
-        }
-
-        setViewingCreator(urlId);
-      } else if (!pendingNavigationRef.current) {
-        // 3. Neither prompt nor creator, and no pending navigation
-        if (selectedPost) setSelectedPost(null);
-        if (viewingCreator) setViewingCreator(null);
-      }
-    };
-
-    syncWithUrl();
-  }, [pathname, posts, fetchPostById]); // Removed selectedPost/viewingCreator from dependencies to avoid loop/flicker
-
   const goBack = useCallback((e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    
-    // Check if we are on an overlay route
-    const pathParts = pathname.split('/').filter(Boolean);
-    const isOverlay = pathParts[0] === 'prompt' || pathParts[0] === 'creator';
-    
-    if (isOverlay) {
-      router.back();
-    } else if (showSettings) {
-      setShowSettings(false);
-    } else if (showSubscription) {
-      setShowSubscription(false);
-    } else if (showAuth) {
-      setShowAuth(false);
-    } else if (showCreatePost) {
-      setShowCreatePost(false);
-    } else {
-      navigateBack();
-    }
-  }, [pathname, router, navigateBack, showSettings, showSubscription, showAuth, showCreatePost]);
+    navigateBack();
+  }, [navigateBack]);
 
   const openPost = useCallback((post: Post) => {
-    if (navigationLockRef.current) return;
-    navigationLockRef.current = true;
-    
-    // Set the planned navigation first
-    pendingNavigationRef.current = { type: 'prompt', id: post.id };
-    
-    // Optimistically set state to start animation immediately
     setSelectedPost(post);
-    
-    // Push the URL
     router.push(`/prompt/${post.id}`, { scroll: false });
-    
-    // Lock for a short time to prevent multiple clicks
-    setTimeout(() => {
-      navigationLockRef.current = false;
-    }, 500);
-  }, [router]);
+  }, [router, setSelectedPost]);
 
   const openCreatePost = useCallback(() => {
     setShowCreatePost(true);
-  }, []);
+  }, [setShowCreatePost]);
 
   const openSettings = useCallback(() => {
     setShowSettings(true);
-  }, []);
+  }, [setShowSettings]);
 
   const openSubscription = useCallback(() => {
     setShowSubscription(true);
-  }, []);
+  }, [setShowSubscription]);
 
   const openAuth = useCallback((mode: 'login' | 'signup') => {
     setAuthMode(mode);
     setShowAuth(true);
-  }, []);
+  }, [setAuthMode, setShowAuth]);
 
   const scrollToTopRef = useRef<() => void>(() => {});
   const handleTabChange = useCallback((tab: string) => {
@@ -229,22 +128,14 @@ export default function CatchAllPage() {
   }, [activeTab, navigateToTab]);
 
   const openCreator = useCallback((creatorName: string, creatorId?: string) => {
-    if (navigationLockRef.current) return;
     const targetId = creatorId || creatorName;
     if (user && targetId === user.id) {
       handleTabChange('profile');
       return;
     }
-    navigationLockRef.current = true;
-    pendingNavigationRef.current = { type: 'creator', id: targetId };
-    
     setViewingCreator(targetId);
     router.push(`/creator/${targetId}`, { scroll: false });
-    
-    setTimeout(() => {
-      navigationLockRef.current = false;
-    }, 500);
-  }, [user, handleTabChange, router]);
+  }, [user, handleTabChange, router, setViewingCreator]);
 
   const smartScrollEnabled = activeTab === 'home' || activeTab === 'discover' || activeTab === 'favorites' || activeTab === 'profile';
   const { visible: navVisible, scrollRef } = useSmartScroll(smartScrollEnabled);
@@ -301,7 +192,7 @@ export default function CatchAllPage() {
     setStudioPrompt(prompt);
     setSelectedPost(null);
     router.push('/studio');
-  }, [router]);
+  }, [router, setSelectedPost]);
 
   const screens = useMemo(() => {
     return {
@@ -332,7 +223,7 @@ export default function CatchAllPage() {
           onCreatorTap={openCreator}
         />
       ),
-      studio: isLoggedIn ? (
+      studio: (
         <StudioScreen
           initialPrompt={studioPrompt}
           onClearInitialPrompt={() => setStudioPrompt('')}
@@ -340,21 +231,9 @@ export default function CatchAllPage() {
             setCreatePostData({ imageUrl, prompt });
             openCreatePost();
           }}
+          isLoggedIn={isLoggedIn}
+          onOpenAuth={() => openAuth('login')}
         />
-      ) : (
-        <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-          </div>
-          <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
-          <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
-          <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-            Sign In
-          </button>
-          <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
-            Create Account
-          </button>
-        </div>
       ),
       notifications: isLoggedIn ? (
         <NotificationScreen />
@@ -373,10 +252,10 @@ export default function CatchAllPage() {
       favorites: <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />,
       profile: <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />
     };
-  }, [scrollRef, openPost, openCreatePost, openSubscription, openCreator, adSettings, isPro, navVisible, handleUsePrompt, openAuth, handleTabChange, isLoggedIn, studioPrompt, openSettings, profile]);
+  }, [scrollRef, openPost, openCreatePost, openSubscription, openCreator, adSettings, isPro, navVisible, handleUsePrompt, openAuth, handleTabChange, isLoggedIn, studioPrompt, setCreatePostData, openSettings, profile]);
 
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden bg-background flex flex-col">
+    <div className="h-full w-full bg-background flex flex-col">
       <SEO 
         title={seoMeta.title}
         description={seoMeta.description}
@@ -387,29 +266,25 @@ export default function CatchAllPage() {
       />
       <div className="flex-1 relative overflow-hidden">
         <div className="absolute inset-0">
-          {activeTab === 'home' && screens.home}
-          {activeTab === 'discover' && screens.discover}
+          <div className={cn("absolute inset-0", activeTab !== 'home' && "hidden")}>{screens.home}</div>
+          <div className={cn("absolute inset-0", activeTab !== 'discover' && "hidden")}>{screens.discover}</div>
           {activeTab === 'shorts' && screens.shorts}
-          {activeTab === 'studio' && screens.studio}
-          {activeTab === 'notifications' && screens.notifications}
-          {activeTab === 'favorites' && screens.favorites}
-          {activeTab === 'profile' && screens.profile}
+          <div className={cn("absolute inset-0", activeTab !== 'studio' && "hidden")}>{screens.studio}</div>
+          <div className={cn("absolute inset-0", activeTab !== 'notifications' && "hidden")}>{screens.notifications}</div>
+          <div className={cn("absolute inset-0", activeTab !== 'favorites' && "hidden")}>{screens.favorites}</div>
+          <div className={cn("absolute inset-0", activeTab !== 'profile' && "hidden")}>{screens.profile}</div>
         </div>
       </div>
 
       <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
 
-      {/* Banner Ad - free users only */}
+      {/* ads and popups */}
       {adSettings.enabled && adSettings.placementBanner && !isPro && navVisible && (
         <BannerAd publisherId={adSettings.adsensePublisherId} slotId={adSettings.adsenseBannerSlot} />
       )}
-
-      {/* Reward Ad Button - logged in free users */}
       {adSettings.enabled && adSettings.placementReward && !isPro && isLoggedIn && (
         <RewardButton onClick={() => setShowRewardAd(true)} />
       )}
-
-      {/* Rewarded Ad Modal */}
       <RewardedAdModal
         open={showRewardAd}
         onClose={() => {
@@ -424,8 +299,6 @@ export default function CatchAllPage() {
         rewardCredits={adSettings.rewardCredits}
         publisherId={adSettings.adsensePublisherId}
       />
-
-      {/* Smart Upgrade Popup */}
       {showUpgradePopup && !isPro && adSettings.enableSubscriptions && (
         <div className="fixed top-16 left-4 right-4 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
           <div className="bg-card border border-border rounded-2xl p-4 shadow-xl flex items-center gap-3">
@@ -436,94 +309,11 @@ export default function CatchAllPage() {
               <p className="text-sm font-bold text-foreground">Upgrade to Pro ✨</p>
               <p className="text-xs text-muted-foreground truncate">Unlimited generations, no ads, priority access</p>
             </div>
-            <button
-              onClick={() => {
-                setShowUpgradePopup(false);
-                openSubscription();
-              }}
-              className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold shrink-0"
-            >
-              Go Pro
-            </button>
-            <button
-              onClick={() => setShowUpgradePopup(false)}
-              className="p-1 shrink-0"
-            >
-              <XIcon />
-            </button>
+            <button onClick={() => { setShowUpgradePopup(false); openSubscription(); }} className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold shrink-0">Go Pro</button>
+            <button onClick={() => setShowUpgradePopup(false)} className="p-1 shrink-0"><XIcon /></button>
           </div>
         </div>
       )}
-
-      <AnimatePresence>
-        {selectedPost && (
-          <motion.div
-            key={`post-detail-wrapper-${selectedPost.id}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-sm px-0 sm:px-4"
-          >
-            <motion.div
-              key={`post-detail-content-${selectedPost.id}`}
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="w-full h-full sm:max-w-2xl sm:h-[90vh] sm:rounded-3xl bg-background overflow-hidden shadow-2xl relative"
-            >
-              <PostDetail
-                post={selectedPost}
-                onBack={goBack}
-                onUsePrompt={handleUsePrompt}
-                onCreatorTap={openCreator}
-                onPostTap={openPost}
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {viewingCreator && (
-          <motion.div
-            key={`creator-overlay-${viewingCreator}`}
-            initial={{ opacity: 0, x: '100%' }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed inset-0 z-[70]"
-          >
-            <CreatorProfileOverlay
-              creatorName={viewingCreator}
-              posts={posts}
-              onBack={goBack}
-              onPostTap={openPost}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {showCreatePost && (
-          <motion.div
-            initial={{ opacity: 0, y: '100%' }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed inset-0 z-[70]"
-          >
-            <CreatePost
-              onBack={goBack}
-              initialImageUrl={createPostData.imageUrl}
-              initialPrompt={createPostData.prompt}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {showSettings && <SettingsScreen onBack={goBack} />}
-      {showSubscription && <SubscriptionScreen onBack={goBack} />}
-      {showAuth && <AuthScreen onBack={goBack} initialMode={authMode} />}
     </div>
   );
 }

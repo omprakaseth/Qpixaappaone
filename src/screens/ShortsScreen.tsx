@@ -26,6 +26,15 @@ import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { LogoLoader } from '@/components/LogoLoader';
 import { getEnv } from '@/lib/env';
+import { useAppState } from '@/context/AppContext';
+
+interface Comment {
+  id: string;
+  username: string;
+  avatar: string;
+  text: string;
+  createdAt: string;
+}
 
 interface Reel {
   id: string;
@@ -82,6 +91,7 @@ interface ShortsScreenProps {
 }
 
 export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps) {
+  const { setCreatePostData, user } = useAppState();
   const [viewMode, setViewMode] = useState<'Shorts' | 'Following'>('Shorts');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [reels, setReels] = useState<Reel[]>([]);
@@ -93,6 +103,45 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
   useEffect(() => {
     fetchReels();
   }, []);
+
+  const [activeComments, setActiveComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
+
+  useEffect(() => {
+    if (showComments) {
+      // Mock loading comments for the active reel
+      setActiveComments([
+        { id: '1', username: 'ai_guru', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guru', text: 'This generation is insane! 🔥', createdAt: '2h ago' },
+        { id: '2', username: 'pixel_perfect', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=pixel', text: 'What model did you use for this?', createdAt: '5h ago' },
+      ]);
+    }
+  }, [showComments]);
+
+  const handlePostComment = () => {
+    if (!newComment.trim()) return;
+    const comment: Comment = {
+      id: Date.now().toString(),
+      username: user?.user_metadata?.username || 'You',
+      avatar: user?.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.id}`,
+      text: newComment,
+      createdAt: 'Just now'
+    };
+    setActiveComments(prev => [comment, ...prev]);
+    setNewComment('');
+    toast.success('Comment posted!');
+  };
+
+  const handleRemix = (reel: Reel) => {
+    // Navigate to Studio with the reel's prompt
+    // In our app structure, we set the context data and navigate
+    setCreatePostData({ prompt: reel.prompt });
+    // Find the way to trigger navigation to Studio
+    // Based on OverlayManager, we use useAppState to set states or just router push
+    // For now, we'll use a local toast and assume the user will navigate
+    toast.success('Prompt copied to Studio! Go there to remix.');
+    // If we had a direct navigate function, we'd use it here.
+    // window.history.pushState({}, '', '/studio');
+  };
 
   const fetchReels = async () => {
     try {
@@ -240,6 +289,7 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
                 setReels(newReels);
               }}
               onShowComments={() => setShowComments(true)}
+              onRemix={handleRemix}
               onCreatorTap={onCreatorTap}
               onBack={onBack}
             />
@@ -269,21 +319,44 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="flex flex-col items-center justify-center h-40 text-white/40">
-                <MessageSquare size={32} className="mb-3 opacity-20" />
-                <p className="text-sm font-medium">No comments yet</p>
-                <p className="text-xs mt-1">Be the first to share your thoughts!</p>
-              </div>
+              {activeComments.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-white/40">
+                  <MessageSquare size={32} className="mb-3 opacity-20" />
+                  <p className="text-sm font-medium">No comments yet</p>
+                  <p className="text-xs mt-1">Be the first to share your thoughts!</p>
+                </div>
+              ) : (
+                activeComments.map(comment => (
+                  <div key={comment.id} className="flex gap-4">
+                    <img src={comment.avatar} alt={comment.username} className="w-10 h-10 rounded-full flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-white">@{comment.username}</span>
+                        <span className="text-[10px] text-white/40">{comment.createdAt}</span>
+                      </div>
+                      <p className="text-sm text-white/80 leading-relaxed">{comment.text}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="p-4 border-t border-white/5 bg-zinc-950 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3 border border-white/5">
                 <input 
                   type="text" 
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a comment..." 
                   className="flex-1 bg-transparent text-sm text-white placeholder:text-white/30 outline-none"
+                  onKeyDown={e => e.key === 'Enter' && handlePostComment()}
                 />
-                <button className="text-primary text-sm font-bold active:scale-95 transition-transform">Post</button>
+                <button 
+                  onClick={handlePostComment}
+                  className="text-primary text-sm font-bold active:scale-95 transition-transform"
+                >
+                  Post
+                </button>
               </div>
             </div>
           </Drawer.Content>
@@ -298,11 +371,12 @@ interface VideoItemProps {
   isActive: boolean;
   onUpdateReel: (reel: Reel) => void;
   onShowComments: () => void;
+  onRemix: (reel: Reel) => void;
   onCreatorTap?: (username: string) => void;
   onBack?: () => void;
 }
 
-const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onShowComments, onCreatorTap, onBack }) => {
+const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onShowComments, onRemix, onCreatorTap, onBack }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState(0);
   const [isLiked, setIsLiked] = useState(reel.isLiked);
@@ -573,7 +647,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
                 {reel.prompt && (
                   <div className="flex flex-col items-center gap-1">
                     <button 
-                      onClick={() => toast.success('Analyzing content to generate similar...')}
+                      onClick={() => onRemix(reel)}
                       className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
                     >
                       <Sparkles className="w-6 h-6 text-primary drop-shadow-md group-hover:text-primary/80" />
@@ -690,14 +764,30 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
               <div className="grid grid-cols-1 gap-1">
                 <button 
                   onClick={() => {
-                    setIsSaved(!isSaved);
-                    onUpdateReel({ ...reel, isSaved: !isSaved });
+                    const newSavedState = !isSaved;
+                    setIsSaved(newSavedState);
+                    onUpdateReel({ ...reel, isSaved: newSavedState });
                     setIsMoreMenuOpen(false);
+                    toast.success(newSavedState ? 'Saved to collection!' : 'Removed from collection');
+                    
+                    // Background sync
+                    if (!reel.id.startsWith('mock-') && !isPlaceholder) {
+                      (async () => {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        if (user) {
+                          if (newSavedState) {
+                            await supabase.from('favorites').insert({ user_id: user.id, image_url: reel.videoUrl, prompt: reel.description });
+                          } else {
+                            await supabase.from('favorites').delete().match({ user_id: user.id, image_url: reel.videoUrl });
+                          }
+                        }
+                      })();
+                    }
                   }}
                   className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-white transition-colors"
                 >
                   <Bookmark className={cn("w-6 h-6", isSaved && "fill-white")} />
-                  <span className="font-bold">Save to Collection</span>
+                  <span className="font-bold">{isSaved ? 'Saved' : 'Save to Collection'}</span>
                 </button>
                 
                 <button className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-white transition-colors">

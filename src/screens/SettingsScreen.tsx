@@ -12,6 +12,7 @@ interface SettingsScreenProps {
 type ThemeMode = 'dark' | 'light' | 'system';
 
 function applyTheme(mode: ThemeMode) {
+  if (typeof window === 'undefined') return;
   const root = document.documentElement;
   let effectiveTheme: 'dark' | 'light' = 'dark';
 
@@ -31,6 +32,7 @@ function applyTheme(mode: ThemeMode) {
 }
 
 function getStoredTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'dark';
   return (localStorage.getItem('qpixa-theme') as ThemeMode) || 'dark';
 }
 
@@ -58,10 +60,22 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [showTheme, setShowTheme] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem('qpixa-notif') !== 'false');
-  const [activityStatus, setActivityStatus] = useState(() => localStorage.getItem('qpixa-activity') !== 'false');
-  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => (localStorage.getItem('qpixa-visibility') as any) || 'public');
-  const [language, setLanguage] = useState(() => localStorage.getItem('qpixa-lang') || 'en');
+  const [notifEnabled, setNotifEnabled] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('qpixa-notif') !== 'false';
+  });
+  const [activityStatus, setActivityStatus] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('qpixa-activity') !== 'false';
+  });
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => {
+    if (typeof window === 'undefined') return 'public';
+    return (localStorage.getItem('qpixa-visibility') as any) || 'public';
+  });
+  const [language, setLanguage] = useState(() => {
+    if (typeof window === 'undefined') return 'en';
+    return localStorage.getItem('qpixa-lang') || 'en';
+  });
   
   // PWA Install
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
