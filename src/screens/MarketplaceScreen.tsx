@@ -1,15 +1,13 @@
-"use client";
 import React, { useState, useEffect, useRef } from 'react';
-import Image from 'next/image';
 import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
-import { X, Clock, ShoppingCart, ArrowLeft, Trash2, Search, SlidersHorizontal, ChevronRight, Star, ChevronDown, Coins, Plus, Bell, Menu } from 'lucide-react';
+import { X, Clock, ShoppingCart, ArrowLeft, Trash2 } from 'lucide-react';
+import { Search, SlidersHorizontal, ChevronRight, Star, ChevronDown, Coins, Plus, Bell, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { useAppState } from '@/context/AppContext';
 import { useCart } from '@/hooks/useCart';
 import { LogoLoader } from '@/components/LogoLoader';
-import { getEnv } from '@/lib/env';
 import PromptDetailSheet from '@/components/marketplace/PromptDetailSheet';
 import SellPromptSheet from '@/components/marketplace/SellPromptSheet';
 import MarketplaceFilterPanel, { defaultFilters, type MarketplaceFilters } from '@/components/marketplace/MarketplaceFilterPanel';
@@ -109,8 +107,13 @@ const MOCK_MARKETPLACE_PROMPTS: MarketplacePrompt[] = [
 ];
 
 export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true }: MarketplaceScreenProps) {
+  const [topHeaderHeight, setTopHeaderHeight] = useState(52);
+  const [stickySectionHeight, setStickySectionHeight] = useState(96);
   const [isMounted, setIsMounted] = useState(false);
+  const [showTopHeader, setShowTopHeader] = useState(true);
   const lastScrollY = useRef(0);
+  const topHeaderRef = useRef<HTMLDivElement>(null);
+  const stickySectionRef = useRef<HTMLDivElement>(null);
   const { isLoggedIn, credits, refreshProfile } = useAppState();
   const { items: cartItems, addToCart, removeFromCart, isInCart, count: cartCount } = useCart();
   const [search, setSearch] = useState('');
@@ -198,8 +201,6 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     setIsMounted(true);
   }, []);
 
-  const [showTopHeader, setShowTopHeader] = useState(true);
-
   useEffect(() => {
     const el = scrollRef?.current;
     if (!el) return;
@@ -208,7 +209,6 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       const currentScrollY = el.scrollTop;
       if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
 
-      // Hide top row on scroll down (> 60px), show on scroll up
       if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
         setShowTopHeader(false);
       } else {
@@ -221,6 +221,22 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     return () => el.removeEventListener('scroll', handleScroll);
   }, [scrollRef]);
 
+  useEffect(() => {
+    if (!topHeaderRef.current || !stickySectionRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        if (entry.target === topHeaderRef.current) {
+          setTopHeaderHeight(entry.contentRect.height + (showTopHeader ? 8 : 0));
+        } else if (entry.target === stickySectionRef.current) {
+          setStickySectionHeight(entry.contentRect.height);
+        }
+      }
+    });
+    observer.observe(topHeaderRef.current);
+    observer.observe(stickySectionRef.current);
+    return () => observer.disconnect();
+  }, [showTopHeader]);
+
   // Filter
   const filtered = prompts.filter(p => {
     if (search) {
@@ -232,6 +248,8 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     if (filters.model !== 'all' && p.model_type !== filters.model) return false;
     return true;
   });
+
+  // Sort
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'popular') return b.sales_count - a.sales_count;
     if (sortBy === 'rating') return b.rating - a.rating;
@@ -274,43 +292,9 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
     }
   };
 
-  const handlePurchaseAll = async () => {
-    if (!isLoggedIn) {
-      onOpenAuth?.('login');
-      return;
-    }
-    if (cartItems.length === 0) return;
-
-    const totalCost = cartItems.reduce((s, i) => s + (i.prompt?.price || 0), 0);
-    if (credits < totalCost) {
-      toast.error('Insufficient credits for entire cart');
-      return;
-    }
-
-    const toastId = toast.loading('Purchasing cart items...');
-    let successCount = 0;
-    
-    try {
-      for (const item of cartItems) {
-        const { data, error } = await supabase.rpc('purchase_prompt', { p_prompt_id: item.prompt_id });
-        if (!error && data === true) {
-          successCount++;
-          setPurchasedIds(prev => new Set(prev).add(item.prompt_id));
-        }
-      }
-      
-      await refreshProfile();
-      toast.success(`Successfully purchased ${successCount} items!`, { id: toastId });
-      setShowCart(false);
-    } catch (err) {
-      console.error('Batch purchase error', err);
-      toast.error('Some items failed to purchase', { id: toastId });
-    }
-  };
-
   const handleUsePrompt = async (prompt: MarketplacePrompt) => {
     // If it's a mock prompt, just return a mock text
-    if (prompt.id.startsWith('mock-') || isPlaceholder) {
+    if (prompt.id.startsWith('mock-') || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !import.meta.env.VITE_SUPABASE_URL) {
       onUsePrompt?.(`A detailed prompt for ${prompt.title}, featuring high quality elements and cinematic lighting.`);
       return;
     }
@@ -332,16 +316,19 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       ref={scrollRef} 
       className="h-full overflow-y-auto bg-background scrollbar-hide"
     >
-      {/* Header Container - Smooth sliding */}
+      {/* Header Container - Smart Sliding */}
       <div 
-        className={cn(
-          "fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-border/50 transition-all duration-300 ease-in-out",
-          !showTopHeader ? "-translate-y-[52px]" : "translate-y-0"
-        )}
-        style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}
+        className="fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out bg-background/95 backdrop-blur-md border-b border-border/50"
+        style={{ 
+          transform: showTopHeader ? 'translateY(0)' : `translateY(-${topHeaderHeight}px)`
+        }}
       >
-        {/* Row 1: Title & Actions (This row slides out) */}
-        <div className="px-4 flex items-center justify-between h-[52px]">
+        {/* Row 1: Title & Actions (This row hides) */}
+        <div 
+          ref={topHeaderRef}
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
+        >
           <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
           <div className="flex items-center gap-2">
             {isLoggedIn && (
@@ -380,7 +367,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
           </div>
         </div>
 
-        {/* Row 2: Search bar (This moves to top) */}
+        {/* Row 2: Search bar */}
         <div className="px-4 py-2">
           <div className="relative flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">
             <Search size={16} className="text-muted-foreground mr-2" />
@@ -590,15 +577,11 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
               ) : (
                 cartItems.map(item => (
                   <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-secondary/50 border border-border">
-                    <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0">
-                      <Image
-                        src={item.prompt?.preview_image || '/placeholder.svg'}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
+                    <img
+                      src={item.prompt?.preview_image || '/placeholder.svg'}
+                      alt=""
+                      className="w-12 h-12 rounded-lg object-cover"
+                    />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{item.prompt?.title || 'Prompt'}</p>
                       <span className="flex items-center gap-0.5 text-xs font-bold text-primary">
@@ -624,10 +607,7 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
                     {cartItems.reduce((s, i) => s + (i.prompt?.price || 0), 0)}
                   </span>
                 </div>
-                <button 
-                  onClick={handlePurchaseAll}
-                  className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.97] transition-transform"
-                >
+                <button className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.97] transition-transform">
                   Purchase All
                 </button>
               </div>
@@ -699,15 +679,8 @@ const PromptPackCard: React.FC<{
       {/* Multi-image grid preview */}
       <div className="relative h-[70%] w-full overflow-hidden flex flex-row rounded-t-[20px]" onContextMenu={(e) => e.preventDefault()}>
         {imgs.map((img, i) => (
-          <div key={i} className="flex-1 overflow-hidden border-r border-background/20 last:border-r-0 relative">
-            <Image 
-              src={img} 
-              alt="" 
-              fill
-              className="object-cover pointer-events-none" 
-              loading="lazy" 
-              referrerPolicy="no-referrer"
-            />
+          <div key={i} className="flex-1 overflow-hidden border-r border-background/20 last:border-r-0">
+            <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
           </div>
         ))}
 

@@ -1,9 +1,6 @@
-"use client";
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AppContext } from '@/context/AppContext';
-import { getEnv } from '@/lib/env';
 import { toast } from 'sonner';
 
 interface Notification {
@@ -107,10 +104,10 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           });
 
           // Also trigger native notification if permission granted
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          if (Notification.permission === 'granted') {
             new Notification(newNotif.title, {
               body: newNotif.message,
-              icon: '/pwa-icon-192.png'
+              icon: '/icons/icon-192x192.png'
             });
           }
         }
@@ -167,7 +164,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const vapidPublicKey = getEnv('VITE_VAPID_PUBLIC_KEY');
+      const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
       
       if (!vapidPublicKey) {
         console.warn('VITE_VAPID_PUBLIC_KEY is not set. Push subscription skipped.');

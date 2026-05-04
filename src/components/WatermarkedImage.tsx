@@ -1,21 +1,15 @@
-"use client";
 import { useEffect, useRef, useState } from 'react';
 import { useWatermarkSettings } from '@/hooks/useWatermarkSettings';
 import { cn } from '@/lib/utils';
-
-import { motion } from 'framer-motion';
-
-import Image from 'next/image';
 
 interface WatermarkedImageProps {
   src: string;
   alt?: string;
   className?: string;
   isPro?: boolean;
-  layoutId?: string;
 }
 
-export default function WatermarkedImage({ src, alt, className, isPro = false, layoutId }: WatermarkedImageProps) {
+export default function WatermarkedImage({ src, alt, className, isPro = false }: WatermarkedImageProps) {
   const watermark = useWatermarkSettings();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [watermarkedSrc, setWatermarkedSrc] = useState<string | null>(null);
@@ -25,7 +19,7 @@ export default function WatermarkedImage({ src, alt, className, isPro = false, l
   useEffect(() => {
     if (!watermark.enabled || isPro) {
       // For non-watermarked images, we still want to track loading state
-      const img = new window.Image();
+      const img = new Image();
       img.onload = () => {
         setWatermarkedSrc(null);
         setLoading(false);
@@ -38,7 +32,7 @@ export default function WatermarkedImage({ src, alt, className, isPro = false, l
       return;
     }
 
-    const img = new window.Image();
+    const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = canvasRef.current;
@@ -94,21 +88,17 @@ export default function WatermarkedImage({ src, alt, className, isPro = false, l
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Failed to load image</p>
         </div>
       ) : (
-        <div className="w-full h-full relative">
-          <Image
-            src={watermarkedSrc || src}
-            alt={alt || "Image"}
-            unoptimized={!!watermarkedSrc}
-            fill
-            className={cn(
-              "object-cover transition-opacity duration-500",
-              loading ? 'opacity-0' : 'opacity-100'
-            )}
-            draggable={false}
-            onContextMenu={(e) => e.preventDefault()}
-            referrerPolicy="no-referrer"
-          />
-        </div>
+        <img
+          src={watermarkedSrc || src}
+          alt={alt}
+          className={cn(
+            className,
+            "transition-opacity duration-500",
+            loading ? 'opacity-0' : 'opacity-100'
+          )}
+          draggable={false}
+          onContextMenu={(e) => e.preventDefault()}
+        />
       )}
     </div>
   );

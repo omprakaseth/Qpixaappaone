@@ -1,4 +1,3 @@
-"use client";
 import React, { useRef, useCallback, useState } from 'react';
 
 interface UseSwipeDismissOptions {

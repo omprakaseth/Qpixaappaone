@@ -230,7 +230,7 @@ export default function AdminDashboard({ onNavigate }: DashboardProps) {
             <div key={u.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-secondary/50">
               <div className="flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold text-foreground overflow-hidden">
-                  {u.avatar_url ? <img src={u.avatar_url} alt={u.username || 'User'} className="w-full h-full object-cover" /> : (u.display_name || '?')[0]?.toUpperCase()}
+                  {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" /> : (u.display_name || '?')[0]?.toUpperCase()}
                 </div>
                 <div>
                   <p className="text-xs font-medium text-foreground">{u.display_name || u.username || 'Unknown'}</p>

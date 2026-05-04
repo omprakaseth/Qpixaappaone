@@ -1,10 +1,9 @@
-"use client";
 import React, { useState, useRef, useCallback } from 'react';
 import { X, Download, Share2, Bookmark, RotateCcw, Upload, MessageSquare, Info } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import { useAppState } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ImageViewerProps {
   src: string;

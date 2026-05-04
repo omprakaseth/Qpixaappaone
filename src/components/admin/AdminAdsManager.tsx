@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Save } from 'lucide-react';
@@ -8,12 +8,13 @@ export default function AdminAdsManager({ setHasUnsavedChanges }: { setHasUnsave
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const fetchSettings = useCallback(async () => {
-    const keys = [
-      'enable_ads', 'ad_frequency', 'ad_reward_credits',
-      'ad_placement_feed', 'ad_placement_banner', 'ad_placement_reward',
-      'adsense_publisher_id', 'adsense_feed_slot', 'adsense_banner_slot',
-    ];
+  const keys = [
+    'enable_ads', 'ad_frequency', 'ad_reward_credits',
+    'ad_placement_feed', 'ad_placement_banner', 'ad_placement_reward',
+    'adsense_publisher_id', 'adsense_feed_slot', 'adsense_banner_slot',
+  ];
+
+  const fetchSettings = async () => {
     const { data } = await supabase.from('admin_settings').select('key, value').in('key', keys);
     if (data) {
       const m: Record<string, string> = {};
@@ -21,9 +22,9 @@ export default function AdminAdsManager({ setHasUnsavedChanges }: { setHasUnsave
       setSettings(m);
     }
     setLoading(false);
-  }, []);
+  };
 
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  useEffect(() => { fetchSettings(); }, []);
 
   const updateSetting = async (key: string, value: string) => {
     const { error } = await supabase.from('admin_settings').update({ value }).eq('key', key);

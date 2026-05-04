@@ -1,7 +1,6 @@
-"use client";
 import React from 'react';
 import { X, Trophy, Medal, Crown, TrendingUp, User } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface LeaderboardOverlayProps {
   open: boolean;

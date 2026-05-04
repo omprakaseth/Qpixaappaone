@@ -1,5 +1,5 @@
-"use client";
-import React, { useEffect } from 'react';
+import React from 'react';
+import { Helmet } from 'react-helmet-async';
 
 interface SEOProps {
   title?: string;
@@ -13,6 +13,7 @@ interface SEOProps {
 
 const DEFAULT_TITLE = 'Qpixa - High Quality AI Image Generation & Marketplace';
 const DEFAULT_DESCRIPTION = 'Create, share, and discover amazing AI-generated images with Qpixa. The ultimate marketplace for AI prompts and art.';
+const DEFAULT_IMAGE = 'https://www.qpixa.in/og-image.png'; // Fallback image
 const SITE_URL = 'https://www.qpixa.in';
 
 export const SEO: React.FC<SEOProps> = ({
@@ -26,23 +27,32 @@ export const SEO: React.FC<SEOProps> = ({
 }) => {
   const fullTitle = title ? `${title} | Qpixa` : DEFAULT_TITLE;
   const metaDescription = description || DEFAULT_DESCRIPTION;
-  
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.title = fullTitle;
-      
-      // Update meta description
-      let descMeta = document.querySelector('meta[name="description"]');
-      if (descMeta) {
-        descMeta.setAttribute('content', metaDescription);
-      } else {
-        descMeta = document.createElement('meta');
-        descMeta.setAttribute('name', 'description');
-        descMeta.setAttribute('content', metaDescription);
-        document.head.appendChild(descMeta);
-      }
-    }
-  }, [fullTitle, metaDescription]);
+  const metaImage = image || DEFAULT_IMAGE;
+  const fullCanonical = canonical ? `${SITE_URL}${canonical}` : SITE_URL;
 
-  return null; // Next.js handles head tags via metadata API in layout/page. This side effect is a fallback.
+  return (
+    <Helmet>
+      {/* Basic Meta Tags */}
+      <title>{fullTitle}</title>
+      <meta name="description" content={metaDescription} />
+      {noindex && <meta name="robots" content="noindex, nofollow" />}
+      {!noindex && <meta name="robots" content="index, follow" />}
+      <link rel="canonical" href={fullCanonical} />
+      {keywords.length > 0 && <meta name="keywords" content={keywords.join(', ')} />}
+
+      {/* Open Graph / Facebook */}
+      <meta property="og:type" content={type} />
+      <meta property="og:title" content={fullTitle} />
+      <meta property="og:description" content={metaDescription} />
+      <meta property="og:image" content={metaImage} />
+      <meta property="og:url" content={fullCanonical} />
+      <meta property="og:site_name" content="Qpixa" />
+
+      {/* Twitter */}
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={fullTitle} />
+      <meta name="twitter:description" content={metaDescription} />
+      <meta name="twitter:image" content={metaImage} />
+    </Helmet>
+  );
 };

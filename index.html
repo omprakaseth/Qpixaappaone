@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Qpixa - Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community for digital artists." />
+    <meta name="keywords" content="AI, Image Generator, Video Generator, AI Art, Qpixa, AI Community, Digital Art, Prompt Engineering" />
+    <meta name="author" content="Qpixa" />
+    <link rel="canonical" href="https://www.qpixa.in" />
+    
+    <!-- Google Search Console Verification -->
+    <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE_HERE" />
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:site_name" content="Qpixa" />
+    <meta property="og:title" content="Qpixa - AI Image & Video Generator | Creative Community" />
+    <meta property="og:description" content="Create, share, and remix stunning AI-generated images and videos. Join the ultimate AI creative community today." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.qpixa.in" />
+    <meta property="og:image" content="/android-chrome-512x512.png" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Qpixa - AI Image & Video Generator" />
+    <meta name="twitter:description" content="Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community." />
+    <meta name="twitter:image" content="/android-chrome-512x512.png" />
+    
+    <!-- PWA Icons & Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="msapplication-TileColor" content="#da532c" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Qpixa" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Qpixa" />
+    <meta name="msapplication-TileImage" content="/android-chrome-512x512.png" />
+    
+    <!-- Structured Data for Sitelinks -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Qpixa",
+      "url": "https://www.qpixa.in/",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.qpixa.in/marketplace?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Qpixa",
+      "url": "https://www.qpixa.in/",
+      "logo": "https://www.qpixa.in/icons/pwa-icon-512-v4.png",
+      "sameAs": [
+        "https://twitter.com/qpixa",
+        "https://www.instagram.com/qpixa"
+      ]
+    }
+    </script>
+    
+    <title>Qpixa - AI Image & Video Generator</title>
+    <style>
+      #splash-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #000000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .splash-logo {
+        width: 120px;
+        height: auto;
+        filter: drop-shadow(0 0 15px rgba(123, 97, 255, 0.5));
+        animation: splash-pulse 2s ease-in-out infinite;
+      }
+      .splash-path {
+        stroke-dasharray: 500;
+        stroke-dashoffset: 500;
+        animation: splash-draw 1.5s cubic-bezier(0.4, 0, 0.2, 1) forwards, splash-glow 2s ease-in-out infinite 1.5s;
+      }
+      .flash-overlay {
+        position: absolute;
+        inset: 0;
+        background: white;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 10000;
+        animation: flash-anim 0.8s ease-out forwards;
+      }
+      @keyframes splash-draw {
+        to { stroke-dashoffset: 0; }
+      }
+      @keyframes splash-pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      @keyframes splash-glow {
+        0%, 100% { filter: drop-shadow(0 0 10px rgba(0, 229, 255, 0.4)); }
+        50% { filter: drop-shadow(0 0 25px rgba(123, 97, 255, 0.8)); }
+      }
+      @keyframes flash-anim {
+        0% { opacity: 0.8; }
+        100% { opacity: 0; }
+      }
+      .splash-text {
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-weight: 700;
+        margin-top: 24px;
+        font-size: 32px;
+        letter-spacing: -0.02em;
+        opacity: 0;
+        animation: fade-in 0.8s ease-out forwards 0.5s;
+      }
+      @keyframes fade-in {
+        to { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash-screen">
+      <div class="flash-overlay"></div>
+      <svg width="130" height="80" viewBox="0 0 130 80" fill="none" xmlns="http://www.w3.org/2000/svg" class="splash-logo">
+        <defs>
+          <linearGradient id="splash-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00E5FF" />
+            <stop offset="100%" stop-color="#7B61FF" />
+          </linearGradient>
+        </defs>
+        <path 
+          d="M 62 70 V 40 A 18 18 0 1 0 26 40 A 18 18 0 0 0 62 40 C 62 32 68 32 68 40 A 18 18 0 0 1 104 40 A 18 18 0 1 1 68 40 V 70"
+          stroke="url(#splash-gradient)"
+          stroke-width="8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="splash-path"
+        />
+      </svg>
+      <h1 class="splash-text">Qpixa</h1>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Check if splash has already been shown in this session
+      const hasShownSplash = sessionStorage.getItem('hasShownSplash');
+      const splash = document.getElementById('splash-screen');
+      
+      if (hasShownSplash && splash) {
+        splash.style.display = 'none';
+        document.body.style.overflow = 'auto';
+      } else {
+        // Remove splash screen after a short delay or when window loads
+        window.addEventListener('load', () => {
+          setTimeout(() => {
+            if (splash) {
+              splash.style.opacity = '0';
+              setTimeout(() => {
+                splash.remove();
+                document.body.style.overflow = 'auto';
+                sessionStorage.setItem('hasShownSplash', 'true');
+              }, 600);
+            }
+          }, 2000); // Increased delay to show the animation
+        });
+      }
+    </script>
+  </body>
+</html>
+

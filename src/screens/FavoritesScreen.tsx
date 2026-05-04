@@ -1,5 +1,4 @@
-"use client";
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart, LogIn, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
@@ -25,7 +24,14 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
     setIsMounted(true);
   }, []);
 
-  const fetchFavorites = useCallback(async () => {
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      fetchFavorites();
+      fetchGenerations();
+    }
+  }, [isLoggedIn, user]);
+
+  const fetchFavorites = async () => {
     if (!user || isPlaceholder) return;
     setLoading(true);
     try {
@@ -42,9 +48,9 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  };
 
-  const fetchGenerations = useCallback(async () => {
+  const fetchGenerations = async () => {
     if (!user || isPlaceholder) return;
     try {
       const { data, error } = await supabase
@@ -58,14 +64,7 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
     } catch (err) {
       console.error('Error fetching generations:', err);
     }
-  }, [user]);
-
-  useEffect(() => {
-    if (isLoggedIn && user) {
-      fetchFavorites();
-      fetchGenerations();
-    }
-  }, [isLoggedIn, user, fetchFavorites, fetchGenerations]);
+  };
 
   useEffect(() => {
     if (!headerRef.current) return;

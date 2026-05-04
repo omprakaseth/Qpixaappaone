@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle2, Clock, AlertCircle, Plus, Trash2 } from 'lucide-react';
@@ -31,7 +31,7 @@ export default function AdminTasks({ isSuperAdmin, setHasUnsavedChanges }: { isS
     priority: 'medium' as 'low' | 'medium' | 'high'
   });
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = async () => {
     try {
       let query = supabase.from('admin_tasks').select('*').order('created_at', { ascending: false });
       
@@ -45,7 +45,7 @@ export default function AdminTasks({ isSuperAdmin, setHasUnsavedChanges }: { isS
 
       // Fetch emails for assigned users
       if (data && data.length > 0) {
-        const userIds = [...new Set(data.map(t => t.assigned_to).filter(Boolean))] as string[];
+        const userIds = [...new Set(data.map(t => t.assigned_to))];
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, username')
@@ -66,9 +66,9 @@ export default function AdminTasks({ isSuperAdmin, setHasUnsavedChanges }: { isS
     } finally {
       setLoading(false);
     }
-  }, [isSuperAdmin, user]);
+  };
 
-  const fetchAdmins = useCallback(async () => {
+  const fetchAdmins = async () => {
     if (!isSuperAdmin) return;
     const { data: roles } = await supabase.from('user_roles').select('user_id').eq('role', 'admin');
     if (roles && roles.length > 0) {
@@ -78,12 +78,12 @@ export default function AdminTasks({ isSuperAdmin, setHasUnsavedChanges }: { isS
         .in('id', roles.map(r => r.user_id));
       if (profiles) setAdmins(profiles.map(p => ({ id: p.id, email: p.username || '' })));
     }
-  }, [isSuperAdmin]);
+  };
 
   useEffect(() => {
     fetchTasks();
     fetchAdmins();
-  }, [fetchTasks, fetchAdmins]);
+  }, [isSuperAdmin, user]);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,7 +230,7 @@ export default function AdminTasks({ isSuperAdmin, setHasUnsavedChanges }: { isS
           <div className="text-center p-10 bg-card border border-border rounded-xl">
             <CheckCircle2 className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
             <p className="text-muted-foreground font-medium">No tasks found</p>
-            <p className="text-sm text-muted-foreground/70 mt-1">You&apos;re all caught up!</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">You're all caught up!</p>
           </div>
         ) : (
           tasks.map(task => (

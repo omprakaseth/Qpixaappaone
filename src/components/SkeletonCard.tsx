@@ -1,4 +1,3 @@
-"use client";
 export default function SkeletonCard() {
   return (
     <div className="relative rounded-[20px] overflow-hidden bg-card border border-border/50 h-[220px] w-full">

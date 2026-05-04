@@ -1,5 +1,4 @@
-"use client";
-import { Post } from '@/types';
+import { Post } from './AppContext';
 
 const suffix = "Use the uploaded image as reference. Maintain same face, identity, hairstyle, and facial features. Apply the scene and style accurately. Ultra realistic, high detail, cinematic lighting, 4K quality.";
 
@@ -460,48 +459,6 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 52000, likes: 24000, saves: 6100, comments: 1100,
     createdAt: new Date(Date.now() - 32000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
-  },
-  {
-    id: 'mock-33',
-    title: 'Ethereal Forest Spirit',
-    imageUrl: getImageUrl(`${FEMALE_DESC} as an ethereal forest spirit with glowing vines and leaves in hair magical blue glowing forest`),
-    creator: { id: 'system', name: 'Qpixa AI', username: '@qpixa', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qpixa', initials: 'QA', isVerified: true },
-    prompt: `Ethereal forest spirit, glowing vines and leaves in hair, skin reflecting moonlight, magical blue glowing forest background, bioluminescent plants. ${suffix}`,
-    tags: ['fantasy', 'spirit', 'nature'],
-    category: 'Fantasy',
-    style: 'Cinematic',
-    aspectRatio: '4:5',
-    views: 12000, likes: 4500, saves: 1200, comments: 210,
-    createdAt: new Date(Date.now() - 33000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
-  },
-  {
-    id: 'mock-34',
-    title: 'Cyberpunk Café',
-    imageUrl: getImageUrl(`Futuristic cyberpunk cafe interior with neon signs and flying robots serving coffee high tech aesthetic`),
-    creator: { id: 'system', name: 'Qpixa AI', username: '@qpixa', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qpixa', initials: 'QA', isVerified: true },
-    prompt: `Futuristic cyberpunk cafe interior, neon signs, flying robots serving coffee, high tech aesthetic, raining outside the neon-lit window. ${suffix}`,
-    tags: ['cyberpunk', 'cafe', 'future'],
-    category: 'Fantasy',
-    style: 'Cyberpunk',
-    aspectRatio: '4:5',
-    views: 8500, likes: 3100, saves: 890, comments: 120,
-    createdAt: new Date(Date.now() - 34000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
-  },
-  {
-    id: 'mock-35',
-    title: 'Vintage Hollywood Glam',
-    imageUrl: getImageUrl(`${FEMALE_DESC} 1950s Hollywood glam starlet wearing a silk gown and diamonds on a red carpet flash photography`),
-    creator: { id: 'system', name: 'Qpixa AI', username: '@qpixa', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qpixa', initials: 'QA', isVerified: true },
-    prompt: `1950s Hollywood glam starlet, wearing a silk gown and diamonds, on a red carpet, vintage flash photography style, classic beauty. ${suffix}`,
-    tags: ['vintage', 'hollywood', 'glam'],
-    category: '90s Retro',
-    style: 'Vintage',
-    aspectRatio: '4:5',
-    views: 19500, likes: 7200, saves: 2300, comments: 340,
-    createdAt: new Date(Date.now() - 35000000).toISOString(),
     isLiked: false, isSaved: false, isShort: false, isMock: true
   }
 ];

@@ -1,48 +1,32 @@
-"use client";
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 export const SplashScreen: React.FC = () => {
-  const [isVisible, setIsVisible] = useState<boolean | null>(null);
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !sessionStorage.getItem('hasShownSplash');
+    }
+    return true;
+  });
 
   useEffect(() => {
-    let hasShown = false;
-    try {
-      if (typeof window !== 'undefined') {
-        hasShown = !!sessionStorage.getItem('has_shown_splash_v2');
-      }
-    } catch (e) {
-      console.warn('Session storage access denied', e);
-    }
-
-    if (hasShown) {
-      setIsVisible(false);
+    if (typeof window !== 'undefined' && sessionStorage.getItem('hasShownSplash')) {
       return;
     }
 
-    setIsVisible(true);
-
     const timer = setTimeout(() => {
       setIsVisible(false);
-      try {
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('has_shown_splash_v2', 'true');
-        }
-      } catch (e) {
-        console.warn('Session storage access denied', e);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('hasShownSplash', 'true');
       }
     }, 2500);
-
     return () => clearTimeout(timer);
   }, []);
-
-  if (isVisible === null) return null;
 
   return (
     <AnimatePresence>
       {isVisible && (
         <motion.div
-          key="splash-screen"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5, ease: "easeInOut" }}

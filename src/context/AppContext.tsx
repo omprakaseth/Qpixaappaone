@@ -1,12 +1,67 @@
-"use client";
-
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { analytics } from '@/lib/analytics';
+
 import { usePWAInstall } from '@/hooks/usePWAInstall';
-import { Post, Profile, UploadingPost } from '@/types';
+
+// We redefine Post interface here to match Supabase schema
+export interface Post {
+  id: string;
+  title: string;
+  imageUrl: string;
+  creator: {
+    id: string;
+    name: string;
+    username: string;
+    avatar: string;
+    initials: string;
+    isVerified?: boolean;
+  };
+  prompt: string;
+  tags: string[];
+  category: string;
+  style: string;
+  aspectRatio: string;
+  views: number;
+  likes: number;
+  saves: number;
+  comments: number;
+  createdAt: string;
+  isLiked: boolean;
+  isSaved: boolean;
+  isShort: boolean;
+  isMock?: boolean;
+}
+
+interface Profile {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  credits: number;
+  is_banned: boolean;
+  is_verified: boolean;
+  subscription_plan: string;
+  role?: string;
+  created_at: string;
+  cover_url: string | null;
+}
+
+export interface UploadingPost {
+  id: string;
+  title: string;
+  prompt: string;
+  tags: string;
+  type: 'post' | 'short';
+  file: File | null;
+  previewUrl: string | null;
+  progress: number;
+  status: 'uploading' | 'error' | 'success';
+  error?: string;
+}
 
 interface AppState {
   posts: Post[];
@@ -32,22 +87,6 @@ interface AppState {
   refreshProfile: () => Promise<void>;
   fetchPosts: () => Promise<void>;
   fetchPostById: (id: string) => Promise<Post | null>;
-  selectedPost: Post | null;
-  setSelectedPost: (post: Post | null) => void;
-  viewingCreator: string | null;
-  setViewingCreator: (creator: string | null) => void;
-  showCreatePost: boolean;
-  setShowCreatePost: (show: boolean) => void;
-  createPostData: { imageUrl?: string; prompt?: string };
-  setCreatePostData: (data: { imageUrl?: string; prompt?: string }) => void;
-  showSettings: boolean;
-  setShowSettings: (show: boolean) => void;
-  showSubscription: boolean;
-  setShowSubscription: (show: boolean) => void;
-  showAuth: boolean;
-  setShowAuth: (show: boolean) => void;
-  authMode: 'login' | 'signup';
-  setAuthMode: (mode: 'login' | 'signup') => void;
   deferredPrompt: any;
   installApp: () => Promise<void>;
 }
@@ -64,14 +103,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [uploadingPost, setUploadingPost] = useState<UploadingPost | null>(null);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [viewingCreator, setViewingCreator] = useState<string | null>(null);
-  const [showCreatePost, setShowCreatePost] = useState(false);
-  const [createPostData, setCreatePostData] = useState<{ imageUrl?: string; prompt?: string }>({});
-  const [showSettings, setShowSettings] = useState(false);
-  const [showSubscription, setShowSubscription] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
 
   const { deferredPrompt, promptInstall: installApp } = usePWAInstall();
 
@@ -255,7 +286,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // Helper to format a single post from DB
-  const formatPost = useCallback((p: any): Post => ({
+  const formatPost = (p: any): Post => ({
     id: p.id,
     title: p.title || 'Untitled',
     imageUrl: p.image_url || '',
@@ -280,36 +311,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isLiked: false,
     isSaved: false,
     isShort: p.is_short || false,
-  }), []);
+  });
 
-  const hasFetchedPosts = useRef(false);
-  const fetchPosts = useCallback(async (force = false) => {
-    if (!force && hasFetchedPosts.current && posts.length > 0) {
-      console.log('fetchPosts: Already fetched and has posts, skipping...');
-      setInitialLoading(false);
-      return;
-    }
-    
-    console.log('fetchPosts: Fetch starting... Force:', force);
-    hasFetchedPosts.current = true;
-    setInitialLoading(true);
-
+  const fetchPosts = async () => {
+    console.log('fetchPosts called');
     if (isPlaceholder) {
-      console.log('fetchPosts: Using MOCK_POSTS (Placeholder mode)');
       setPosts(MOCK_POSTS);
       setInitialLoading(false);
       return;
     }
-
-    // Add a timeout to prevent infinite loading if Supabase hangs
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Supabase request timed out after 10s')), 10000)
-    );
-
     try {
-      console.log('fetchPosts: Fetching from Supabase...');
+      console.log('Fetching posts from Supabase...');
       // Fetch posts with creator profile
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('posts')
         .select(`
           *,
@@ -319,11 +333,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .order('created_at', { ascending: false })
         .limit(100);
 
-      const response: any = await Promise.race([fetchPromise, timeoutPromise]);
-      const { data, error } = response;
-
       if (error) {
-        console.warn('fetchPosts: Error with join, trying simple fetch:', error);
+        console.warn('Error fetching posts with join, trying simple fetch:', error);
         const { data: simpleData, error: simpleError } = await supabase
           .from('posts')
           .select('*')
@@ -332,35 +343,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
           .limit(100);
           
         if (simpleError) {
-          console.error('fetchPosts: Simple fetch also failed:', simpleError);
+          console.error('Simple fetch also failed:', simpleError);
           throw simpleError;
         }
         
-        if (simpleData && simpleData.length > 0) {
-          console.log(`fetchPosts: Fetched ${simpleData.length} posts (simple)`);
+        if (simpleData) {
+          console.log(`Fetched ${simpleData.length} posts (simple)`);
           const formattedPosts: Post[] = simpleData.map(formatPost);
-          setPosts([...formattedPosts, ...MOCK_POSTS]);
-        } else {
-          console.log('fetchPosts: No posts in Supabase simple fetch, using mock');
-          setPosts(MOCK_POSTS);
+          
+          // Logic: Real posts first. Only add mock if real posts < 10
+          let finalPosts = formattedPosts;
+          if (formattedPosts.length < 10) {
+            finalPosts = [...formattedPosts, ...MOCK_POSTS];
+          }
+          
+          setPosts(finalPosts);
+          console.log('setPosts called with', finalPosts.length, 'posts');
         }
-      } else if (data && data.length > 0) {
-        console.log(`fetchPosts: Fetched ${data.length} posts (with join)`);
+      } else if (data) {
+        console.log(`Fetched ${data.length} posts (with join)`);
         const formattedPosts: Post[] = data.map(formatPost);
-        setPosts([...formattedPosts, ...MOCK_POSTS]);
+        
+        // Logic: Real posts first. Only add mock if real posts < 10
+        let finalPosts = formattedPosts;
+        if (formattedPosts.length < 10) {
+          finalPosts = [...formattedPosts, ...MOCK_POSTS];
+        }
+        
+        setPosts(finalPosts);
+        console.log('setPosts called with', finalPosts.length, 'posts');
       } else {
-        console.log('fetchPosts: No data returned from Supabase, using mock');
+        // Fallback if data is null but no error
+        console.log('No data and no error, setting mock posts');
         setPosts(MOCK_POSTS);
       }
     } catch (err) {
-      console.error('fetchPosts: Error in fetch cycle:', err);
+      console.error('Error fetching posts:', err);
       // Always fallback to mock posts on error
       setPosts(MOCK_POSTS);
     } finally {
-      console.log('fetchPosts: Cycle complete');
       setInitialLoading(false);
     }
-  }, [formatPost, isPlaceholder, posts.length]);
+  };
 
   const fetchPostById = async (id: string): Promise<Post | null> => {
     if (isPlaceholder) return MOCK_POSTS.find(p => p.id === id) || null;
@@ -382,7 +406,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const fetchProfile = useCallback(async (currentUser: User) => {
+  const fetchProfile = async (currentUser: User) => {
     let { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -402,9 +426,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (data) {
-      // Auto-assign admin role to specific emails
-      const adminEmails = ['omprakashseth248@gmail.com', 'qpixerapp@gmail.com'];
-      if (adminEmails.includes(currentUser.email || '') && (data as any).role !== 'admin') {
+      // Auto-assign admin role to specific email
+      if (currentUser.email === 'omprakashseth248@gmail.com' && (data as any).role !== 'admin') {
         const { data: updatedProfile } = await supabase
           .from('profiles')
           .update({ role: 'admin' } as any)
@@ -415,13 +438,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       setProfile(data as Profile);
-      if (adminEmails.includes(currentUser?.email || '')) {
+      if (currentUser?.email === 'omprakashseth248@gmail.com') {
         setCredits(999999);
       } else {
         setCredits(data.credits);
       }
     }
-  }, []);
+  };
 
   useEffect(() => {
     if (isPlaceholder) {
@@ -451,7 +474,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [fetchPosts, fetchProfile]);
+  }, []);
 
   const toggleLike = async (id: string) => {
     if (!user || isPlaceholder) return; // Must be logged in
@@ -613,10 +636,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       posts, setPosts, initialLoading, user, session, profile, isLoggedIn, isPro, credits, setCredits,
       uploadingPost, startUpload, retryUpload, clearUpload,
       toggleLike, toggleSave, addPost, deletePost, updatePost, signOut, refreshProfile, fetchPosts, fetchPostById,
-      selectedPost, setSelectedPost, viewingCreator, setViewingCreator,
-      showCreatePost, setShowCreatePost, createPostData, setCreatePostData,
-      showSettings, setShowSettings, showSubscription, setShowSubscription,
-      showAuth, setShowAuth, authMode, setAuthMode,
       deferredPrompt, installApp
     }}>
       {children}

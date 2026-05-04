@@ -1,5 +1,4 @@
-"use client";
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus } from 'lucide-react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import ImageViewer from '@/components/ImageViewer';
@@ -12,7 +11,6 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { analytics } from '@/lib/analytics';
 import { GoogleGenAI } from '@google/genai';
-import { motion, AnimatePresence } from 'framer-motion';
 
 const STYLE_PRESETS = [
   { id: 'none', name: 'None', prompt: '' },
@@ -33,7 +31,7 @@ const ASPECT_RATIOS = [
 ];
 
 function useVisualViewport() {
-  const [viewport, setViewport] = useState({ height: typeof window !== 'undefined' ? window.innerHeight : 800, offsetTop: 0 });
+  const [viewport, setViewport] = useState({ height: window.innerHeight, offsetTop: 0 });
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   useEffect(() => {
@@ -84,27 +82,13 @@ interface StudioScreenProps {
   initialPrompt?: string;
   onClearInitialPrompt?: () => void;
   onPublish?: (imageUrl: string, prompt: string) => void;
-  isLoggedIn?: boolean;
-  onOpenAuth?: () => void;
 }
 
-function AiMessageBubble({ msg, isPro, setViewerImage, progress }: any) {
+function AiMessageBubble({ msg, isPro, setViewerImage }: any) {
   if (msg.status === 'pending') {
     return (
-      <div className="flex flex-col gap-2 p-4 bg-secondary/20 rounded-2xl border border-border/50 max-w-[85%]">
-        <div className="flex items-center gap-4">
-          <AILoader showSecondary={false} />
-          <div className="flex-1">
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Generating Masterpiece...</div>
-            <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-primary transition-all duration-300 ease-out" 
-                style={{ width: `${progress}%` }} 
-              />
-            </div>
-          </div>
-          <div className="text-xs font-mono font-bold text-primary">{progress}%</div>
-        </div>
+      <div className="flex justify-start items-center gap-4">
+        <AILoader showSecondary={false} />
       </div>
     );
   }
@@ -149,20 +133,20 @@ function AiMessageBubble({ msg, isPro, setViewerImage, progress }: any) {
   );
 }
 
-export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPublish, isLoggedIn: propIsLoggedIn, onOpenAuth }: StudioScreenProps) {
-  const { credits, setCredits, isPro, isLoggedIn: contextIsLoggedIn, refreshProfile, user } = useAppState();
-  const isLoggedIn = propIsLoggedIn ?? contextIsLoggedIn;
+export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPublish }: StudioScreenProps) {
+  const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('flux');
   const MODELS = [
-    { id: 'flux', name: 'Flux.1 Hyper', provider: 'Pollinations', tier: 'pro' },
-    { id: 'flux-realism', name: 'Flux Realism', provider: 'Pollinations', tier: 'pro' },
-    { id: 'flux-anime', name: 'Flux Anime', provider: 'Pollinations', tier: 'pro' },
-    { id: 'flux-3d', name: 'Flux 3D', provider: 'Pollinations', tier: 'pro' },
-    { id: 'flux-pro', name: 'Flux Pro Ultra', provider: 'Pollinations', tier: 'ultra' },
-    { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'SDXL Fast', provider: 'HuggingFace', tier: 'free' },
-    { id: 'gemini-imagen', name: 'Imagen 3 (Via Flux)', provider: 'Pollinations', tier: 'ultra' },
+    { id: 'flux', name: 'Flux.1 (High Quality)', provider: 'Pollinations' },
+    { id: 'flux-realism', name: 'Flux Realism', provider: 'Pollinations' },
+    { id: 'flux-anime', name: 'Flux Anime', provider: 'Pollinations' },
+    { id: 'flux-3d', name: 'Flux 3D', provider: 'Pollinations' },
+    { id: 'pollinations', name: 'Pollinations Standard', provider: 'Pollinations' },
+    { id: 'gemini-2.5-flash-image', name: 'Gemini 2.5 (Free)', provider: 'Google' },
+    { id: 'gemini-3.1-flash-image-preview', name: 'Gemini 3.1 (Pro)', provider: 'Google' },
+    { id: 'stabilityai/stable-diffusion-xl-base-1.0', name: 'SDXL (Free)', provider: 'HuggingFace' },
   ];
 
   const generateWithHuggingFace = async (modelId: string, promptText: string, signal?: AbortSignal) => {
@@ -325,67 +309,66 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     }
   }, [prompt]);
 
-  const loadSessions = useCallback(async () => {
-    try {
-      const savedSessions = localStorage.getItem('qpixa_studio_sessions');
-      let parsed: ChatSession[] = [];
-      if (savedSessions) {
-        parsed = JSON.parse(savedSessions);
-      }
-
-      // If logged in, also fetch from DB to ensure we have history
-      if (user && !isPlaceholder) {
-        const { data: dbGenerations } = await supabase
-          .from('generations')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (dbGenerations && dbGenerations.length > 0) {
-          // Create a "Cloud History" session if it doesn't exist or update it
-          const cloudMessages: ChatMessage[] = dbGenerations.map((g: any) => ({
-            id: g.id,
-            type: 'ai',
-            text: g.prompt,
-            imageUrl: g.image_url,
-            createdAt: g.created_at,
-            status: 'success'
-          }));
-
-          const cloudSession: ChatSession = {
-            id: 'cloud-history',
-            title: '☁️ Cloud History',
-            messages: cloudMessages,
-            createdAt: dbGenerations[dbGenerations.length - 1].created_at,
-            updatedAt: dbGenerations[0].created_at,
-          };
-
-          // Merge with local sessions
-          const otherSessions = parsed.filter(s => s.id !== 'cloud-history');
-          parsed = [cloudSession, ...otherSessions];
-        }
-      }
-
-      if (parsed.length > 0) {
-        setSessions(parsed);
-        
-        // If there are sessions, load the most recent one if none selected
-        if (!currentSessionId) {
-          const mostRecent = parsed[0];
-          setCurrentSessionId(mostRecent.id);
-          setMessages(mostRecent.messages);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load sessions', e);
-    }
-  }, [user, currentSessionId]);
-
   // Load sessions from Local Storage and Sync with DB
   useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const savedSessions = localStorage.getItem('qpixa_studio_sessions');
+        let parsed: ChatSession[] = [];
+        if (savedSessions) {
+          parsed = JSON.parse(savedSessions);
+        }
+
+        // If logged in, also fetch from DB to ensure we have history
+        if (user && !isPlaceholder) {
+          const { data: dbGenerations } = await supabase
+            .from('generations')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+          if (dbGenerations && dbGenerations.length > 0) {
+            // Create a "Cloud History" session if it doesn't exist or update it
+            const cloudMessages: ChatMessage[] = dbGenerations.map((g: any) => ({
+              id: g.id,
+              type: 'ai',
+              text: g.prompt,
+              imageUrl: g.image_url,
+              createdAt: g.created_at,
+              status: 'success'
+            }));
+
+            const cloudSession: ChatSession = {
+              id: 'cloud-history',
+              title: '☁️ Cloud History',
+              messages: cloudMessages,
+              createdAt: dbGenerations[dbGenerations.length - 1].created_at,
+              updatedAt: dbGenerations[0].created_at,
+            };
+
+            // Merge with local sessions
+            const otherSessions = parsed.filter(s => s.id !== 'cloud-history');
+            parsed = [cloudSession, ...otherSessions];
+          }
+        }
+
+        if (parsed.length > 0) {
+          setSessions(parsed);
+          
+          // If there are sessions, load the most recent one if none selected
+          if (!currentSessionId) {
+            const mostRecent = parsed[0];
+            setCurrentSessionId(mostRecent.id);
+            setMessages(mostRecent.messages);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load sessions', e);
+      }
+    };
     loadSessions();
-  }, [loadSessions, isLoggedIn]);
+  }, [user, isLoggedIn]);
 
   // Helper to save sessions to local storage
   const saveSessionsToLocalStorage = (updatedSessions: ChatSession[]) => {
@@ -887,24 +870,6 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     ? { position: 'fixed', top: `${vpOffsetTop}px`, left: 0, right: 0, height: `${vpHeight}px`, zIndex: 30 }
     : { position: 'fixed', top: 0, left: 0, right: 0, bottom: '56px', zIndex: 30 };
 
-  if (!isLoggedIn) {
-    return (
-      <div style={containerStyle} className="flex flex-col items-center justify-center px-6 bg-background text-center">
-        <div className="w-20 h-20 rounded-3xl bg-secondary flex items-center justify-center mb-6 shadow-glow">
-          <Zap size={40} className="text-primary fill-primary/20" />
-        </div>
-        <h2 className="text-2xl font-black text-foreground mb-3 tracking-tight italic">READY TO CREATE?</h2>
-        <p className="text-sm text-muted-foreground mb-8 max-w-[280px]">Sign in to unlock our powerful AI models and start generating masterpieces.</p>
-        <button 
-          onClick={onOpenAuth} 
-          className="w-full max-w-[240px] py-4 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all"
-        >
-          Sign in to studio
-        </button>
-      </div>
-    );
-  }
-
   return (
     <>
     <div style={containerStyle} className="flex flex-col overflow-hidden bg-background">
@@ -1114,18 +1079,6 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
       {/* Chat content */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-none scrollbar-hide px-4 pb-4">
-        {generating && (
-          <div className="sticky top-0 left-0 right-0 z-10 pt-2 pb-1">
-            <div className="h-1 w-full bg-secondary rounded-full overflow-hidden shadow-sm">
-              <motion.div 
-                className="h-full bg-primary"
-                initial={{ width: 0 }}
-                animate={{ width: `${generationProgress}%` }}
-                transition={{ duration: 0.3 }}
-              />
-            </div>
-          </div>
-        )}
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
@@ -1159,7 +1112,6 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                   key={msg.id} 
                   msg={msg} 
                   isPro={isPro} 
-                  progress={generationProgress}
                   setViewerImage={(url: string, prompt: string) => setViewerData({ url, prompt })} 
                 />
               )
@@ -1230,13 +1182,11 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                         selectedModel === m.id ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-background/50 border-transparent text-muted-foreground'
                       }`}
                     >
-                      <span className="truncate">{m.name}</span>
-                      {m.tier === 'free' ? (
-                        <span className="text-[7px] px-1 py-0.5 bg-green-500/10 text-green-500 rounded uppercase font-black">Free</span>
-                      ) : m.tier === 'pro' ? (
-                        <span className="text-[7px] px-1 py-0.5 bg-amber-500/10 text-amber-500 rounded uppercase font-black">Pro</span>
+                      <span className="truncate">{m.name.replace(' (Free)', '').replace(' (High Quality)', '').replace(' (Fast & Free)', '')}</span>
+                      {m.provider === 'HuggingFace' || m.id === 'gemini-2.5-flash-image' ? (
+                        <span className="text-[7px] px-1 py-0.5 bg-green-500/20 text-green-500 rounded uppercase font-black">Free</span>
                       ) : (
-                        <span className="text-[7px] px-1 py-0.5 bg-primary/10 text-primary rounded uppercase font-black">Ultra</span>
+                        <span className="text-[7px] px-1 py-0.5 bg-amber-500/20 text-amber-500 rounded uppercase font-black">Pro</span>
                       )}
                     </button>
                   ))}

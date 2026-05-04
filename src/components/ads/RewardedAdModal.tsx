@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Gift, X, Play, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +18,22 @@ export default function RewardedAdModal({ open, onClose, rewardCredits, publishe
   const [completed, setCompleted] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  const handleRewardComplete = useCallback(async () => {
+  useEffect(() => {
+    if (!watching) return;
+    const duration = 15; // 15 seconds
+    let elapsed = 0;
+    timerRef.current = setInterval(() => {
+      elapsed += 0.1;
+      setProgress(Math.min((elapsed / duration) * 100, 100));
+      if (elapsed >= duration) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        handleRewardComplete();
+      }
+    }, 100);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [watching]);
+
+  const handleRewardComplete = async () => {
     setCompleted(true);
     setWatching(false);
 
@@ -41,22 +56,7 @@ export default function RewardedAdModal({ open, onClose, rewardCredits, publishe
     }
 
     toast.success(`🎉 ${rewardCredits} credits earned!`);
-  }, [user, rewardCredits, refreshProfile, setCredits]);
-
-  useEffect(() => {
-    if (!watching) return;
-    const duration = 15; // 15 seconds
-    let elapsed = 0;
-    timerRef.current = setInterval(() => {
-      elapsed += 0.1;
-      setProgress(Math.min((elapsed / duration) * 100, 100));
-      if (elapsed >= duration) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        handleRewardComplete();
-      }
-    }, 100);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [watching, handleRewardComplete]);
+  };
 
   const handleClose = () => {
     if (timerRef.current) clearInterval(timerRef.current);

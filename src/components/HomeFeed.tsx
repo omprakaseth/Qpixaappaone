@@ -1,6 +1,4 @@
-"use client";
 import React, { useState } from 'react';
-import Image from 'next/image';
 import { LayoutGrid, SlidersHorizontal, Star, TrendingUp, Zap } from 'lucide-react';
 
 export default function HomeFeed() {
@@ -62,11 +60,10 @@ export default function HomeFeed() {
         {[1, 2, 3, 4].map((item) => (
           <div key={item} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800">
             <div className="h-48 bg-zinc-800 relative">
-              <Image 
+              <img 
                 src={`https://picsum.photos/seed/ai${item}/600/400`} 
                 alt="AI Tool" 
-                fill
-                className="object-cover opacity-80"
+                className="w-full h-full object-cover opacity-80"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md flex items-center gap-1 text-xs font-medium">

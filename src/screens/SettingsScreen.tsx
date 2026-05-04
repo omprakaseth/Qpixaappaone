@@ -1,9 +1,7 @@
-"use client";
 import { ArrowLeft, User, Bell, Shield, Palette, Globe, CreditCard, HelpCircle, LogOut, ChevronRight, Info, FileText, Mail, Sun, Moon, Monitor, Save, Lock, Eye, EyeOff, Download } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
-import { getEnv } from '@/lib/env';
 import { toast } from 'sonner';
 interface SettingsScreenProps {
   onBack: () => void;
@@ -12,7 +10,6 @@ interface SettingsScreenProps {
 type ThemeMode = 'dark' | 'light' | 'system';
 
 function applyTheme(mode: ThemeMode) {
-  if (typeof window === 'undefined') return;
   const root = document.documentElement;
   let effectiveTheme: 'dark' | 'light' = 'dark';
 
@@ -32,7 +29,6 @@ function applyTheme(mode: ThemeMode) {
 }
 
 function getStoredTheme(): ThemeMode {
-  if (typeof window === 'undefined') return 'dark';
   return (localStorage.getItem('qpixa-theme') as ThemeMode) || 'dark';
 }
 
@@ -60,22 +56,10 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [showTheme, setShowTheme] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [notifEnabled, setNotifEnabled] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem('qpixa-notif') !== 'false';
-  });
-  const [activityStatus, setActivityStatus] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem('qpixa-activity') !== 'false';
-  });
-  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => {
-    if (typeof window === 'undefined') return 'public';
-    return (localStorage.getItem('qpixa-visibility') as any) || 'public';
-  });
-  const [language, setLanguage] = useState(() => {
-    if (typeof window === 'undefined') return 'en';
-    return localStorage.getItem('qpixa-lang') || 'en';
-  });
+  const [notifEnabled, setNotifEnabled] = useState(() => localStorage.getItem('qpixa-notif') !== 'false');
+  const [activityStatus, setActivityStatus] = useState(() => localStorage.getItem('qpixa-activity') !== 'false');
+  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>(() => (localStorage.getItem('qpixa-visibility') as any) || 'public');
+  const [language, setLanguage] = useState(() => localStorage.getItem('qpixa-lang') || 'en');
   
   // PWA Install
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -144,7 +128,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     const file = e.target.files[0];
     
     // Check if it's a mock project
-    if (getEnv('VITE_SUPABASE_URL') === 'https://placeholder-project.supabase.co') {
+    if (import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co') {
       toast.error('Avatar upload is not available in demo mode');
       return;
     }
@@ -174,7 +158,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
   };
 
   const saveProfile = async () => {
-    if (!isLoggedIn || !profile?.id) return;
+    if (!isLoggedIn) return;
     setSaving(true);
     try {
       const updateData: any = {
@@ -188,7 +172,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', profile.id);
+        .eq('id', profile?.id);
 
       if (error) {
         // If error is about updated_at column, try again without it
@@ -197,7 +181,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
           const { error: retryError } = await supabase
             .from('profiles')
             .update(updateData)
-            .eq('id', profile.id);
+            .eq('id', profile?.id);
           if (retryError) throw retryError;
         } else {
           throw error;
@@ -617,7 +601,7 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-medium text-foreground">Show Activity Status</p>
-                    <p className="text-[10px] text-muted-foreground">Let others see when you&apos;re online</p>
+                    <p className="text-[10px] text-muted-foreground">Let others see when you're online</p>
                   </div>
                   <button
                     onClick={toggleActivity}
