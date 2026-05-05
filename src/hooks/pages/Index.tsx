@@ -31,14 +31,24 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [tabStacks, setTabStacks] = useState<Record<string, { selectedPost?: Post | null; viewingCreator?: string | null }>>({
+    home: {},
+    discover: {},
+    shorts: {},
+    studio: {},
+    notifications: {},
+    favorites: {},
+    profile: {}
+  });
+
   const activeTab = useMemo(() => {
     const path = location.pathname;
-    if (path === '/market') return 'discover';
-    if (path === '/shorts') return 'shorts';
-    if (path === '/studio') return 'studio';
-    if (path === '/notifications') return 'notifications';
-    if (path === '/favorites') return 'favorites';
-    if (path === '/profile') return 'profile';
+    if (path.startsWith('/market')) return 'discover';
+    if (path.startsWith('/shorts')) return 'shorts';
+    if (path.startsWith('/studio')) return 'studio';
+    if (path.startsWith('/notifications')) return 'notifications';
+    if (path.startsWith('/favorites')) return 'favorites';
+    if (path.startsWith('/profile')) return 'profile';
     return 'home';
   }, [location.pathname]);
 
@@ -57,6 +67,25 @@ function AppShell() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [studioPrompt, setStudioPrompt] = useState('');
   const [viewingCreator, setViewingCreator] = useState<string | null>(null);
+
+  // Sync tab stacks with global overlay state
+  useEffect(() => {
+    const currentStack = tabStacks[activeTab];
+    if (currentStack) {
+      setSelectedPost(currentStack.selectedPost || null);
+      setViewingCreator(currentStack.viewingCreator || null);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    setTabStacks(prev => ({
+      ...prev,
+      [activeTab]: {
+        selectedPost,
+        viewingCreator
+      }
+    }));
+  }, [selectedPost, viewingCreator, activeTab]);
 
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
@@ -82,7 +111,7 @@ function AppShell() {
 
   useEffect(() => {
     const handleDeepLink = async () => {
-      if (location.pathname.startsWith('/prompt/') && id) {
+      if (location.pathname.includes('/prompt/') && id) {
         // First check local posts
         const post = posts.find(p => p.id === id);
         if (post) {
@@ -94,7 +123,7 @@ function AppShell() {
             setSelectedPost(fetchedPost);
           }
         }
-      } else if (location.pathname.startsWith('/creator/') && id) {
+      } else if (location.pathname.includes('/creator/') && id) {
         setViewingCreator(id);
       }
     };
@@ -112,49 +141,59 @@ function AppShell() {
 
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
-      // Close overlays in priority order (topmost first)
+      // 1. Handle Overlays (Stack popping)
       if (showAuth) { setShowAuth(false); return; }
       if (showCreatePost) { setShowCreatePost(false); setCreatePostData({}); return; }
       if (selectedPost) { 
         setSelectedPost(null); 
-        // If we were on a deep link, go back to where we came from or home
-        if (location.pathname.startsWith('/prompt/')) {
-          // Check if we have history to go back to
-          if (window.history.length > 1) {
-            // We'll let the browser handle it or navigate to parent
-            // But since we are in a SPA with state-based overlays, 
-            // we might need to navigate manually if the URL changed
-            if (activeTab === 'discover') navigate('/market');
-            else if (activeTab === 'profile') navigate('/profile');
-            else navigate('/');
-          } else {
-            navigate('/');
-          }
+        // Sync URL back to tab root if we were on a prompt path
+        if (location.pathname.includes('/prompt/')) {
+          navigate(location.pathname.split('/prompt/')[0] || '/', { replace: true });
         }
         return; 
       }
       if (viewingCreator) { 
         setViewingCreator(null); 
-        if (location.pathname.startsWith('/creator/')) {
-          if (activeTab === 'discover') navigate('/market');
-          else navigate('/');
+        if (location.pathname.includes('/creator/')) {
+          navigate(location.pathname.split('/creator/')[0] || '/', { replace: true });
         }
         return; 
       }
       if (showSettings) { setShowSettings(false); return; }
       if (showSubscription) { setShowSubscription(false); return; }
-      // If on a non-home tab, go back to home
-      if (activeTab !== 'home') { navigate('/'); return; }
+      
+      // 2. Tab-specific back behavior
+      // If at non-home root, go back to home as requested
+      if (activeTab !== 'home' && !location.pathname.includes('/prompt/') && !location.pathname.includes('/creator/')) {
+        navigate('/', { replace: true });
+        return;
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [showAuth, showCreatePost, showSettings, showSubscription, viewingCreator, selectedPost, activeTab, navigate, location.pathname]);
 
+  const tabRootPaths: Record<string, string> = {
+    home: '/',
+    discover: '/market',
+    shorts: '/shorts',
+    studio: '/studio',
+    notifications: '/notifications',
+    favorites: '/favorites',
+    profile: '/profile'
+  };
+
+  const getSubPath = useCallback((type: 'prompt' | 'creator', id: string) => {
+    const root = tabRootPaths[activeTab];
+    const prefix = root === '/' ? '/home' : root;
+    return `${prefix}/${type}/${id}`;
+  }, [activeTab]);
+
   // Push history when overlays open
   const openPost = useCallback((post: Post) => {
-    pushHistory('post', `/prompt/${post.id}`);
+    pushHistory('post', getSubPath('prompt', post.id));
     setSelectedPost(post);
-  }, [pushHistory]);
+  }, [pushHistory, getSubPath]);
 
   const openCreatePost = useCallback(() => {
     pushHistory('createPost');
@@ -180,24 +219,22 @@ function AppShell() {
   const scrollToTopRef = useRef<() => void>(() => {});
   const handleTabChange = useCallback((tab: string) => {
     if (tab === activeTab) {
+      // Tapping active tab resets it to root
       scrollToTopRef.current();
+      
+      // Clear stack state for this tab
+      setTabStacks(prev => ({
+        ...prev,
+        [tab]: {}
+      }));
+      
+      navigate(tabRootPaths[tab], { replace: true });
       return;
     }
-    const paths: Record<string, string> = {
-      home: '/',
-      discover: '/market',
-      shorts: '/shorts',
-      studio: '/studio',
-      notifications: '/notifications',
-      favorites: '/favorites',
-      profile: '/profile'
-    };
 
-    // Mark tab as visited
-    // (Handled by useEffect now)
-
-    navigate(paths[tab]);
-  }, [navigate]);
+    // Use push for tab switches to allow back button to return to home
+    navigate(tabRootPaths[tab]);
+  }, [navigate, activeTab]);
 
   const openCreator = useCallback((creatorName: string, creatorId?: string) => {
     if (user && creatorId === user.id) {
@@ -212,15 +249,32 @@ function AppShell() {
       handleTabChange('profile');
       return;
     }
-    pushHistory('creator', creatorId ? `/creator/${creatorId}` : undefined);
+    
+    const creatorIdToUse = creatorId || creatorName;
+    pushHistory('creator', getSubPath('creator', creatorIdToUse));
     setSelectedPost(null);
-    setViewingCreator(creatorId || creatorName);
-  }, [pushHistory, user, profile, handleTabChange, selectedPost, viewingCreator]);
+    setViewingCreator(creatorIdToUse);
+  }, [pushHistory, user, profile, handleTabChange, selectedPost, viewingCreator, getSubPath]);
 
   // Close helpers that go back in history
   const goBack = useCallback(() => {
-    window.history.back();
-  }, []);
+    if (window.history.length > 1) {
+      window.history.back();
+    }
+    
+    // Safety timeout: if popstate doesn't fire (e.g. no history entries), manual close
+    setTimeout(() => {
+      if (selectedPost) setSelectedPost(null);
+      if (viewingCreator) setViewingCreator(null);
+      if (showAuth) setShowAuth(false);
+      if (showCreatePost) {
+        setShowCreatePost(false);
+        setCreatePostData({});
+      }
+      if (showSettings) setShowSettings(false);
+      if (showSubscription) setShowSubscription(false);
+    }, 100);
+  }, [selectedPost, viewingCreator, showAuth, showCreatePost, showSettings, showSubscription]);
 
   const smartScrollEnabled = activeTab === 'home' || activeTab === 'discover' || activeTab === 'favorites' || activeTab === 'profile';
   const { visible: navVisible, scrollRef } = useSmartScroll(smartScrollEnabled);
@@ -302,6 +356,7 @@ function AppShell() {
               onOpenAuth={openAuth}
               onCreatorTap={openCreator}
               navVisible={navVisible}
+              onBack={() => handleTabChange('home')}
             />
           )}
           {activeTab === 'shorts' && (

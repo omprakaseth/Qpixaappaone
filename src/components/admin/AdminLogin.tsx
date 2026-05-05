@@ -19,61 +19,34 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
     setLoading(true);
 
     try {
-      let authData;
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
-        if ((email === 'qpixerapp@gmail.com' && password === 'Admin@224477') || 
-            (email === 'omprakashseth248@gmail.com' && password === 'Admin@224477OMPS')) {
-          // Attempt to sign up if login fails (maybe account doesn't exist yet)
-          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: { username: 'Super Admin', display_name: 'Super Admin' }
-            }
-          });
-          
-          if (signUpError) {
-            if (signUpError.message.includes('already registered')) {
-              throw error; // Throw the original "Invalid login credentials"
-            }
-            throw new Error('Account setup failed: ' + signUpError.message);
-          }
-          
-          if (!signUpData.session) {
-            toast.success('Admin account created! Please check your email to verify.');
-            setLoading(false);
-            return;
-          }
-          authData = signUpData;
-        } else {
-          throw error;
-        }
-      } else {
-        authData = data;
+        throw error;
       }
 
-      const user = authData?.user;
+      const user = data?.user;
       if (!user) throw new Error('Login failed');
 
-      // Check if user has admin or super_admin role
-      let hasAdmin = false;
-      if (user.email === 'qpixerapp@gmail.com' || user.email === 'omprakashseth248@gmail.com') {
-        hasAdmin = true;
-      } else {
-        const { data: roleData } = await supabase.rpc('has_role', {
-          _user_id: user.id,
-          _role: 'admin',
-        });
-        hasAdmin = !!roleData;
-      }
+      // Check if user has admin role via RPC
+      const { data: hasAdminRole, error: roleError } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin',
+      });
 
-      if (!hasAdmin) {
-        await supabase.auth.signOut();
-        toast.error('Access denied. Admin privileges required.');
-        setLoading(false);
-        return;
+      if (roleError || !hasAdminRole) {
+        // Fallback check for initial setup if RPC fails or isn't there yet
+        // In a real app, you'd solely rely on roles, but for the first admin, 
+        // we might check a restricted set of emails IF configured in ENV
+        const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(',') || [];
+        const isEmailAdmin = adminEmails.includes(user.email || '');
+
+        if (!isEmailAdmin) {
+          await supabase.auth.signOut();
+          toast.error('Access denied. Admin privileges required.');
+          setLoading(false);
+          return;
+        }
       }
 
       toast.success('Welcome back, Admin!');

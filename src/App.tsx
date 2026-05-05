@@ -28,15 +28,32 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/home/prompt/:id" element={<Index />} />
+              <Route path="/home/creator/:id" element={<Index />} />
+
               <Route path="/market" element={<Index />} />
+              <Route path="/market/prompt/:id" element={<Index />} />
+              <Route path="/market/creator/:id" element={<Index />} />
               <Route path="/marketplace" element={<Navigate to="/market" replace />} />
+
               <Route path="/shorts" element={<Index />} />
+              <Route path="/shorts/creator/:id" element={<Index />} />
+
               <Route path="/studio" element={<Index />} />
+
               <Route path="/notifications" element={<Index />} />
+
               <Route path="/favorites" element={<Index />} />
+              <Route path="/favorites/prompt/:id" element={<Index />} />
+
               <Route path="/profile" element={<Index />} />
+              <Route path="/profile/prompt/:id" element={<Index />} />
+              <Route path="/profile/creator/:id" element={<Index />} />
+
+              {/* Legacy / Compatibility routes for deep links */}
               <Route path="/prompt/:id" element={<Index />} />
               <Route path="/creator/:id" element={<Index />} />
+
               <Route path="/admin/qpixa-portal" element={<Admin />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/terms" element={<TermsPage />} />

@@ -83,12 +83,19 @@ export default function CreatorProfileOverlay({ creatorName, posts, onBack, onPo
 
   return (
     <div className="fixed inset-0 z-[60] bg-background flex flex-col animate-in slide-in-from-right duration-200">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 pt-3 pb-3 safe-top">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-md border-b border-border px-4 pb-3" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 rounded-full hover:bg-secondary">
-            <ArrowLeft size={20} className="text-foreground" />
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onBack();
+            }} 
+            className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-secondary active:scale-90 transition-all"
+            aria-label="Go back"
+          >
+            <ArrowLeft size={22} className="text-foreground" />
           </button>
-          <h1 className="text-lg font-bold text-foreground flex-1">{creatorName}</h1>
+          <h1 className="text-lg font-bold text-foreground flex-1 truncate">{creatorName}</h1>
         </div>
       </div>
 

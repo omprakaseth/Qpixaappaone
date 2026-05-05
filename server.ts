@@ -5,6 +5,8 @@ import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
 
 dotenv.config();
 
@@ -16,7 +18,18 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Security Middlewares
+  app.set('trust proxy', 1);
+  app.use(cors());
   app.use(express.json({ limit: '50mb' }));
+
+  // Rate Limiting
+  const limiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // Limit each IP to 30 requests per minute
+    message: { error: "Too many requests, please try again later." }
+  });
+  app.use("/api/", limiter);
 
   // Health check
   app.get("/api/health", (req, res) => {
@@ -27,10 +40,19 @@ async function startServer() {
   app.post("/api/hf", async (req, res) => {
     try {
       const { modelId, inputs, options } = req.body;
-      const token = process.env.HUGGING_FACE_TOKEN;
+      
+      // Simple validation
+      if (!modelId || typeof modelId !== 'string') {
+        return res.status(400).json({ error: "Invalid modelId" });
+      }
+      if (!inputs) {
+        return res.status(400).json({ error: "Inputs are required" });
+      }
+
+      const token = process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
 
       if (!token) {
-        return res.status(500).json({ error: "HUGGING_FACE_TOKEN is not configured on the server." });
+        return res.status(500).json({ error: "HF_TOKEN is not configured on the server." });
       }
 
       const response = await fetch(
@@ -69,6 +91,11 @@ async function startServer() {
   app.post("/api/pollinations", async (req, res) => {
     try {
       const { prompt, model, width, height, seed, nologo, enhance } = req.body;
+      
+      if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+
       const queryParams = new URLSearchParams({
         prompt,
         width: width?.toString() || '1024',
@@ -81,11 +108,36 @@ async function startServer() {
 
       const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${queryParams.toString()}`;
       
-      // We can just return the URL or fetch it to check if it's alive
-      // For speed, let's just return the URL after light validation
-      res.json({ imageUrl });
+      // Fetch the image and return as base64 for consistency and to avoid mixed content/cors issues in some environments
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error("Failed to fetch from Pollinations");
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64 = buffer.toString('base64');
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+
+      res.json({ imageUrl: `data:${contentType};base64,${base64}` });
     } catch (error: any) {
       console.error("Pollinations Proxy Error:", error);
+      res.status(500).json({ error: error.message || "Internal Server Error" });
+    }
+  });
+
+  // API Route for Pollinations Text Proxy
+  app.post("/api/pollinations/text", async (req, res) => {
+    try {
+      const { prompt, model } = req.body;
+      if (!prompt) return res.status(400).json({ error: "Prompt is required" });
+
+      const url = `https://text.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=${model || 'openai'}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch from Pollinations Text");
+      
+      const text = await response.text();
+      res.json({ text });
+    } catch (error: any) {
+      console.error("Pollinations Text Proxy Error:", error);
       res.status(500).json({ error: error.message || "Internal Server Error" });
     }
   });
@@ -125,22 +177,10 @@ async function startServer() {
     console.log("Initializing Vite dev server...");
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "custom", // Use custom to handle SPA manually
+      appType: "spa",
     });
     console.log("Vite dev server initialized.");
     app.use(vite.middlewares);
-
-    app.get('*', async (req, res, next) => {
-      const url = req.originalUrl;
-      try {
-        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
-        template = await vite.transformIndexHtml(url, template);
-        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
-      } catch (e) {
-        vite.ssrFixStacktrace(e as Error);
-        next(e);
-      }
-    });
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));

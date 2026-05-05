@@ -1,178 +1,272 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { X, Download, Share2, Bookmark, RotateCcw, Upload, MessageSquare, Info } from 'lucide-react';
-import WatermarkedImage from '@/components/WatermarkedImage';
-import { useAppState } from '@/context/AppContext';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence, useAnimation } from 'motion/react';
+import { X, ZoomIn, ZoomOut, RotateCcw, Trash2, Download, Share2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'motion/react';
 
 interface ImageViewerProps {
-  src: string;
+  url: string;
   alt?: string;
   onClose: () => void;
-  actions?: {
-    onDownload?: () => void;
-    onShare?: () => void;
-    onBookmark?: () => void;
-    onReuse?: () => void;
-    onPublish?: () => void;
-  };
+  onDelete?: () => void;
+  onDownload?: () => void;
+  onShare?: () => void;
+  isOwner?: boolean;
 }
 
-export default function ImageViewer({ src, alt, onClose, actions }: ImageViewerProps) {
-  const { isPro } = useAppState();
+export function ImageViewer({ url, alt, onClose, onDelete, onDownload, onShare, isOwner }: ImageViewerProps) {
   const [scale, setScale] = useState(1);
-  const [translate, setTranslate] = useState({ x: 0, y: 0 });
-  const [showInfo, setShowInfo] = useState(false);
-  const imgRef = useRef<HTMLDivElement>(null);
-  const lastDistRef = useRef(0);
-  const isDragging = useRef(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const velocity = useRef({ x: 0, y: 0 });
   const lastPos = useRef({ x: 0, y: 0 });
+  const lastTime = useRef(0);
+  const animationFrame = useRef<number>(0);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const lastTouchTime = useRef(0);
+  const startPinchDistance = useRef(0);
+  const startScale = useRef(1);
+  const dragStart = useRef({ x: 0, y: 0 });
 
-  const getDistance = (t1: React.Touch, t2: React.Touch) =>
-    Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  // Boundary limits for clamping
+  const getLimits = useCallback((currentScale: number) => {
+    if (!containerRef.current || !imageRef.current) return { maxX: 0, maxY: 0 };
+    const contRect = containerRef.current.getBoundingClientRect();
+    const imgRect = imageRef.current.getBoundingClientRect();
+    const maxX = Math.max(0, (imgRect.width - contRect.width) / 2);
+    const maxY = Math.max(0, (imgRect.height - contRect.height) / 2);
+    return { maxX, maxY };
+  }, []);
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      lastDistRef.current = getDistance(e.touches[0], e.touches[1]);
-    } else if (e.touches.length === 1 && scale > 1) {
-      isDragging.current = true;
+  const applyInertia = useCallback(() => {
+    if (isDragging) return;
+
+    setPosition(prev => {
+      const { maxX, maxY } = getLimits(scale);
+      let nextX = prev.x + velocity.current.x;
+      let nextY = prev.y + velocity.current.y;
+
+      // Friction
+      velocity.current.x *= 0.95;
+      velocity.current.y *= 0.95;
+
+      // Bounce back if out of bounds
+      if (nextX > maxX) {
+        nextX = maxX + (nextX - maxX) * 0.5;
+        velocity.current.x *= 0.5;
+        if (Math.abs(nextX - maxX) < 0.5) nextX = maxX;
+      } else if (nextX < -maxX) {
+        nextX = -maxX + (nextX + maxX) * 0.5;
+        velocity.current.x *= 0.5;
+        if (Math.abs(nextX + maxX) < 0.5) nextX = -maxX;
+      }
+
+      if (nextY > maxY) {
+        nextY = maxY + (nextY - maxY) * 0.5;
+        velocity.current.y *= 0.5;
+        if (Math.abs(nextY - maxY) < 0.5) nextY = maxY;
+      } else if (nextY < -maxY) {
+        nextY = -maxY + (nextY + maxY) * 0.5;
+        velocity.current.y *= 0.5;
+        if (Math.abs(nextY + maxY) < 0.5) nextY = -maxY;
+      }
+
+      // Stop animation if velocity is low
+      if (Math.abs(velocity.current.x) < 0.1 && Math.abs(velocity.current.y) < 0.1) {
+        cancelAnimationFrame(animationFrame.current);
+        return { x: nextX, y: nextY };
+      }
+
+      animationFrame.current = requestAnimationFrame(applyInertia);
+      return { x: nextX, y: nextY };
+    });
+  }, [isDragging, scale, getLimits]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    cancelAnimationFrame(animationFrame.current);
+    velocity.current = { x: 0, y: 0 };
+
+    if (e.touches.length === 1) {
+      dragStart.current = { x: e.touches[0].clientX - position.x, y: e.touches[0].clientY - position.y };
       lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-  }, [scale]);
+      lastTime.current = Date.now();
+      setIsDragging(true);
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
-      const dist = getDistance(e.touches[0], e.touches[1]);
-      const ratio = dist / lastDistRef.current;
-      setScale(s => Math.min(5, Math.max(1, s * ratio)));
-      lastDistRef.current = dist;
-    } else if (e.touches.length === 1 && isDragging.current && scale > 1) {
-      const dx = e.touches[0].clientX - lastPos.current.x;
-      const dy = e.touches[0].clientY - lastPos.current.y;
-      setTranslate(t => ({ x: t.x + dx, y: t.y + dy }));
+      const now = Date.now();
+      if (now - lastTouchTime.current < 300) {
+        handleDoubleTap(e.touches[0].clientX, e.touches[0].clientY);
+      }
+      lastTouchTime.current = now;
+    } else if (e.touches.length === 2) {
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      startPinchDistance.current = distance;
+      startScale.current = scale;
+      setIsDragging(false);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && scale > 1) {
+      const currentTime = Date.now();
+      const dt = currentTime - lastTime.current;
+      if (dt > 0) {
+        velocity.current = {
+          x: (e.touches[0].clientX - lastPos.current.x),
+          y: (e.touches[0].clientY - lastPos.current.y)
+        };
+      }
       lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      lastTime.current = currentTime;
+
+      const newX = e.touches[0].clientX - dragStart.current.x;
+      const newY = e.touches[0].clientY - dragStart.current.y;
+      
+      // Edge resistance
+      const { maxX, maxY } = getLimits(scale);
+      let finalX = newX;
+      let finalY = newY;
+
+      if (newX > maxX) finalX = maxX + (newX - maxX) * 0.3;
+      if (newX < -maxX) finalX = -maxX + (newX + maxX) * 0.3;
+      if (newY > maxY) finalY = maxY + (newY - maxY) * 0.3;
+      if (newY < -maxY) finalY = -maxY + (newY + maxY) * 0.3;
+
+      setPosition({ x: finalX, y: finalY });
+    } else if (e.touches.length === 2) {
+      const distance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const newScale = Math.min(Math.max((distance / startPinchDistance.current) * startScale.current, 1), 4);
+      setScale(newScale);
+      if (newScale <= 1.05) setPosition({ x: 0, y: 0 });
     }
-  }, [scale]);
+  };
 
-  const handleTouchEnd = useCallback(() => {
-    isDragging.current = false;
-    if (scale <= 1) setTranslate({ x: 0, y: 0 });
-  }, [scale]);
-
-  const handleDoubleClick = useCallback(() => {
-    if (scale > 1) {
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    if (scale <= 1.05) {
       setScale(1);
-      setTranslate({ x: 0, y: 0 });
+      setPosition({ x: 0, y: 0 });
+    } else {
+      animationFrame.current = requestAnimationFrame(applyInertia);
+    }
+  };
+
+  const handleDoubleTap = (clientX: number, clientY: number) => {
+    if (scale > 1.1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
     } else {
       setScale(2.5);
+      // Optional: Center zoom on tap point
+      setPosition({ x: 0, y: 0 });
     }
-  }, [scale]);
+  };
+
+  const reset = () => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center">
-      {/* Top Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-20 bg-gradient-to-b from-black/60 to-transparent">
-        <button
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-black/95 flex flex-col touch-none select-none"
+    >
+      {/* Header */}
+      <div className="absolute top-0 left-0 right-0 p-6 flex items-center justify-between z-10 safe-top">
+        <button 
           onClick={onClose}
-          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform"
+          className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white active:scale-90 transition-transform"
         >
-          <X size={22} className="text-white" />
+          <X size={24} />
         </button>
-        {alt && (
-          <button
-            onClick={() => setShowInfo(!showInfo)}
-            className={cn(
-              "w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md active:scale-90 transition-transform",
-              showInfo ? "bg-primary text-primary-foreground" : "bg-white/10 text-white"
-            )}
-          >
-            <Info size={20} />
-          </button>
-        )}
+        
+        <div className="flex items-center gap-3">
+          {onShare && (
+            <button onClick={onShare} className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white">
+              <Share2 size={20} />
+            </button>
+          )}
+          {onDownload && (
+            <button onClick={handleDownloadAction} className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white">
+              <Download size={20} />
+            </button>
+          )}
+          {isOwner && onDelete && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm('Permanently delete this image?')) {
+                  onDelete();
+                  onClose();
+                }
+              }}
+              className="w-11 h-11 rounded-full bg-red-500/20 backdrop-blur-md flex items-center justify-center text-red-500"
+            >
+              <Trash2 size={20} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div
-        ref={imgRef}
-        className="flex-1 w-full flex items-center justify-center overflow-hidden touch-none"
+      {/* Main Viewport */}
+      <div 
+        ref={containerRef}
+        className="flex-1 flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onDoubleClick={handleDoubleClick}
       >
-        <div
-          style={{
-            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-            transition: isDragging.current ? 'none' : 'transform 0.2s ease-out',
+        <div 
+          className="relative transition-transform duration-300 ease-out will-change-transform"
+          style={{ 
+            transform: `translate3d(${position.x}px, ${position.y}px, 0) scale(${scale})`
           }}
-          className="relative"
         >
-          <WatermarkedImage
-            src={src}
-            alt={alt || ''}
-            className="max-w-full max-h-[85vh] object-contain select-none"
-            isPro={isPro}
+          <img
+            ref={imageRef}
+            src={url}
+            alt={alt || "Image"}
+            className="max-w-full max-h-[85vh] object-contain pointer-events-none"
+            referrerPolicy="no-referrer"
           />
         </div>
       </div>
 
-      {/* Info Panel Overlay */}
-      <AnimatePresence>
-        {showInfo && alt && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute inset-x-4 bottom-24 p-4 bg-background/90 backdrop-blur-xl border border-border rounded-2xl z-30 shadow-2xl"
-          >
-            <h4 className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Prompt Details</h4>
-            <p className="text-sm text-foreground leading-relaxed max-h-40 overflow-y-auto pr-2">{alt}</p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Bottom Actions Bar */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm px-6 py-4 bg-background/50 backdrop-blur-2xl border border-white/10 rounded-3xl flex items-center justify-between z-20 shadow-2xl">
-        <button onClick={actions?.onBookmark} className="flex flex-col items-center gap-1 group active:scale-90 transition-transform">
-          <div className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            <Bookmark size={18} className="text-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Save</span>
-        </button>
-        
-        <button onClick={actions?.onDownload} className="flex flex-col items-center gap-1 group active:scale-90 transition-transform">
-          <div className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            <Download size={18} className="text-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Get</span>
-        </button>
-
-        <div className="h-8 w-px bg-white/10 mx-2" />
-
-        <button onClick={actions?.onPublish} className="flex flex-col items-center gap-1 group active:scale-90 transition-transform">
-          <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-            <Upload size={20} className="text-primary-foreground" />
-          </div>
-          <span className="text-[9px] font-bold text-primary uppercase tracking-widest">Publish</span>
-        </button>
-
-        <div className="h-8 w-px bg-white/10 mx-2" />
-
-        <button onClick={actions?.onReuse} className="flex flex-col items-center gap-1 group active:scale-90 transition-transform">
-          <div className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            <RotateCcw size={18} className="text-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Reuse</span>
-        </button>
-
-        <button onClick={actions?.onShare} className="flex flex-col items-center gap-1 group active:scale-90 transition-transform">
-          <div className="w-10 h-10 rounded-full bg-secondary/50 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-            <Share2 size={18} className="text-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Share</span>
-        </button>
+      {/* Bottom Controls */}
+      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 z-10">
+        <button onClick={() => setScale(s => Math.max(1, s - 0.5))} className="p-2 text-white/70 hover:text-white"><ZoomOut size={18} /></button>
+        <div className="w-[1px] h-4 bg-white/10" />
+        <span className="text-[10px] font-bold text-white/50 w-8 text-center">{Math.round(scale * 100)}%</span>
+        <div className="w-[1px] h-4 bg-white/10" />
+        <button onClick={() => setScale(s => Math.min(4, s + 0.5))} className="p-2 text-white/70 hover:text-white"><ZoomIn size={18} /></button>
+        <button onClick={reset} className="p-2 text-white/70 hover:text-white"><RotateCcw size={16} /></button>
       </div>
-    </div>
+    </motion.div>
   );
+
+  async function handleDownloadAction() {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const sUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = sUrl;
+      link.download = `qpixa-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(sUrl);
+    } catch (e) {
+      onDownload?.();
+    }
+  }
 }

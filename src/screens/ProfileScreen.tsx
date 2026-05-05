@@ -8,6 +8,7 @@ import EditProfileSheet from '@/components/profile/EditProfileSheet';
 import DashboardSheet from '@/components/profile/DashboardSheet';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
+import AdminScreen from './AdminScreen';
 
 interface ProfileScreenProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
@@ -69,6 +70,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const [earnings, setEarnings] = useState({ totalSales: 0, totalEarnings: 0, avgRating: 0 });
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [promptFilter, setPromptFilter] = useState<string>('All');
   
   const { deferredPrompt, installApp: handleInstallApp } = useAppState();
@@ -211,6 +213,10 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     }
   };
 
+  if (showAdmin && profile?.role === 'admin') {
+    return <AdminScreen onBack={() => setShowAdmin(false)} />;
+  }
+
   if (!isLoggedIn) {
     return (
       <div className="h-full flex flex-col items-center justify-center px-8 text-center">
@@ -345,6 +351,27 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
             )}
           </div>
         </div>
+
+        {/* Admin Section (Only for Admin role) */}
+        {profile?.role === 'admin' && (
+          <div className="px-4 mb-6">
+            <button
+              onClick={() => setShowAdmin(true)}
+              className="w-full flex items-center justify-between p-4 rounded-2xl bg-primary/10 border border-primary/20 transition-all active:scale-[0.98]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground">
+                  <Shield size={20} />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-bold text-foreground">Admin Control</p>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">System & Reports</p>
+                </div>
+              </div>
+              <Sparkles size={18} className="text-primary animate-pulse" />
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex border-b border-border mt-1">

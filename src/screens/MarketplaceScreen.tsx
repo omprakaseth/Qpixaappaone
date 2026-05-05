@@ -57,6 +57,7 @@ interface MarketplaceScreenProps {
   onOpenAuth?: (mode: 'login' | 'signup') => void;
   onCreatorTap?: (creatorName: string, creatorId?: string) => void;
   navVisible?: boolean;
+  onBack?: () => void;
 }
 
 const MOCK_MARKETPLACE_PROMPTS: MarketplacePrompt[] = [
@@ -106,7 +107,7 @@ const MOCK_MARKETPLACE_PROMPTS: MarketplacePrompt[] = [
   }
 ];
 
-export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true }: MarketplaceScreenProps) {
+export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, onCreatorTap, navVisible = true, onBack }: MarketplaceScreenProps) {
   const [topHeaderHeight, setTopHeaderHeight] = useState(52);
   const [stickySectionHeight, setStickySectionHeight] = useState(96);
   const [isMounted, setIsMounted] = useState(false);
@@ -329,7 +330,17 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
           className="px-4 py-3 flex items-center justify-between"
           style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
         >
-          <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <button 
+                onClick={onBack}
+                className="p-1 -ml-1 rounded-full hover:bg-secondary active:scale-95 transition-all text-foreground"
+              >
+                <ArrowLeft size={22} />
+              </button>
+            )}
+            <h1 className="text-xl font-bold text-foreground">Marketplace</h1>
+          </div>
           <div className="flex items-center gap-2">
             {isLoggedIn && (
               <div className="flex items-center gap-1 bg-secondary px-2.5 py-1 rounded-full">

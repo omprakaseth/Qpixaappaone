@@ -269,8 +269,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUploadingPost(prev => prev ? { ...prev, progress: 100, status: 'success' } : null);
       
       // Wait a bit for DB consistency before full refetch
-      setTimeout(() => {
-        fetchPosts();
+      setTimeout(async () => {
+        await fetchPosts();
       }, 1500);
       
       // Auto clear after 3 seconds on success
@@ -354,7 +354,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           // Logic: Real posts first. Only add mock if real posts < 10
           let finalPosts = formattedPosts;
           if (formattedPosts.length < 10) {
-            finalPosts = [...formattedPosts, ...MOCK_POSTS];
+            // Deduplicate: Don't add mock posts that have the same ID as real posts
+            const realIds = new Set(formattedPosts.map(p => p.id));
+            const uniqueMockPosts = MOCK_POSTS.filter(p => !realIds.has(p.id));
+            finalPosts = [...formattedPosts, ...uniqueMockPosts];
           }
           
           setPosts(finalPosts);
@@ -367,7 +370,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Logic: Real posts first. Only add mock if real posts < 10
         let finalPosts = formattedPosts;
         if (formattedPosts.length < 10) {
-          finalPosts = [...formattedPosts, ...MOCK_POSTS];
+          // Deduplicate
+          const realIds = new Set(formattedPosts.map(p => p.id));
+          const uniqueMockPosts = MOCK_POSTS.filter(p => !realIds.has(p.id));
+          finalPosts = [...formattedPosts, ...uniqueMockPosts];
         }
         
         setPosts(finalPosts);
@@ -426,23 +432,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     if (data) {
-      // Auto-assign admin role to specific email
-      if (currentUser.email === 'omprakashseth248@gmail.com' && (data as any).role !== 'admin') {
-        const { data: updatedProfile } = await supabase
-          .from('profiles')
-          .update({ role: 'admin' } as any)
-          .eq('id', currentUser.id)
-          .select()
-          .single();
-        if (updatedProfile) data = updatedProfile;
-      }
-
       setProfile(data as Profile);
-      if (currentUser?.email === 'omprakashseth248@gmail.com') {
-        setCredits(999999);
-      } else {
-        setCredits(data.credits);
-      }
+      setCredits(data.credits);
     }
   };
 
@@ -482,15 +473,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const post = posts.find(p => p.id === id);
     if (!post) return;
 
+    const wasLiked = post.isLiked;
+    const originalLikes = post.likes;
+
     // Optimistic update
     setPosts(prev => prev.map(p =>
-      p.id === id ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p
+      p.id === id ? { ...p, isLiked: !wasLiked, likes: wasLiked ? originalLikes - 1 : originalLikes + 1 } : p
     ));
 
     if (post.isMock) return; // Don't call Supabase for mock posts
 
     try {
-      if (post.isLiked) {
+      if (wasLiked) {
         // Unlike
         await supabase.from('post_likes').delete().match({ post_id: id, user_id: user.id });
       } else {
@@ -512,9 +506,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Error toggling like:', err);
       toast.error('Failed to update like status');
-      // Revert on error
+      // Revert to original state
       setPosts(prev => prev.map(p =>
-        p.id === id ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 } : p
+        p.id === id ? { ...p, isLiked: wasLiked, likes: originalLikes } : p
       ));
     }
   };
@@ -525,15 +519,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const post = posts.find(p => p.id === id);
     if (!post) return;
 
+    const wasSaved = post.isSaved;
+    const originalSaves = post.saves;
+
     // Optimistic update
     setPosts(prev => prev.map(p =>
-      p.id === id ? { ...p, isSaved: !p.isSaved, saves: p.isSaved ? p.saves - 1 : p.saves + 1 } : p
+      p.id === id ? { ...p, isSaved: !wasSaved, saves: wasSaved ? originalSaves - 1 : originalSaves + 1 } : p
     ));
 
     if (post.isMock) return; // Don't call Supabase for mock posts
 
     try {
-      if (post.isSaved) {
+      if (wasSaved) {
         // Unsave
         await supabase.from('favorites').delete().match({ image_url: post.imageUrl, user_id: user.id });
       } else {
@@ -543,9 +540,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Error toggling save:', err);
       toast.error('Failed to update save status');
-      // Revert on error
+      // Revert to original state
       setPosts(prev => prev.map(p =>
-        p.id === id ? { ...p, isSaved: !p.isSaved, saves: p.isSaved ? p.saves - 1 : p.saves + 1 } : p
+        p.id === id ? { ...p, isSaved: wasSaved, saves: originalSaves } : p
       ));
     }
   };

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus } from 'lucide-react';
+import { ImageViewer } from '@/components/ImageViewer';
+import { motion, AnimatePresence } from 'motion/react';
 import WatermarkedImage from '@/components/WatermarkedImage';
-import ImageViewer from '@/components/ImageViewer';
 import AILoader from '@/components/AILoader';
 import { useAppState } from '@/context/AppContext';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
@@ -10,7 +11,6 @@ import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { analytics } from '@/lib/analytics';
-import { GoogleGenAI } from '@google/genai';
 
 const STYLE_PRESETS = [
   { id: 'none', name: 'None', prompt: '' },
@@ -84,7 +84,7 @@ interface StudioScreenProps {
   onPublish?: (imageUrl: string, prompt: string) => void;
 }
 
-function AiMessageBubble({ msg, isPro, setViewerImage }: any) {
+function AiMessageBubble({ msg, isPro, onOpenViewer, onDelete }: any) {
   if (msg.status === 'pending') {
     return (
       <div className="flex justify-start items-center gap-4">
@@ -116,17 +116,30 @@ function AiMessageBubble({ msg, isPro, setViewerImage }: any) {
     <div className="flex justify-start">
       <div className="bg-card rounded-2xl overflow-hidden max-w-[85%] border border-border/50 shadow-sm relative group">
         {msg.imageUrl && (
-          <button 
-            onClick={() => setViewerImage(msg.imageUrl!, msg.text || '')} 
-            className="w-full relative block"
-          >
-            <WatermarkedImage 
-              src={msg.imageUrl} 
-              alt={msg.text || 'Generated image'} 
-              className={cn("w-full object-cover", ratioClass)} 
-              isPro={isPro} 
-            />
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => onOpenViewer(msg.imageUrl!, msg.text || '', msg.id)} 
+              className="w-full relative block"
+            >
+              <WatermarkedImage 
+                src={msg.imageUrl} 
+                alt={msg.text || 'Generated image'} 
+                className={cn("w-full object-cover", ratioClass)} 
+                isPro={isPro} 
+              />
+            </button>
+            
+            {/* Delete Button for individual images */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.(msg.id);
+              }}
+              className="absolute top-2 right-2 p-1.5 bg-black/40 backdrop-blur-md rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -286,7 +299,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const { height: vpHeight, offsetTop: vpOffsetTop, isKeyboardVisible } = useVisualViewport();
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [viewerData, setViewerData] = useState<{ url: string; prompt: string } | null>(null);
+  const [viewerData, setViewerData] = useState<{ url: string; prompt: string; id?: string } | null>(null);
   const [longPressSession, setLongPressSession] = useState<ChatSession | null>(null);
   const [showSessionActions, setShowSessionActions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -414,25 +427,79 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     setEditingSessionId(null);
   };
 
-  const handleDeleteSession = async (id: string) => {
+  const handleDeleteMessage = async (sessionId: string, messageId: string) => {
     try {
-      if (id === 'cloud-history' && user && !isPlaceholder) {
-        const confirmDelete = window.confirm('Are you sure you want to permanently delete ALL your cloud history? This cannot be undone.');
-        if (!confirmDelete) return;
-        
-        toast.promise(
-          async () => {
-            const { error } = await supabase.from('generations').delete().eq('user_id', user.id);
-            if (error) throw error;
-          },
-          {
-            loading: 'Clearing cloud history...',
-            success: 'Cloud history permanently deleted',
-            error: 'Failed to clear cloud history'
-          }
+      // 1. Optimistic Update - Remove from UI instantly
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+      
+      // Update the session in local storage/state too
+      setSessions(prev => prev.map(s => {
+        if (s.id === sessionId) {
+          return { ...s, messages: s.messages.filter(m => m.id !== messageId) };
+        }
+        return s;
+      }));
+
+      // 2. Clear from Supabase if it's cloud history
+      if (sessionId === 'cloud-history' && user && !isPlaceholder) {
+        const { error } = await supabase
+          .from('generations')
+          .delete()
+          .eq('id', messageId)
+          .eq('user_id', user.id); // Security: ensure user owns it
+          
+        if (error) {
+          console.error('Supabase delete error:', error);
+          throw error;
+        }
+      }
+      
+      // 3. Update local session storage
+      const savedSessions = localStorage.getItem('qpixa_studio_sessions');
+      if (savedSessions) {
+        const parsed: ChatSession[] = JSON.parse(savedSessions);
+        const updated = parsed.map(s => 
+          s.id === sessionId 
+            ? { ...s, messages: s.messages.filter(m => m.id !== messageId) } 
+            : s
         );
+        localStorage.setItem('qpixa_studio_sessions', JSON.stringify(updated));
       }
 
+      toast.success('Permanently deleted');
+    } catch (err: any) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete permanently');
+      // If error occurs, you might want to refresh sessions here to recover state
+    }
+  };
+
+  const handleClearHistory = async () => {
+    if (!user || isPlaceholder) return;
+    const confirmDelete = window.confirm('Are you sure you want to permanently delete ALL your cloud history?');
+    if (!confirmDelete) return;
+
+    try {
+      const { error } = await supabase.from('generations').delete().eq('user_id', user.id);
+      if (error) throw error;
+      
+      setSessions(prev => prev.map(s => s.id === 'cloud-history' ? { ...s, messages: [] } : s));
+      if (currentSessionId === 'cloud-history') {
+        setMessages([]);
+      }
+      toast.success('History cleared');
+    } catch (err) {
+      toast.error('Failed to clear history');
+    }
+  };
+  
+  const handleDeleteSession = async (id: string) => {
+    if (id === 'cloud-history') {
+      await handleClearHistory();
+      return;
+    }
+
+    try {
       setSessions(prev => {
         const updated = prev.filter(s => s.id !== id);
         saveSessionsToLocalStorage(updated);
@@ -442,9 +509,10 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       if (currentSessionId === id) {
         handleNewChat();
       }
+      toast.success('Chat deleted');
     } catch (err) {
       console.error('Delete error:', err);
-      toast.error('Failed to delete history');
+      toast.error('Failed to delete chat');
     }
   };
 
@@ -681,11 +749,19 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         const data = await response.json();
         enhanced = data.text?.trim();
       } else {
-        // Fallback to Pollinations Text AI (Free & No Key)
+        // Fallback to Pollinations Text AI (Proxy)
         console.log('Gemini enhance failed, falling back to Pollinations');
-        const pollResponse = await fetch(`https://text.pollinations.ai/prompt/${encodeURIComponent(`Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`)}?model=openai`);
+        const pollResponse = await fetch('/api/pollinations/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            prompt: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`,
+            model: 'openai'
+          })
+        });
         if (pollResponse.ok) {
-          enhanced = await pollResponse.text();
+          const pollData = await pollResponse.json();
+          enhanced = pollData.text;
         }
       }
       
@@ -1112,7 +1188,8 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                   key={msg.id} 
                   msg={msg} 
                   isPro={isPro} 
-                  setViewerImage={(url: string, prompt: string) => setViewerData({ url, prompt })} 
+                  onOpenViewer={(url: string, prompt: string, id: string) => setViewerData({ url, prompt, id })} 
+                  onDelete={() => currentSessionId && handleDeleteMessage(currentSessionId, msg.id)}
                 />
               )
             ))}
@@ -1336,27 +1413,24 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       </div>
     )}
 
-    {viewerData && (
-      <ImageViewer 
-        src={viewerData.url} 
-        alt={viewerData.prompt} 
-        onClose={() => setViewerData(null)} 
-        actions={{
-          onDownload: () => handleDownload(viewerData.url),
-          onShare: () => handleShare(viewerData.url, viewerData.prompt),
-          onBookmark: () => handleBookmark(viewerData.url, viewerData.prompt),
-          onReuse: () => {
-            setPrompt(viewerData.prompt);
-            setViewerData(null);
-            toast.success('Prompt copied to input');
-          },
-          onPublish: () => {
-            onPublish?.(viewerData.url, viewerData.prompt);
-            setViewerData(null);
-          }
-        }}
-      />
-    )}
+    <AnimatePresence>
+      {viewerData && (
+        <ImageViewer 
+          url={viewerData.url} 
+          alt={viewerData.prompt} 
+          onClose={() => setViewerData(null)} 
+          isOwner={true}
+          onDelete={() => {
+            if (viewerData.id && currentSessionId) {
+              handleDeleteMessage(currentSessionId, viewerData.id);
+              setViewerData(null);
+            }
+          }}
+          onDownload={() => handleDownload?.(viewerData.url)}
+          onShare={() => handleShare?.(viewerData.url, viewerData.prompt)}
+        />
+      )}
+    </AnimatePresence>
     </>
   );
 }

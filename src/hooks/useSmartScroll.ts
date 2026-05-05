@@ -28,12 +28,12 @@ export function useSmartScroll(enabled = true) {
 
     const delta = current - lastScrollY.current;
     
-    // Scroll down -> hide
-    if (delta > 10 && current > 150) {
+    // Scroll down -> hide (be more sensitive)
+    if (delta > 5 && current > 50) {
       setVisible(false);
     } 
     // Scroll up -> show
-    else if (delta < -10 || current < 10) {
+    else if (delta < -5 || current < 5) {
       setVisible(true);
     }
 
