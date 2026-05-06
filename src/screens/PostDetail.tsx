@@ -49,14 +49,25 @@ interface PostDetailProps {
 }
 
 export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: PostDetailProps) {
+  // Defensive defaults for malformed post objects
+  const safePost = useMemo(() => ({
+    ...post,
+    prompt: post?.prompt || '',
+    tags: post?.tags || [],
+    category: post?.category || 'General',
+    likes: post?.likes ?? 0,
+    views: post?.views ?? 0,
+    creator: post?.creator || { id: '', name: 'Unknown', username: 'user', initials: 'U', avatar: '' }
+  }), [post]);
+
   const { toggleLike, toggleSave, isPro, isLoggedIn, user, profile, deletePost, updatePost, posts } = useAppState();
   const { isFollowing, toggleFollow, loading: followLoading } = useFollows();
   
   const relatedPosts = useMemo(() => {
     return posts
-      .filter(p => p.id !== post.id && (p.category === post.category || p.tags.some(t => post.tags.includes(t))))
+      .filter(p => p.id !== safePost.id && (p.category === safePost.category || (p.tags && p.tags.some(t => safePost.tags.includes(t)))))
       .slice(0, 4);
-  }, [posts, post]);
+  }, [posts, safePost]);
 
   const useCases = useMemo(() => {
     const cases = [
@@ -68,9 +79,9 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       "Personal Projects"
     ];
     // Deterministic selection based on prompt
-    const seed = post.prompt.length;
+    const seed = safePost.prompt.length;
     return [cases[seed % cases.length], cases[(seed + 1) % cases.length]];
-  }, [post.prompt]);
+  }, [safePost.prompt]);
 
   const [showFullViewer, setShowFullViewer] = useState(false);
   const [reviewText, setReviewText] = useState('');
@@ -125,9 +136,9 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   
   // Edit states
   const [isEditing, setIsEditing] = useState(false);
-  const [editedTitle, setEditedTitle] = useState(post.title);
-  const [editedPrompt, setEditedPrompt] = useState(post.prompt);
-  const [editedTags, setEditedTags] = useState(post.tags.join(', '));
+  const [editedTitle, setEditedTitle] = useState(safePost.title);
+  const [editedPrompt, setEditedPrompt] = useState(safePost.prompt);
+  const [editedTags, setEditedTags] = useState(safePost.tags.join(', '));
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -167,10 +178,10 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
     fetchReviews();
   }, [post.id]);
 
-  if (!post || !post.creator) {
+  if (!post) {
     return (
       <div className="fixed inset-0 z-[70] bg-background flex flex-col items-center justify-center">
-        <p className="text-muted-foreground mb-4">Post not found or malformed.</p>
+        <p className="text-muted-foreground mb-4">Post not found.</p>
         <button onClick={onBack} className="px-4 py-2 bg-primary text-primary-foreground rounded-xl font-bold">
           Go Back
         </button>
@@ -179,7 +190,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   }
 
   // Use creator id if available, fallback
-  const creatorId = post.creator.id || '';
+  const creatorId = safePost.creator.id || '';
   const following = isFollowing(creatorId);
   const isOwner = Boolean(user?.id && creatorId && user.id === creatorId);
 
@@ -196,29 +207,29 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   const handleShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: post.title, text: post.prompt, url: window.location.href });
+        await navigator.share({ title: safePost.title, text: safePost.prompt, url: window.location.href });
       } catch {}
     } else {
-      navigator.clipboard?.writeText(post.prompt);
+      navigator.clipboard?.writeText(safePost.prompt);
       toast.success('Prompt copied!');
     }
   };
 
   const handleDownload = () => {
     const a = document.createElement('a');
-    a.href = post.imageUrl;
-    a.download = `${post.title.replace(/\s+/g, '-').toLowerCase()}.jpg`;
+    a.href = safePost.imageUrl;
+    a.download = `${safePost.title.replace(/\s+/g, '-').toLowerCase()}.jpg`;
     a.target = '_blank';
     a.click();
   };
 
   const handleLike = () => {
-    toggleLike(post.id);
-    if (!post.isLiked) toast.success('Liked!');
+    toggleLike(safePost.id);
+    if (!safePost.isLiked) toast.success('Liked!');
   };
 
   const handleCopy = () => {
-    navigator.clipboard?.writeText(post.prompt);
+    navigator.clipboard?.writeText(safePost.prompt);
     toast.success('Prompt copied!');
   };
 
@@ -240,7 +251,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       const { data, error } = await (supabase as any)
         .from('post_comments')
         .insert({
-          post_id: post.id,
+          post_id: safePost.id,
           user_id: user.id,
           content: reviewText,
           rating: rating
@@ -257,14 +268,14 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       if (error) throw error;
 
       // Send notification to post creator
-      if (post.creator.id !== user.id) {
+      if (safePost.creator.id !== user.id) {
         await (supabase as any).from('user_notifications').insert({
-          user_id: post.creator.id,
+          user_id: safePost.creator.id,
           actor_id: user.id,
           type: 'comment',
           title: 'New Comment! 💬',
-          message: `${profile?.display_name || 'Someone'} commented on your post "${post.title}"`,
-          link: `/post/${post.id}`
+          message: `${profile?.display_name || 'Someone'} commented on your post "${safePost.title}"`,
+          link: `/post/${safePost.id}`
         });
       }
 
@@ -278,7 +289,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   };
 
   const handleDelete = async () => {
-    await deletePost(post.id);
+    await deletePost(safePost.id);
     onBack();
   };
 
@@ -299,7 +310,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
 
     setIsUpdating(true);
     try {
-      await updatePost(post.id, {
+      await updatePost(safePost.id, {
         title: editedTitle.trim(),
         prompt: editedPrompt.trim(),
         tags: editedTags.split(',').map(t => t.trim()).filter(Boolean)
@@ -424,8 +435,8 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
           onClick={() => setShowFullViewer(true)}
         >
           <img
-            src={post.imageUrl}
-            alt={post.title}
+            src={safePost.imageUrl}
+            alt={safePost.title}
             className="w-full h-full object-contain"
             referrerPolicy="no-referrer"
           />
@@ -445,16 +456,16 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
             />
           ) : (
             <h1 className="text-[18px] font-bold tracking-tight text-foreground mb-1 leading-tight">
-              {post.title}
+              {safePost.title}
             </h1>
           )}
           
           <div className="flex items-center gap-3 text-muted-foreground/60">
             <span className="flex items-center gap-1 text-[12px] font-medium">
-              <Eye size={12} /> {formatNumber(post.views)} views
+              <Eye size={12} /> {formatNumber(safePost.views)} views
             </span>
             <span className="flex items-center gap-1 text-[12px] font-medium">
-              <Heart size={12} /> {formatNumber(post.likes)} likes
+              <Heart size={12} /> {formatNumber(safePost.likes)} likes
             </span>
           </div>
         </div>
@@ -462,23 +473,23 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
         {/* Creator Info */}
         <div className="flex items-center justify-between mb-6">
           <button
-            onClick={() => onCreatorTap?.(post.creator.name, post.creator.id)}
+            onClick={() => onCreatorTap?.(safePost.creator.name, safePost.creator.id)}
             className="flex items-center gap-2 active:opacity-70 transition-opacity"
           >
             <div className="w-8 h-8 rounded-full overflow-hidden bg-secondary border border-border">
-              {post.creator.avatar ? (
-                <img src={post.creator.avatar} alt="" className="w-full h-full object-cover" />
+              {safePost.creator.avatar ? (
+                <img src={safePost.creator.avatar} alt="" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-[10px] font-bold">
-                  {post.creator.initials}
+                  {safePost.creator.initials}
                 </div>
               )}
             </div>
             <div className="text-left">
               <p className="text-[14px] font-semibold text-foreground flex items-center gap-1 leading-none">
-                {post.creator.name} {post.creator.isVerified && <VerifiedBadge size={12} />}
+                {safePost.creator.name} {safePost.creator.isVerified && <VerifiedBadge size={12} />}
               </p>
-              <p className="text-[12px] text-muted-foreground">@{post.creator.username}</p>
+              <p className="text-[12px] text-muted-foreground">@{safePost.creator.username}</p>
             </div>
           </button>
           
@@ -502,10 +513,10 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
             onClick={handleLike}
             className={cn(
               "flex items-center gap-1.5 transition-colors active:scale-90",
-              post.isLiked ? "text-red-500" : "text-foreground"
+              safePost.isLiked ? "text-red-500" : "text-foreground"
             )}
           >
-            <Heart size={22} className={post.isLiked ? "fill-current" : ""} />
+            <Heart size={22} className={safePost.isLiked ? "fill-current" : ""} />
           </button>
           <button className="text-foreground transition-colors active:scale-90">
             <MessageSquare size={22} />
@@ -514,8 +525,8 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
             <Share2 size={22} />
           </button>
           <div className="flex-1" />
-          <button onClick={() => toggleSave(post.id)} className="text-foreground transition-colors active:scale-90">
-            <Bookmark size={22} className={post.isSaved ? "fill-current" : ""} />
+          <button onClick={() => toggleSave(safePost.id)} className="text-foreground transition-colors active:scale-90">
+            <Bookmark size={22} className={safePost.isSaved ? "fill-current" : ""} />
           </button>
         </div>
 
@@ -550,7 +561,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
                   ) : (
                     <div className="pt-4">
                       <p className="text-[15px] text-foreground leading-relaxed italic">
-                        "{post.prompt}"
+                        "{safePost.prompt}"
                       </p>
                       <button 
                         onClick={handleCopy}
@@ -577,7 +588,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
 
         {/* Meta / Tags */}
         <div className="flex flex-wrap gap-2 mb-10">
-          {post.tags.map(tag => (
+          {(safePost.tags || []).map(tag => (
             <span key={tag} className="px-3 py-1.5 rounded-lg bg-secondary text-[12px] font-medium text-muted-foreground border border-border/50">
               #{tag}
             </span>
@@ -662,8 +673,8 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       <AnimatePresence>
         {showFullViewer && (
           <ImageViewer
-            url={post.imageUrl}
-            alt={post.title}
+            url={safePost.imageUrl}
+            alt={safePost.title}
             onClose={() => setShowFullViewer(false)}
             onDownload={handleDownload}
             onShare={handleShare}
