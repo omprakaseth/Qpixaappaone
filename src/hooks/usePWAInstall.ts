@@ -1,16 +1,7 @@
 import { useState, useEffect } from 'react';
 
-interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed';
-    platform: string;
-  }>;
-  prompt(): Promise<void>;
-}
-
 export function usePWAInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
@@ -20,45 +11,34 @@ export function usePWAInstall() {
       setIsInstalled(true);
     }
 
-    const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
+    const handler = (e: any) => {
       e.preventDefault();
-      // Stash the event so it can be triggered later.
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      setInstallPrompt(e);
       setIsInstallable(true);
     };
 
-    const handleAppInstalled = () => {
-      setIsInstallable(false);
-      setIsInstalled(true);
-      setDeferredPrompt(null);
-    };
+    window.addEventListener('beforeinstallprompt', handler);
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    window.addEventListener('appinstalled', handleAppInstalled);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', handleAppInstalled);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const promptInstall = async () => {
-    if (!deferredPrompt) return;
+    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     
-    // Show the install prompt
-    deferredPrompt.prompt();
+    if (isiOS && !isInstalled) {
+      alert('To install: Tap the Share button at the bottom and then "Add to Home Screen"');
+      return;
+    }
+
+    if (!installPrompt) return;
     
-    // Wait for the user to respond to the prompt
-    const { outcome } = await deferredPrompt.userChoice;
-    
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') {
       setIsInstallable(false);
     }
-    
-    // We've used the prompt, and can't use it again, throw it away
-    setDeferredPrompt(null);
+    setInstallPrompt(null);
   };
 
-  return { isInstallable, isInstalled, promptInstall, deferredPrompt };
+  return { isInstallable, isInstalled, promptInstall, deferredPrompt: installPrompt };
 }

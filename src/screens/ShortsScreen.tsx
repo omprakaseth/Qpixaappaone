@@ -22,6 +22,7 @@ import {
 import { Drawer } from 'vaul';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { LogoLoader } from '@/components/LogoLoader';
 
@@ -80,6 +81,7 @@ interface ShortsScreenProps {
 }
 
 export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps) {
+  const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<'Shorts' | 'Following'>('Shorts');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [reels, setReels] = useState<Reel[]>([]);
@@ -153,7 +155,10 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
   }, [activeIndex]);
 
   return (
-    <div className="h-full w-full bg-black relative overflow-hidden flex flex-col pb-16">
+    <div className={cn(
+      "h-full w-full bg-black relative overflow-hidden flex flex-col",
+      isMobile ? "pb-16" : "pb-0"
+    )}>
       {/* Top Navigation - Glass Pill Style */}
       <motion.div 
         initial={{ y: 0, opacity: 1 }}
@@ -162,26 +167,34 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
           opacity: activeIndex >= 3 ? 0 : 1
         }}
         transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="absolute top-0 left-0 w-full z-50 px-4 pt-[max(env(safe-area-inset-top),1rem)] flex items-center justify-between pointer-events-none"
+        className={cn(
+          "absolute top-0 left-0 w-full z-50 px-4 pt-[max(env(safe-area-inset-top),1rem)] flex items-center justify-between pointer-events-none",
+          !isMobile && "max-w-[500px] left-1/2 -translate-x-1/2 pt-6"
+        )}
       >
-        <button 
-          onClick={onBack}
-          className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-md text-white transition-all active:scale-90"
-        >
-          <ArrowLeft className="w-5 h-5 drop-shadow-md" />
-        </button>
+        {isMobile && (
+          <button 
+            onClick={onBack}
+            className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-black/20 backdrop-blur-md text-white transition-all active:scale-90"
+          >
+            <ArrowLeft className="w-5 h-5 drop-shadow-md" />
+          </button>
+        )}
 
-        <div className="relative pointer-events-auto absolute left-1/2 -translate-x-1/2">
+        <div className={cn(
+          "relative pointer-events-auto",
+          isMobile ? "absolute left-1/2 -translate-x-1/2" : "flex-1 flex justify-center"
+        )}>
           <button 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-black/20 backdrop-blur-md text-white font-bold text-sm transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white font-black uppercase italic tracking-wider text-xs transition-with-smooth active:scale-95 shadow-2xl"
           >
             {viewMode}
             <motion.div
               animate={{ rotate: isDropdownOpen ? 180 : 0 }}
               transition={{ duration: 0.2 }}
             >
-              <ChevronDown className="w-4 h-4 opacity-80" />
+              <ChevronDown className="w-4 h-4 opacity-80 text-primary" />
             </motion.div>
           </button>
 
@@ -191,7 +204,7 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
                 initial={{ opacity: 0, y: -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-36 bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl z-50"
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] z-50"
               >
                 {(['Shorts', 'Following'] as const).map((mode) => (
                   <button
@@ -201,8 +214,8 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
                       setIsDropdownOpen(false);
                     }}
                     className={cn(
-                      "w-full px-4 py-3 text-sm font-bold text-left transition-colors hover:bg-white/5",
-                      viewMode === mode ? "text-white" : "text-white/40"
+                      "w-full px-5 py-4 text-xs font-black uppercase italic tracking-wider text-left transition-colors hover:bg-white/5",
+                      viewMode === mode ? "text-primary" : "text-white/40"
                     )}
                   >
                     {mode}
@@ -213,14 +226,17 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
           </AnimatePresence>
         </div>
 
-        <div className="w-10 h-10" /> {/* Spacer for centering */}
+        {isMobile ? <div className="w-10 h-10" /> : <div />} {/* Spacer for centering */}
       </motion.div>
 
       {/* Video Feed */}
       <div 
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-scroll snap-y snap-mandatory no-scrollbar"
+        className={cn(
+          "flex-1 overflow-y-scroll snap-y snap-mandatory no-scrollbar",
+          !isMobile && "max-w-[500px] mx-auto w-full border-x border-white/5 relative bg-[#09090b]"
+        )}
       >
         {loading ? (
           <div className="h-full w-full flex flex-col items-center justify-center bg-black">
@@ -240,6 +256,7 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
               onShowComments={() => setShowComments(true)}
               onCreatorTap={onCreatorTap}
               onBack={onBack}
+              isMobile={isMobile}
             />
           ))
         ) : (
@@ -250,6 +267,38 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
           </div>
         )}
       </div>
+
+      {/* Desktop Navigation Helper (Next/Prev) */}
+      {!isMobile && (
+        <div className="fixed right-8 bottom-8 flex flex-col gap-4 z-50">
+           <button 
+            onClick={() => {
+              if (activeIndex > 0) {
+                containerRef.current?.scrollTo({ 
+                  top: (activeIndex - 1) * containerRef.current.clientHeight, 
+                  behavior: 'smooth' 
+                });
+              }
+            }}
+            className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all active:scale-90"
+           >
+             <ChevronUp />
+           </button>
+           <button 
+            onClick={() => {
+               if (activeIndex < reels.length - 1) {
+                containerRef.current?.scrollTo({ 
+                  top: (activeIndex + 1) * containerRef.current.clientHeight, 
+                  behavior: 'smooth' 
+                });
+              }
+            }}
+            className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white hover:bg-white/10 transition-all active:scale-90"
+           >
+             <ChevronDown />
+           </button>
+        </div>
+      )}
 
       {/* Comments Drawer */}
       <Drawer.Root open={showComments} onOpenChange={setShowComments}>
@@ -298,9 +347,10 @@ interface VideoItemProps {
   onShowComments: () => void;
   onCreatorTap?: (username: string) => void;
   onBack?: () => void;
+  isMobile?: boolean; // Added isMobile prop
 }
 
-const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onShowComments, onCreatorTap, onBack }) => {
+const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onShowComments, onCreatorTap, onBack, isMobile }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState(0);
   const [isLiked, setIsLiked] = useState(reel.isLiked);
@@ -510,128 +560,134 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
               exit={{ opacity: 0 }}
               className="absolute inset-0 pointer-events-none z-20"
             >
-              {/* Right Side Actions - AI Focused */}
-              <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3 pointer-events-auto min-h-[300px] justify-end">
-                <div className="flex flex-col items-center gap-1">
-                  <button 
-                    onClick={() => {
-                      const newLikedState = !isLiked;
-                      setIsLiked(newLikedState);
-                      onUpdateReel({ ...reel, isLiked: newLikedState });
-                      
-                      // Background sync
-                      if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
-                        (async () => {
-                          const { data: { user } } = await supabase.auth.getUser();
-                          if (user) {
-                            if (newLikedState) {
-                              await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id });
-                            } else {
-                              await supabase.from('post_likes').delete().eq('post_id', reel.id).eq('user_id', user.id);
-                            }
-                          }
-                        })();
-                      }
-                    }}
-                    className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
-                  >
-                    <Heart className={cn("w-6 h-6 transition-colors drop-shadow-md", isLiked ? "fill-red-500 text-red-500" : "text-white group-hover:text-white/80")} />
-                  </button>
-                  <span className="text-[11px] font-bold text-white drop-shadow-md">{reel.likes}</span>
-                </div>
-
-                <div className="flex flex-col items-center gap-1">
-                  <button 
-                    onClick={() => onShowComments()}
-                    className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
-                  >
-                    <MessageSquare className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
-                  </button>
-                  <span className="text-[11px] font-bold text-white drop-shadow-md">{reel.comments}</span>
-                </div>
-
-                <div className="flex flex-col items-center gap-1">
-                  <button 
-                    onClick={() => {
-                      if (navigator.share) {
-                        navigator.share({
-                          title: `Check out @${reel.username}'s AI Short`,
-                          text: reel.description,
-                          url: window.location.href,
-                        }).catch(() => {});
-                      }
-                    }}
-                    className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
-                  >
-                    <Share2 className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
-                  </button>
-                  <span className="text-[11px] font-bold text-white drop-shadow-md">{reel.shares}</span>
-                </div>
-
-                <button 
-                  onClick={() => setIsMoreMenuOpen(true)}
-                  className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group mt-1"
-                >
-                  <MoreVertical className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
-                </button>
-              </div>
-
-              {/* Bottom Left Creator Section */}
-              <div className="absolute left-4 bottom-10 right-20 flex flex-col gap-3 pointer-events-auto">
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="w-11 h-11 rounded-full border-2 border-white/30 overflow-hidden shadow-2xl flex-shrink-0 cursor-pointer"
-                    onClick={() => onCreatorTap?.(reel.username)}
-                  >
-                    <img src={reel.profilePic} alt={reel.username} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span 
-                      className="text-white font-bold text-sm drop-shadow-md cursor-pointer"
-                      onClick={() => onCreatorTap?.(reel.username)}
-                    >
-                      @{reel.username}
-                    </span>
-                    <button 
-                      onClick={() => {
-                        setIsFollowing(!isFollowing);
-                        onUpdateReel({ ...reel, isFollowing: !isFollowing });
-                      }}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-[11px] font-bold border transition-all active:scale-95",
-                        isFollowing 
-                          ? "bg-white/10 border-white/20 text-white/60" 
-                          : "bg-white border-white text-black"
-                      )}
-                    >
-                      {isFollowing ? 'Following' : 'Follow'}
-                    </button>
-                  </div>
-                </div>
+        {/* Right Side Actions - AI Focused */}
+        <div className={cn(
+          "absolute right-3 bottom-20 flex flex-col items-center gap-3 pointer-events-auto min-h-[300px] justify-end",
+          !isMobile && "right-6 bottom-24 gap-4"
+        )}>
+          <div className="flex flex-col items-center gap-1">
+            <button 
+              onClick={() => {
+                const newLikedState = !isLiked;
+                setIsLiked(newLikedState);
+                onUpdateReel({ ...reel, isLiked: newLikedState });
                 
-                <div className="space-y-2">
-                  <p className="text-white text-sm font-medium line-clamp-2 leading-relaxed drop-shadow-md">
-                    {reel.description}
-                  </p>
-                  <div className="flex items-center gap-2 text-white/80 text-xs w-48 overflow-hidden">
-                    <Music className="w-3 h-3 flex-shrink-0" />
-                    <div className="flex-1 overflow-hidden relative h-4">
-                      <motion.div 
-                        animate={{ x: ["0%", "-50%"] }}
-                        transition={{ 
-                          duration: 10, 
-                          repeat: Infinity, 
-                          ease: "linear" 
-                        }}
-                        className="flex gap-8 whitespace-nowrap absolute left-0"
-                      >
-                        <span className="font-medium">{reel.audio}</span>
-                        <span className="font-medium">{reel.audio}</span>
-                      </motion.div>
-                    </div>
-                  </div>
-                </div>
+                // Background sync
+                if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+                  (async () => {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    if (user) {
+                      if (newLikedState) {
+                        await supabase.from('post_likes').insert({ post_id: reel.id, user_id: user.id });
+                      } else {
+                        await supabase.from('post_likes').delete().eq('post_id', reel.id).eq('user_id', user.id);
+                      }
+                    }
+                  })();
+                }
+              }}
+              className="w-12 h-12 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-90 group"
+            >
+              <Heart className={cn("w-6 h-6 transition-colors drop-shadow-md", isLiked ? "fill-red-500 text-red-500" : "text-white group-hover:text-white/80")} />
+            </button>
+            <span className="text-[11px] font-black italic text-white drop-shadow-md uppercase tracking-tighter">{reel.likes}</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1">
+            <button 
+              onClick={() => onShowComments()}
+              className="w-12 h-12 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-90 group"
+            >
+              <MessageSquare className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
+            </button>
+            <span className="text-[11px] font-black italic text-white drop-shadow-md uppercase tracking-tighter">{reel.comments}</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1">
+            <button 
+              onClick={() => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: `Check out @${reel.username}'s AI Short`,
+                    text: reel.description,
+                    url: window.location.href,
+                  }).catch(() => {});
+                }
+              }}
+              className="w-12 h-12 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-90 group"
+            >
+              <Share2 className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
+            </button>
+            <span className="text-[11px] font-black italic text-white drop-shadow-md uppercase tracking-tighter">{reel.shares}</span>
+          </div>
+
+          <button 
+            onClick={() => setIsMoreMenuOpen(true)}
+            className="w-12 h-12 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-90 group mt-1"
+          >
+            <MoreVertical className="w-6 h-6 text-white drop-shadow-md group-hover:text-white/80" />
+          </button>
+        </div>
+
+        {/* Bottom Left Creator Section */}
+        <div className={cn(
+          "absolute left-4 bottom-10 right-20 flex flex-col gap-3 pointer-events-auto",
+          !isMobile && "left-6 bottom-14"
+        )}>
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-12 h-12 rounded-full border-2 border-primary/50 overflow-hidden shadow-2xl flex-shrink-0 cursor-pointer p-0.5 bg-black"
+              onClick={() => onCreatorTap?.(reel.username)}
+            >
+              <img src={reel.profilePic} alt={reel.username} className="w-full h-full rounded-full object-cover" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span 
+                className="text-white font-black italic uppercase tracking-tighter text-base drop-shadow-md cursor-pointer"
+                onClick={() => onCreatorTap?.(reel.username)}
+              >
+                @{reel.username}
+              </span>
+              <button 
+                onClick={() => {
+                  setIsFollowing(!isFollowing);
+                  onUpdateReel({ ...reel, isFollowing: !isFollowing });
+                }}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-[10px] font-black uppercase italic tracking-widest border transition-all active:scale-95",
+                  isFollowing 
+                    ? "bg-white/10 border-white/20 text-white/60" 
+                    : "bg-primary border-primary text-white shadow-[0_0_15px_rgba(var(--primary),0.5)]"
+                )}
+              >
+                {isFollowing ? 'Following' : 'Follow'}
+              </button>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <p className="text-white text-sm font-medium line-clamp-2 leading-relaxed drop-shadow-md max-w-sm">
+              {reel.description}
+            </p>
+            <div className="flex items-center gap-2 text-white/80 text-[10px] font-black uppercase tracking-widest italic w-56 overflow-hidden bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/5">
+              <Music className="w-3 h-3 flex-shrink-0 text-primary" />
+              <div className="flex-1 overflow-hidden relative h-4">
+                <motion.div 
+                  animate={{ x: ["0%", "-50%"] }}
+                  transition={{ 
+                    duration: 10, 
+                    repeat: Infinity, 
+                    ease: "linear" 
+                  }}
+                  className="flex gap-8 whitespace-nowrap absolute left-0"
+                >
+                  <span>{reel.audio}</span>
+                  <span>{reel.audio}</span>
+                </motion.div>
               </div>
+            </div>
+          </div>
+        </div>
             </motion.div>
           )}
         </AnimatePresence>

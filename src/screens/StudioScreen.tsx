@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus } from 'lucide-react';
+import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus, Check, Loader2 } from 'lucide-react';
 import { ImageViewer } from '@/components/ImageViewer';
 import { motion, AnimatePresence } from 'motion/react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import AILoader from '@/components/AILoader';
 import { useAppState } from '@/context/AppContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
@@ -148,6 +149,7 @@ function AiMessageBubble({ msg, isPro, onOpenViewer, onDelete }: any) {
 }
 
 export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPublish }: StudioScreenProps) {
+  const isMobile = useIsMobile();
   const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user, profile } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
@@ -1005,491 +1007,414 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   };
 
   const containerStyle: React.CSSProperties = isKeyboardVisible
-    ? { position: 'fixed', top: `${vpOffsetTop}px`, left: 0, right: 0, height: `${vpHeight}px`, zIndex: 30 }
-    : { position: 'fixed', top: 0, left: 0, right: 0, bottom: '56px', zIndex: 30 };
+    ? { 
+        position: 'fixed', 
+        top: `${vpOffsetTop}px`, 
+        left: 0, 
+        right: 0, 
+        height: `${vpHeight}px`, 
+        zIndex: 30 
+      }
+    : { 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: isMobile ? '56px' : '0', 
+        zIndex: 30 
+      };
 
   return (
     <>
-    <div style={containerStyle} className="flex flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <div className="flex-shrink-0 flex items-center justify-between px-3 pt-2 pb-3 bg-background/95 backdrop-blur-sm border-b border-border z-20" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
-        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <SheetTrigger asChild>
-            <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors">
-              <Menu size={22} className="text-foreground" />
-            </button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-80 bg-card border-border p-0 flex flex-col" onOpenAutoFocus={(e) => e.preventDefault()}>
-            <div className="p-4 border-b border-border shrink-0">
-              <SheetTitle className="text-base font-bold text-foreground">Chat History</SheetTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Manage your conversations</p>
-              
-              <div className="mt-4 space-y-3">
-                <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search chats..."
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                    className="w-full bg-secondary text-foreground text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              {sessions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <Clock size={32} className="mb-2 opacity-20" />
-                  <p className="text-xs">No chat history yet</p>
-                </div>
-              ) : (
-                sessions.filter(s => s.title.toLowerCase().includes(historySearch.toLowerCase())).map(session => (
-                  <div
-                    key={session.id}
-                    className={cn(
-                      "group relative flex items-center gap-3 w-full p-3 rounded-xl transition-all cursor-pointer",
-                      currentSessionId === session.id ? "bg-primary/10 border border-primary/20" : "bg-secondary/50 hover:bg-secondary border border-transparent"
-                    )}
-                    onClick={() => handleSelectSession(session)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setLongPressSession(session);
-                      setShowSessionActions(true);
-                    }}
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <MessageSquare size={16} className="text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {editingSessionId === session.id ? (
-                        <input
-                          autoFocus
-                          value={editTitle}
-                          onChange={(e) => setEditTitle(e.target.value)}
-                          onBlur={() => handleRenameSession(session.id, editTitle)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleRenameSession(session.id, editTitle)}
-                          className="w-full bg-background text-xs font-medium py-0.5 px-1 rounded outline-none ring-1 ring-primary"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <p className="text-xs font-medium text-foreground truncate">{session.title}</p>
-                      )}
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {new Date(session.updatedAt).toLocaleDateString()}
-                      </p>
-                    </div>
-                    
-                    {/* Status Icon for Pending */}
-                    {session.messages.some(m => m.status === 'pending') && (
-                      <RotateCcw size={12} className="text-primary animate-spin shrink-0" />
-                    )}
-
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSessionId(session.id);
-                          setEditTitle(session.title);
-                        }}
-                        className="p-1 hover:bg-background rounded"
-                      >
-                        <PenLine size={12} className="text-muted-foreground hover:text-foreground" />
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSession(session.id);
-                        }}
-                        className="p-1 hover:bg-background rounded"
-                      >
-                        <Trash2 size={12} className="text-muted-foreground hover:text-destructive" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            
-            <div className="p-4 border-t border-border">
-              <button 
-                onClick={() => { handleNewChat(); setMenuOpen(false); }}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
-              >
-                <Plus size={18} />
-                New Chat
-              </button>
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        <h1 className="text-sm font-bold text-foreground">AI Studio</h1>
-
-        <div className="flex items-center gap-1">
-          <div className="flex items-center gap-1 bg-secondary px-2.5 py-1.5 rounded-full mr-1">
-            <Zap size={13} className="text-primary" />
-            <span className="text-xs font-semibold text-foreground">{credits}</span>
-          </div>
-          <button onClick={handleNewChat} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors">
-            <PenLine size={18} className="text-foreground" />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+    <div style={containerStyle} className="flex flex-col overflow-hidden bg-[#09090b]">
+      {/* Mobile Header - Hidden on Desktop */}
+      {isMobile && (
+        <div className="flex-shrink-0 flex items-center justify-between px-3 pt-2 pb-3 bg-background/95 backdrop-blur-sm border-b border-border z-20" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+            <SheetTrigger asChild>
               <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors">
-                <MoreVertical size={18} className="text-foreground" />
+                <Menu size={22} className="text-foreground" />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border">
-              <DropdownMenuItem onClick={() => setShowReportModal(true)} className="text-sm gap-2">
-                <Flag size={15} /> Report Issue
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowFeedbackModal(true)} className="text-sm gap-2">
-                <MessageSquare size={15} /> Send Feedback
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Report Modal */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card w-full max-w-sm rounded-2xl border border-border shadow-xl overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="font-bold text-foreground flex items-center gap-2">
-                <Flag size={18} className="text-primary" />
-                Report an Issue
-              </h3>
-              <button onClick={() => setShowReportModal(false)} className="p-1 rounded-full hover:bg-secondary">
-                <X size={18} className="text-muted-foreground" />
-              </button>
-            </div>
-            <div className="p-4">
-              <p className="text-xs text-muted-foreground mb-3">Describe the error or issue you encountered in the Studio.</p>
-              <textarea
-                value={reportText}
-                onChange={(e) => setReportText(e.target.value)}
-                placeholder="What went wrong?"
-                className="w-full h-32 bg-secondary text-sm text-foreground rounded-xl p-3 outline-none resize-none focus:ring-1 focus:ring-primary"
-              />
-              <button
-                onClick={handleReportSubmit}
-                className="w-full mt-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.98] transition-transform"
-              >
-                Submit Report
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Feedback Modal */}
-      {showFeedbackModal && (
-        <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card w-full max-w-sm rounded-2xl border border-border shadow-xl overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="font-bold text-foreground flex items-center gap-2">
-                <MessageSquare size={18} className="text-primary" />
-                Send Feedback
-              </h3>
-              <button onClick={() => setShowFeedbackModal(false)} className="p-1 rounded-full hover:bg-secondary">
-                <X size={18} className="text-muted-foreground" />
-              </button>
-            </div>
-            <div className="p-4">
-              <p className="text-xs text-muted-foreground mb-3">Have an idea to improve the Studio? Let us know!</p>
-              <textarea
-                value={feedbackText}
-                onChange={(e) => setFeedbackText(e.target.value)}
-                placeholder="Your suggestions..."
-                className="w-full h-32 bg-secondary text-sm text-foreground rounded-xl p-3 outline-none resize-none focus:ring-1 focus:ring-primary"
-              />
-              <button
-                onClick={handleFeedbackSubmit}
-                className="w-full mt-4 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold active:scale-[0.98] transition-transform"
-              >
-                Send Feedback
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Chat content */}
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-none scrollbar-hide px-4 pb-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center mb-4">
-              <Zap size={28} className="text-primary" />
-            </div>
-            <h2 className="text-lg font-bold text-foreground mb-1">Create Something Amazing</h2>
-            <p className="text-sm text-muted-foreground mb-6">Describe your image below to get started</p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-secondary/50 rounded-xl px-4 py-2.5">
-              <Paperclip size={14} className="text-primary" />
-              <span>Attach a photo to edit it with AI</span>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3 pt-2">
-            {messages.map(msg => (
-              msg.type === 'user' ? (
-                <div key={msg.id} className="flex justify-end">
-                  <div className="max-w-[80%]">
-                    {msg.attachedImageUrl && (
-                      <div className="mb-1.5 rounded-2xl rounded-br-sm overflow-hidden">
-                        <img src={msg.attachedImageUrl} alt="Attached" className="w-full max-h-48 object-cover" />
-                      </div>
-                    )}
-                    <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5">
-                      <p className="text-sm">{msg.text}</p>
-                    </div>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 bg-card border-border p-0 flex flex-col" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <div className="p-4 border-b border-border shrink-0">
+                <SheetTitle className="text-base font-bold text-foreground">Chat History</SheetTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Manage your conversations</p>
+                
+                <div className="mt-4 space-y-3">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search chats..."
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                      className="w-full bg-secondary text-foreground text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:ring-1 focus:ring-primary"
+                    />
                   </div>
                 </div>
-              ) : (
-                <AiMessageBubble 
-                  key={msg.id} 
-                  msg={msg} 
-                  isPro={isPro} 
-                  onOpenViewer={(url: string, prompt: string, id: string) => setViewerData({ url, prompt, id })} 
-                  onDelete={() => currentSessionId && handleDeleteMessage(currentSessionId, msg.id)}
-                />
-              )
-            ))}
-            <div ref={chatEndRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-
-      {/* Input bar */}
-      <div className="flex-shrink-0 bg-background border-t border-border px-3 py-2 z-20 mb-[2%]">
-        {showAdvanced && (
-          <div className="mb-3">
-            <div className="bg-secondary/30 rounded-xl p-2.5 border border-border/50 space-y-3">
-              {/* Style Presets */}
-              <div>
-                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Style Preset</label>
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
-                  {STYLE_PRESETS.map(style => (
-                    <button
-                      key={style.id}
-                      onClick={() => setSelectedStyle(style.id)}
-                      className={`px-2.5 py-1 rounded-lg text-[9px] font-semibold whitespace-nowrap transition-colors ${
-                        selectedStyle === style.id ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary text-muted-foreground border border-transparent'
-                      }`}
-                    >
-                      {style.name}
-                    </button>
-                  ))}
-                </div>
               </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {sessions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Clock size={32} className="mb-2 opacity-20" />
+                    <p className="text-xs">No chat history yet</p>
+                  </div>
+                ) : (
+                  sessions.filter(s => s.title.toLowerCase().includes(historySearch.toLowerCase())).map(session => (
+                    <div
+                      key={session.id}
+                      className={cn(
+                        "group relative flex items-center gap-3 w-full p-3 rounded-xl transition-all cursor-pointer",
+                        currentSessionId === session.id ? "bg-primary/10 border border-primary/20" : "bg-secondary/50 hover:bg-secondary border border-transparent"
+                      )}
+                      onClick={() => handleSelectSession(session)}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <MessageSquare size={16} className="text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {editingSessionId === session.id ? (
+                          <input
+                            autoFocus
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            onBlur={() => handleRenameSession(session.id, editTitle)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleRenameSession(session.id, editTitle)}
+                            className="w-full bg-background text-xs font-medium py-0.5 px-1 rounded outline-none ring-1 ring-primary"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <p className="text-xs font-medium text-foreground truncate">{session.title}</p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {new Date(session.updatedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      
+                      {session.messages.some(m => m.status === 'pending') && (
+                        <RotateCcw size={12} className="text-primary animate-spin shrink-0" />
+                      )}
 
-              {/* Aspect Ratio Selector */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSessionId(session.id);
+                            setEditTitle(session.title);
+                          }}
+                          className="p-1 hover:bg-background rounded"
+                        >
+                          <PenLine size={12} className="text-muted-foreground hover:text-foreground" />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSession(session.id);
+                          }}
+                          className="p-1 hover:bg-background rounded"
+                        >
+                          <Trash2 size={12} className="text-muted-foreground hover:text-destructive" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              <div className="p-4 border-t border-border">
+                <button 
+                  onClick={() => { handleNewChat(); setMenuOpen(false); }}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+                >
+                  <Plus size={18} />
+                  New Chat
+                </button>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <h1 className="text-sm font-bold text-foreground">AI Studio</h1>
+
+          <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 bg-secondary px-2.5 py-1.5 rounded-full mr-1">
+              <Zap size={13} className="text-primary" />
+              <span className="text-xs font-semibold text-foreground">{credits}</span>
+            </div>
+            <button onClick={handleNewChat} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors">
+              <PenLine size={18} className="text-foreground" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Split View */}
+      <div className={cn("flex-1 flex overflow-hidden", isMobile ? "flex-col" : "flex-row")}>
+        
+        {/* LEFT PANEL: Settings & Prompt (Desktop) */}
+        {!isMobile && (
+          <aside className="w-[420px] bg-[#0f0f13] border-r border-[#1f1f23] flex flex-col overflow-hidden animate-in slide-in-from-left duration-300">
+            <div className="flex-shrink-0 p-6 border-b border-white/5 flex items-center justify-between">
               <div>
-                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">Aspect Ratio</label>
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+                <h2 className="text-lg font-black tracking-tighter uppercase italic text-white leading-none">Studio Engine</h2>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-widest mt-1">Professional Suite</p>
+              </div>
+              <div className="flex items-center gap-2">
+                 <button 
+                  onClick={handleNewChat}
+                  className="p-2 rounded-lg bg-white/5 text-white hover:bg-white/10 transition-colors"
+                  title="New Session"
+                >
+                  <RotateCcw size={16} />
+                </button>
+                <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+                  <SheetTrigger asChild>
+                    <button className="p-2 rounded-lg bg-white/5 text-white hover:bg-white/10 transition-colors">
+                      <Clock size={16} />
+                    </button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-80 bg-[#0f0f13] border-[#1f1f23] p-0 flex flex-col">
+                     <div className="p-6 border-b border-white/5">
+                        <SheetTitle className="text-white font-black uppercase italic tracking-wider">Session History</SheetTitle>
+                     </div>
+                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                        {sessions.map(s => (
+                          <button 
+                            key={s.id}
+                            onClick={() => handleSelectSession(s)}
+                            className={cn(
+                              "w-full p-4 rounded-xl text-left transition-all border",
+                              currentSessionId === s.id ? "bg-primary/20 border-primary/40" : "bg-white/5 border-transparent hover:bg-white/10"
+                            )}
+                          >
+                            <p className="text-sm font-bold text-white truncate">{s.title}</p>
+                            <p className="text-[10px] text-white/40 mt-1">{new Date(s.updatedAt).toLocaleString()}</p>
+                          </button>
+                        ))}
+                     </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+              {/* Prompt Input */}
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                   <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Describe Vision</h3>
+                   <button 
+                    onClick={handleEnhancePrompt}
+                    disabled={enhancing || !prompt.trim()}
+                    className="text-[10px] font-bold text-white/40 hover:text-primary transition-colors flex items-center gap-1 uppercase"
+                   >
+                     {enhancing ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                     Magic Enhance
+                   </button>
+                </div>
+                <div className="relative group">
+                  <textarea
+                    ref={textareaRef}
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="E.g. A futuristic samurai in a neon forest, cinematic lighting..."
+                    className="w-full bg-[#16161c] border border-white/10 rounded-2xl p-4 text-sm text-white placeholder:text-white/20 outline-none focus:border-primary transition-all min-h-[160px] resize-none"
+                  />
+                  <div className="absolute bottom-4 right-4 flex gap-2">
+                     <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-2 rounded-lg bg-white/5 text-white/40 hover:text-white hover:bg-white/10 transition-all"
+                      title="Attach Reference Image"
+                     >
+                       <Paperclip size={18} />
+                     </button>
+                  </div>
+                </div>
+                {attachedPreview && (
+                  <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center gap-3">
+                    <img src={attachedPreview} className="w-12 h-12 rounded-lg object-cover ring-2 ring-primary/40" />
+                    <div className="flex-1">
+                      <p className="text-[10px] font-black text-primary uppercase">Identity Source</p>
+                      <p className="text-[11px] text-white/60">Character locked for next generation</p>
+                    </div>
+                    <button onClick={removeAttachment} className="p-1.5 hover:bg-destructive/20 text-white/40 hover:text-destructive rounded-lg"><X size={14} /></button>
+                  </div>
+                )}
+              </section>
+
+              {/* Aspect Ratio */}
+              <section>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-4">Canvas Frame</h3>
+                <div className="grid grid-cols-5 gap-2">
                   {ASPECT_RATIOS.map(ratio => (
                     <button
                       key={ratio.id}
                       onClick={() => setSelectedRatio(ratio.id)}
-                      className={`px-3 py-1.5 rounded-lg text-[9px] font-bold whitespace-nowrap transition-all ${
-                        selectedRatio === ratio.id ? 'bg-primary/20 text-primary border border-primary/20 shadow-sm' : 'bg-background/50 text-muted-foreground border border-transparent'
-                      }`}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all gap-1.5",
+                        selectedRatio === ratio.id ? "bg-primary border-primary text-white" : "bg-white/5 border-white/5 text-white/40 hover:border-white/20"
+                      )}
                     >
-                      {ratio.name} ({ratio.id})
+                      <Square size={14} className={cn(
+                        ratio.id === '16:9' ? 'scale-x-125 scale-y-75' : 
+                        ratio.id === '9:16' ? 'scale-x-75 scale-y-125' : 
+                        ratio.id === '4:3' ? 'scale-x-110 scale-y-90' :
+                        ratio.id === '3:4' ? 'scale-x-90 scale-y-110' : ''
+                      )} />
+                      <span className="text-[10px] font-bold">{ratio.id}</span>
                     </button>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              <div>
-                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 block">AI Model</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {MODELS.map(m => (
+              {/* Models */}
+              <section>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-4">Core Engine</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODELS.slice(0, 4).map(m => (
                     <button
                       key={m.id}
                       onClick={() => setSelectedModel(m.id)}
-                      className={`px-2 py-1.5 rounded-lg text-[9px] font-bold border transition-all flex flex-row items-center justify-between gap-2 ${
-                        selectedModel === m.id ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-background/50 border-transparent text-muted-foreground'
-                      }`}
-                    >
-                      <span className="truncate">{m.name.replace(' (Free)', '').replace(' (High Quality)', '').replace(' (Fast & Free)', '')}</span>
-                      {m.provider === 'HuggingFace' || m.id === 'gemini-2.5-flash-image' ? (
-                        <span className="text-[7px] px-1 py-0.5 bg-green-500/20 text-green-500 rounded uppercase font-black">Free</span>
-                      ) : (
-                        <span className="text-[7px] px-1 py-0.5 bg-amber-500/20 text-amber-500 rounded uppercase font-black">Pro</span>
+                      className={cn(
+                        "p-3 rounded-xl border text-left transition-all relative group",
+                        selectedModel === m.id ? "bg-primary/20 border-primary text-primary" : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10"
                       )}
+                    >
+                      <p className="text-xs font-bold leading-tight">{m.name}</p>
+                      <p className="text-[9px] mt-1 opacity-60 uppercase font-black">{m.provider}</p>
+                      {selectedModel === m.id && <Check size={12} className="absolute top-3 right-3" />}
                     </button>
                   ))}
                 </div>
-              </div>
-              <div>
-                <label className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mb-1 block">Negative Prompt</label>
-                <textarea
-                  value={negativePrompt}
-                  onChange={(e) => setNegativePrompt(e.target.value)}
-                  placeholder="What to exclude..."
-                  className="w-full bg-transparent text-[10px] text-foreground placeholder:text-muted-foreground/50 outline-none resize-none h-10"
-                />
-              </div>
+              </section>
+
+              {/* Styles */}
+              <section>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-4">Aesthetic Overlay</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {STYLE_PRESETS.map(style => (
+                    <button
+                      key={style.id}
+                      onClick={() => setSelectedStyle(style.id)}
+                      className={cn(
+                        "p-2.5 rounded-xl border text-center transition-all",
+                        selectedStyle === style.id ? "bg-primary text-white border-primary" : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10"
+                      )}
+                    >
+                      <span className="text-[10px] font-bold truncate block">{style.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
             </div>
-          </div>
+
+            {/* Bottom Generate Button */}
+            <div className="p-6 border-t border-white/5">
+               <button
+                onClick={handleGenerate}
+                disabled={generating || !prompt.trim()}
+                className={cn(
+                  "w-full h-14 rounded-2xl font-black uppercase tracking-[0.1em] text-sm flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-2xl",
+                  generating ? "bg-white/5 text-white/20 cursor-not-allowed" : "bg-primary text-white shadow-primary/20 hover:scale-[1.02]"
+                )}
+              >
+                {generating ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    <span className="tabular-nums">Forging Image... {generationProgress}%</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={20} />
+                    Ignite Creation
+                  </>
+                )}
+              </button>
+            </div>
+          </aside>
         )}
 
-        {attachedPreview && (
-          <div className="flex items-center gap-2 p-2 bg-secondary/50 rounded-xl mb-4 border border-border/50 group relative">
-            <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 shadow-lg border border-white/10">
-              <img src={attachedPreview} alt="Attached" className="w-full h-full object-cover" />
-              {isUploadingAttachment ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <RotateCcw size={16} className="text-primary animate-spin" />
+        {/* RIGHT CONTENT: Preview & Chat */}
+        <div className="flex-1 flex flex-col relative bg-[#09090b]">
+           <div className={cn(
+             "flex-1 overflow-y-auto p-6 md:p-12 space-y-12 flex flex-col-reverse custom-scrollbar",
+             isMobile && "p-4 space-y-6"
+           )}>
+             <div ref={chatEndRef} />
+             
+             {[...messages].reverse().map((msg) => (
+                <div key={msg.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  {msg.type === 'user' ? (
+                    <div className="flex justify-end mb-8">
+                       <div className="bg-primary/10 border border-primary/20 rounded-3xl rounded-tr-sm p-6 max-w-[85%] md:max-w-xl">
+                         {msg.attachedImageUrl && (
+                           <img src={msg.attachedImageUrl} className="w-full rounded-2xl mb-4 object-cover max-h-[400px] shadow-2xl" />
+                         )}
+                         <p className="text-white text-sm md:text-base leading-relaxed tracking-wide">{msg.text}</p>
+                       </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center md:justify-start">
+                       <AiMessageBubble 
+                        msg={msg} 
+                        isPro={isPro} 
+                        onOpenViewer={(url: string, p: string, id: string) => setViewerData({ url, prompt: p, id })}
+                        onDelete={(id: string) => handleDeleteMessage(currentSessionId!, id)}
+                      />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                  <Zap size={12} className="text-white fill-primary animate-pulse" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0 pr-8">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Sparkles size={10} className="text-primary" />
-                <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Identity Locked</p>
+             ))}
+
+             {messages.length === 0 && (
+               <div className="h-full flex flex-col items-center justify-center text-center">
+                  <div className="relative mb-10 group">
+                    <div className="absolute inset-0 bg-primary blur-[120px] opacity-20 group-hover:opacity-40 transition-opacity" />
+                    <div className="relative w-32 h-32 rounded-[2.5rem] bg-white/5 border border-white/10 flex items-center justify-center shadow-2xl backdrop-blur-xl">
+                      <Sparkles size={60} className="text-white animate-pulse" />
+                    </div>
+                  </div>
+                  <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter mb-4">Imagine the Impossible</h2>
+                  <p className="text-white/40 text-lg max-w-md font-medium px-8 leading-relaxed">
+                    Professional AI workspace. Prompt, refine, and generate museum-quality art in seconds.
+                  </p>
+               </div>
+             )}
+           </div>
+
+           {/* Mobile Input (Shown only on mobile) */}
+           {isMobile && (
+              <div className="flex-shrink-0 p-4 pb-safe bg-[#09090b] border-t border-white/5 z-20">
+                 <div className="relative flex items-end gap-2 bg-[#16161c] rounded-2xl p-2 border border-white/5 focus-within:border-primary/50 transition-all">
+                    <button onClick={() => fileInputRef.current?.click()} className="p-3 text-white/40 hover:text-white transition-colors">
+                      <Paperclip size={20} />
+                    </button>
+                    <textarea
+                      ref={textareaRef}
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder="Say something creative..."
+                      className="flex-1 bg-transparent border-none outline-none text-sm text-white py-3 max-h-[160px] resize-none"
+                      rows={1}
+                    />
+                    <button 
+                      onClick={generating ? handleStop : handleGenerate}
+                      className={cn(
+                        "p-3 rounded-xl flex items-center justify-center transition-all",
+                        generating || prompt.trim() ? "bg-primary text-white" : "bg-white/5 text-white/20"
+                      )}
+                    >
+                      {generating ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                    </button>
+                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground truncate font-medium">
-                {isUploadingAttachment ? 'Uploading your identity...' : 'Recreating this subject in new setting...'}
-              </p>
-            </div>
-            {!isUploadingAttachment && (
-              <button 
-                onClick={removeAttachment}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-secondary hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full transition-all active:scale-90"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        )}
-        <div className="bg-secondary search-glow rounded-2xl px-3 py-2 focus-within:border-primary transition-colors">
-          <textarea
-            ref={textareaRef}
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-            placeholder={attachedImage ? "Describe how to edit this image..." : "Describe your image..."}
-            rows={1}
-            style={{ minHeight: '44px' }}
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none max-h-[160px] py-2"
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); } }}
-          />
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
-                title="Attach Image"
-              >
-                <Paperclip size={18} className="text-muted-foreground" />
-              </button>
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors relative",
-                  showAdvanced ? "text-primary" : "text-muted-foreground"
-                )}
-                title="Advanced Settings"
-              >
-                <SlidersHorizontal size={18} />
-                {(selectedStyle !== 'none' || negativePrompt.trim() !== '') && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full border border-background" />
-                )}
-              </button>
-              <button
-                onClick={handleEnhancePrompt}
-                disabled={!prompt.trim() || enhancing}
-                className={`w-8 h-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors ${enhancing ? 'animate-pulse text-primary' : 'text-muted-foreground'}`}
-                title="Enhance Prompt"
-              >
-                <Wand2 size={18} />
-              </button>
-            </div>
-            <button
-              onClick={generating ? handleStop : handleGenerate}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                generating ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'
-              } disabled:opacity-50`}
-            >
-              {generating ? (
-                <Square size={12} fill="currentColor" />
-              ) : (
-                <Send size={14} />
-              )}
-            </button>
-          </div>
+           )}
         </div>
       </div>
     </div>
 
-    {showSessionActions && longPressSession && (
-      <div className="fixed inset-0 z-[110] bg-background/80 backdrop-blur-sm flex items-end justify-center sm:items-center p-4" onClick={() => setShowSessionActions(false)}>
-        <div 
-          className="bg-card w-full max-w-sm rounded-t-3xl sm:rounded-3xl border border-border shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="p-4 border-b border-border text-center">
-            <h3 className="font-bold text-foreground truncate px-4">{longPressSession.title}</h3>
-            <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-widest font-bold">Chat Actions</p>
-          </div>
-          <div className="p-2 space-y-1">
-            <button 
-              onClick={() => {
-                setEditingSessionId(longPressSession.id);
-                setEditTitle(longPressSession.title);
-                setShowSessionActions(false);
-              }}
-              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-secondary transition-colors text-sm font-medium"
-            >
-              <PenLine size={18} className="text-primary" />
-              Rename Chat
-            </button>
-            <button 
-              onClick={() => {
-                handleShareSession(longPressSession);
-                setShowSessionActions(false);
-              }}
-              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-secondary transition-colors text-sm font-medium"
-            >
-              <Share2 size={18} className="text-blue-500" />
-              Share Chat
-            </button>
-            <button 
-              onClick={() => {
-                handleDeleteSession(longPressSession.id);
-                setShowSessionActions(false);
-              }}
-              className="w-full flex items-center gap-3 p-4 rounded-xl hover:bg-secondary transition-colors text-sm font-medium text-destructive"
-            >
-              <Trash2 size={18} />
-              Delete Chat
-            </button>
-          </div>
-          <div className="p-4 bg-secondary/30">
-            <button 
-              onClick={() => setShowSessionActions(false)}
-              className="w-full py-3 rounded-xl bg-secondary text-foreground text-sm font-bold"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
+      <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
+      
+      {/* Modals & Menus */}
 
     <AnimatePresence>
       {viewerData && (

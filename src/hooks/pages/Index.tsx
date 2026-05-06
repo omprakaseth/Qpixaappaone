@@ -20,15 +20,20 @@ import CreatorProfileOverlay from '@/components/profile/CreatorProfileOverlay';
 import BannerAd from '@/components/ads/BannerAd';
 import RewardButton from '@/components/ads/RewardButton';
 import RewardedAdModal from '@/components/ads/RewardedAdModal';
+import { DesktopSidebar } from '@/components/layout/DesktopSidebar';
+import { DesktopHeader } from '@/components/layout/DesktopHeader';
+import { DesktopRightPanel } from '@/components/layout/DesktopRightPanel';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useSmartScroll } from '@/hooks/useSmartScroll';
 import { useAdSettings } from '@/hooks/useAdSettings';
 import { Post } from '@/context/AppContext';
-import { Loader2, Sparkles, Key, RotateCcw, Upload, X, Bell } from 'lucide-react';
+import { Loader2, Sparkles, Key, RotateCcw, Upload, X, Bell, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { generatePromptMeta } from '@/lib/seo-utils';
 
 function AppShell() {
+  const isMobile = useIsMobile();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -363,7 +368,7 @@ function AppShell() {
   }, [navigate]);
 
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden bg-background flex flex-col">
+    <div className="h-[100dvh] w-screen overflow-hidden bg-[#09090b] flex">
       <SEO 
         title={seoMeta.title}
         description={seoMeta.description}
@@ -372,84 +377,116 @@ function AppShell() {
         noindex={seoMeta.isLowQuality}
         keywords={seoMeta.keywords}
       />
-      <div className="flex-1 relative overflow-hidden">
-        <div className="absolute inset-0">
-          {activeTab === 'home' && (
-            <HomeScreen
-              scrollRef={scrollRef}
-              onPostTap={openPost}
-              onCreatePost={openCreatePost}
-              onGetPro={openSubscription}
-              onCreatorTap={openCreator}
-              adSettings={adSettings}
-              isPro={isPro}
-              navVisible={navVisible}
-            />
-          )}
-          {activeTab === 'discover' && (
-            <MarketplaceScreen
-              scrollRef={scrollRef}
-              onUsePrompt={handleUsePrompt}
-              onOpenAuth={openAuth}
-              onCreatorTap={openCreator}
-              navVisible={navVisible}
-              onBack={() => handleTabChange('home')}
-            />
-          )}
-          {activeTab === 'shorts' && (
-            <ShortsScreen 
-              onBack={() => handleTabChange('home')} 
-              onCreatorTap={openCreator}
-            />
-          )}
-          {activeTab === 'studio' && (
-            isLoggedIn ? (
-              <StudioScreen
-                initialPrompt={studioPrompt}
-                onClearInitialPrompt={() => setStudioPrompt('')}
-                onPublish={(imageUrl, prompt) => {
-                  setCreatePostData({ imageUrl, prompt });
-                  openCreatePost();
-                }}
+
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <DesktopSidebar 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange} 
+          onAuth={openAuth}
+          isLoggedIn={isLoggedIn}
+        />
+      )}
+
+      <div className={cn(
+        "flex-1 flex flex-col min-w-0 h-full relative",
+        !isMobile && "md:ml-[240px] md:mr-0 lg:mr-[320px]"
+      )}>
+        {/* Desktop Header */}
+        {!isMobile && (
+          <DesktopHeader 
+            onSearch={(q) => console.log('Searching:', q)}
+            onUpload={openCreatePost}
+            onNotifications={() => handleTabChange('notifications')}
+          />
+        )}
+
+        <div className="flex-1 relative overflow-hidden">
+          <div className="absolute inset-0">
+            {activeTab === 'home' && (
+              <HomeScreen
+                scrollRef={scrollRef}
+                onPostTap={openPost}
+                onCreatePost={openCreatePost}
+                onGetPro={openSubscription}
+                onCreatorTap={openCreator}
+                adSettings={adSettings}
+                isPro={isPro}
+                navVisible={navVisible}
               />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            )}
+            {activeTab === 'discover' && (
+              <MarketplaceScreen
+                scrollRef={scrollRef}
+                onUsePrompt={handleUsePrompt}
+                onOpenAuth={openAuth}
+                onCreatorTap={openCreator}
+                navVisible={navVisible}
+                onBack={() => handleTabChange('home')}
+              />
+            )}
+            {activeTab === 'shorts' && (
+              <ShortsScreen 
+                onBack={() => handleTabChange('home')} 
+                onCreatorTap={openCreator}
+              />
+            )}
+            {activeTab === 'studio' && (
+              isLoggedIn ? (
+                <StudioScreen
+                  initialPrompt={studioPrompt}
+                  onClearInitialPrompt={() => setStudioPrompt('')}
+                  onPublish={(imageUrl, prompt) => {
+                    setCreatePostData({ imageUrl, prompt });
+                    openCreatePost();
+                  }}
+                />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                  </div>
+                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
+                  <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
+                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                    Sign In
+                  </button>
+                  <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
+                    Create Account
+                  </button>
                 </div>
-                <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
-                <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
-                <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                  Sign In
-                </button>
-                <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
-                  Create Account
-                </button>
-              </div>
-            )
-          )}
-          {activeTab === 'notifications' && (
-            isLoggedIn ? (
-              <NotificationScreen />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Bell size={36} className="text-primary" />
+              )
+            )}
+            {activeTab === 'notifications' && (
+              isLoggedIn ? (
+                <NotificationScreen />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Bell size={36} className="text-primary" />
+                  </div>
+                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
+                  <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
+                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                    Sign In
+                  </button>
                 </div>
-                <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
-                <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
-                <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                  Sign In
-                </button>
-              </div>
-            )
-          )}
-          {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
-          {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
+              )
+            )}
+            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
+            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
+          </div>
         </div>
+
+        {isMobile && (
+          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
+        )}
+
+        {/* ... mobile only ads ... */}
       </div>
 
-      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
+      {/* Desktop Right Panel */}
+      {!isMobile && <DesktopRightPanel />}
 
       {/* Banner Ad - free users only */}
       {adSettings.enabled && adSettings.placementBanner && !isPro && navVisible && (

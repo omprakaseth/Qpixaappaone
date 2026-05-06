@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
-import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield } from 'lucide-react';
+import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/context/AppContext';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
@@ -9,6 +9,7 @@ import DashboardSheet from '@/components/profile/DashboardSheet';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
 import AdminScreen from './AdminScreen';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ProfileScreenProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
@@ -74,6 +75,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const [promptFilter, setPromptFilter] = useState<string>('All');
   
   const { deferredPrompt, installApp: handleInstallApp } = useAppState();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (user) {
@@ -268,7 +270,6 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const initial = displayName.charAt(0).toUpperCase();
 
   const categories = ['All', ...Array.from(new Set(myPrompts.map(p => p.category)))];
-  const filteredPrompts = promptFilter === 'All' ? myPrompts : myPrompts.filter(p => p.category === promptFilter);
 
   const tabs = [
     { id: 'posts' as const, icon: Grid3X3, label: 'Posts' },
@@ -279,295 +280,399 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
 
   return (
     <>
-      <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide">
-        {/* Fixed Header - Slides on scroll */}
+      <div ref={scrollRef} className="h-full overflow-y-auto scrollbar-hide bg-[#09090b]">
+        {/* Fixed Header - Mobile Only or Scrolling Desktop */}
         <div 
           ref={headerRef}
           className={cn(
-            "fixed top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md px-4 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out border-b border-border/50",
-            showTopHeader ? "translate-y-0" : "-translate-y-full"
+            "fixed top-0 left-0 right-0 z-40 bg-[#09090b]/95 backdrop-blur-md px-4 pb-3 flex items-center justify-between transition-all duration-300 ease-in-out border-b border-white/5",
+            showTopHeader ? "translate-y-0" : "-translate-y-full",
+            !isMobile && "left-[240px] px-8 py-4"
           )}
-          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
+          style={{ paddingTop: isMobile ? 'max(env(safe-area-inset-top), 0.75rem)' : '1rem' }}
         >
-          <h1 className="text-xl font-bold text-foreground">@{username}</h1>
-          <button onClick={onOpenSettings} className="p-1 rounded-lg hover:bg-secondary transition-colors">
-            <Settings size={22} className="text-muted-foreground" />
-          </button>
+          <h1 className="text-xl font-black italic uppercase tracking-tighter text-white">@{username}</h1>
+          <div className="flex items-center gap-2">
+            <button onClick={onOpenSettings} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors">
+              <Settings size={20} className="text-white" />
+            </button>
+          </div>
         </div>
 
-        {/* Cover Photo */}
-        <div 
-          className={cn(
-            "relative w-full overflow-hidden bg-secondary",
-            isMounted && "transition-all duration-300"
-          )}
-          style={{ height: 200, marginTop: headerHeight }}
-        >
-          <img
-            src={profile?.cover_url || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80'}
-            alt="Cover"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Profile Hero */}
-        <div className="px-4 pb-2 -mt-12 relative z-10">
-          <div className="flex flex-col items-center">
-            <div className="relative">
-              <div className="w-[96px] h-[96px] rounded-full p-[3px] bg-background">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center">
-                    <span className="text-3xl font-bold text-secondary-foreground">{initial}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <h2 className="text-lg font-bold text-foreground mt-2 flex items-center gap-1">
-              {displayName}
-              {profile?.is_verified && <VerifiedBadge size={16} />}
-            </h2>
-            {profile?.bio && (
-              <div className="flex items-center justify-center gap-2 mt-1 px-4">
-                <p className="text-[13px] text-muted-foreground text-center max-w-[280px] leading-relaxed">{profile.bio}</p>
-                <button className="p-1 text-muted-foreground hover:text-primary transition-colors flex-shrink-0 active:opacity-60">
-                  <Bell size={16} />
+        {/* Desktop Profile Layout */}
+        {!isMobile ? (
+          <div className="max-w-6xl mx-auto pt-24 px-8 pb-20">
+            {/* Header / Hero Section */}
+            <div className="flex items-start gap-10 mb-12">
+              <div className="relative group">
+                <div className="w-40 h-40 rounded-full p-1 bg-gradient-to-tr from-primary to-purple-500 shadow-2xl">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover border-4 border-[#09090b]" />
+                  ) : (
+                    <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center border-4 border-[#09090b]">
+                      <span className="text-5xl font-black italic text-white/20">{initial}</span>
+                    </div>
+                  )}
+                </div>
+                <button 
+                  onClick={() => setShowEditProfile(true)}
+                  className="absolute bottom-1 right-1 w-10 h-10 rounded-full bg-primary border-4 border-[#09090b] flex items-center justify-center text-white shadow-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Edit3 size={18} />
                 </button>
               </div>
-            )}
-          </div>
 
-          {/* Stats Row */}
-          <div className="flex items-center justify-center gap-8 mt-6">
-            <div className="text-center flex flex-col items-center">
-              <p className="text-base font-bold text-foreground">{followerCount > 1000 ? (followerCount/1000).toFixed(1) + 'k' : followerCount}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Followers</p>
-            </div>
-            <div className="text-center flex flex-col items-center">
-              <p className="text-base font-bold text-foreground">{followingIds.size}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Followings</p>
-            </div>
-            <div className="text-center flex flex-col items-center">
-              <p className="text-base font-bold text-foreground">{myPosts.length}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Posts</p>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 mt-6">
-            <button
-              onClick={() => setShowEditProfile(true)}
-              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
-            >
-              Edit Profile
-            </button>
-            <button
-              onClick={() => setShowDashboard(true)}
-              className="flex-1 py-2 rounded-xl bg-secondary/50 text-foreground text-[13px] font-semibold active:scale-[0.98] transition-transform"
-            >
-              Dashboard
-            </button>
-            {deferredPrompt && (
-              <button
-                onClick={handleInstallApp}
-                className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-[13px] font-bold active:scale-[0.98] transition-transform"
-              >
-                Install App
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Admin Section (Only for Admin role) */}
-        {profile?.role === 'admin' && (
-          <div className="px-4 mb-6">
-            <button
-              onClick={() => setShowAdmin(true)}
-              className="w-full flex items-center justify-between p-4 rounded-2xl bg-primary/10 border border-primary/20 transition-all active:scale-[0.98]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground">
-                  <Shield size={20} />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-bold text-foreground">Admin Control</p>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">System & Reports</p>
-                </div>
-              </div>
-              <Sparkles size={18} className="text-primary animate-pulse" />
-            </button>
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex border-b border-border mt-1">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 border-b-2 transition-colors ${
-                activeTab === t.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'
-              }`}
-            >
-              <t.icon size={15} />
-              <span className="text-[10px] font-semibold">{t.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Tab Content */}
-        <div className="pb-safe-nav">
-          {activeTab === 'posts' && (
-            myPosts.length > 0 ? (
-              <div className="grid grid-cols-3 gap-0.5">
-                {myPosts.map(p => (
-                  <button key={p.id} onClick={() => onPostTap?.(p)} className="relative aspect-square overflow-hidden group active:opacity-80 transition-opacity">
-                    <img src={p.imageUrl || '/placeholder.svg'} alt={p.prompt} className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-3">
-                  <ImageIcon size={28} className="text-muted-foreground/40" />
-                </div>
-                <p className="text-sm font-semibold text-foreground">No Posts Yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Your creations will appear here</p>
-              </div>
-            )
-          )}
-
-          {activeTab === 'shorts' && (
-            myShorts.length > 0 ? (
-              <div className="grid grid-cols-3 gap-0.5">
-                {myShorts.map(s => (
-                  <button key={s.id} className="relative aspect-[9/16] overflow-hidden group active:opacity-80 transition-opacity bg-secondary">
-                    <video 
-                      src={s.video_url} 
-                      className="w-full h-full object-cover"
-                      onMouseOver={e => (e.target as HTMLVideoElement).play()}
-                      onMouseOut={e => (e.target as HTMLVideoElement).pause()}
-                      muted
-                      loop
-                    />
-                    <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
-                      <PlaySquare size={10} className="text-white fill-white" />
-                      <span className="text-[10px] font-bold text-white">{s.views || 0}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-3">
-                  <PlaySquare size={28} className="text-muted-foreground/40" />
-                </div>
-                <p className="text-sm font-semibold text-foreground">No Shorts Yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Your short videos will appear here</p>
-              </div>
-            )
-          )}
-
-          {activeTab === 'prompts' && (
-            myPrompts.length > 0 ? (
-              <div>
-                <div className="flex items-center gap-2 px-3 py-2.5 overflow-x-auto scrollbar-hide">
-                  <SlidersHorizontal size={14} className="text-muted-foreground flex-shrink-0" />
-                  {categories.map(cat => (
+              <div className="flex-1 pt-4">
+                <div className="flex items-center gap-4 mb-4">
+                  <h2 className="text-3xl font-black italic uppercase tracking-tighter text-white flex items-center gap-2">
+                    {displayName}
+                    {profile?.is_verified && <VerifiedBadge size={24} />}
+                  </h2>
+                  <div className="flex gap-2">
                     <button
-                      key={cat}
-                      onClick={() => setPromptFilter(cat)}
-                      className={`flex-shrink-0 px-3 py-1 rounded-full text-[10px] font-semibold transition-colors ${
-                        promptFilter === cat
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-secondary text-secondary-foreground'
-                      }`}
+                      onClick={() => setShowEditProfile(true)}
+                      className="px-6 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white text-xs font-black uppercase tracking-widest italic transition-all"
                     >
-                      {cat}
+                      Edit Profile
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setShowDashboard(true)}
+                      className="px-6 py-2 rounded-xl bg-primary text-white text-xs font-black uppercase tracking-widest italic transition-all hover:shadow-[0_0_20px_rgba(var(--primary),0.4)]"
+                    >
+                      Dashboard
+                    </button>
+                  </div>
                 </div>
 
-                {promptFilter === 'All' ? (
-                  categories.filter(c => c !== 'All').map(cat => {
-                    const catPrompts = myPrompts.filter(p => p.category === cat);
-                    if (catPrompts.length === 0) return null;
-                    return (
-                      <div key={cat} className="mb-3">
-                        <div className="flex items-center justify-between px-3 py-2">
-                          <h3 className="text-[12px] font-bold text-foreground">{cat}</h3>
-                          <span className="text-[10px] text-muted-foreground">{catPrompts.length}</span>
+                <div className="flex items-center gap-8 mb-6">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xl font-black italic text-white tracking-tight">{followerCount}</span>
+                    <span className="text-[10px] font-black uppercase italic tracking-widest text-white/40">Followers</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xl font-black italic text-white tracking-tight">{followingIds.size}</span>
+                    <span className="text-[10px] font-black uppercase italic tracking-widest text-white/40">Following</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xl font-black italic text-white tracking-tight">{myPosts.length}</span>
+                    <span className="text-[10px] font-black uppercase italic tracking-widest text-white/40">Posts</span>
+                  </div>
+                </div>
+
+                <p className="text-white/60 text-sm leading-relaxed max-w-xl">
+                  {profile?.bio || 'Explore my worlds. Powered by Qpixa AI.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Content Tabs */}
+            <div className="border-t border-white/5">
+              <div className="flex gap-10 mb-8">
+                {tabs.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTab(t.id)}
+                    className={cn(
+                      "group flex items-center gap-2 py-4 border-t-2 -mt-0.5 transition-all relative",
+                      activeTab === t.id 
+                        ? "border-primary text-white" 
+                        : "border-transparent text-white/30 hover:text-white/60"
+                    )}
+                  >
+                    <t.icon size={16} className={cn("transition-colors", activeTab === t.id ? "text-primary" : "text-white/30")} />
+                    <span className="text-[10px] font-black uppercase italic tracking-widest">{t.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Grid Content */}
+              <div className="min-h-[400px]">
+                {activeTab === 'posts' && (
+                  myPosts.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-6">
+                      {myPosts.map(p => (
+                        <button 
+                          key={p.id} 
+                          onClick={() => onPostTap?.(p)} 
+                          className="relative aspect-square overflow-hidden rounded-3xl group active:opacity-80 transition-all hover:scale-[1.02] hover:shadow-[0_20px_50px_rgba(167,139,250,0.15)] ring-1 ring-white/5"
+                        >
+                          <img src={p.imageUrl || '/placeholder.svg'} alt={p.prompt} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-6">
+                            <p className="text-[10px] text-primary font-black uppercase tracking-[0.2em] mb-1 italic">Vision Prompt</p>
+                            <p className="text-sm text-white font-black italic uppercase tracking-tighter truncate w-full">{p.prompt}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState icon={ImageIcon} title="No Posts Yet" sub="Start creating with Qpixa Studio" />
+                  )
+                )}
+
+                {activeTab === 'shorts' && (
+                  myShorts.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-6">
+                      {myShorts.map(s => (
+                        <button key={s.id} className="relative aspect-[9/16] overflow-hidden rounded-3xl group active:opacity-80 transition-all hover:scale-[1.02] bg-zinc-900 border border-white/5 shadow-2xl">
+                          <img src={s.thumbnail} className="w-full h-full object-cover" alt="" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <PlaySquare size={48} className="text-white drop-shadow-2xl" />
+                          </div>
+                          <div className="absolute bottom-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 backdrop-blur-md border border-white/10">
+                            <PlaySquare size={14} className="text-primary" />
+                            <span className="text-[11px] font-black italic text-white uppercase">{s.views || 0}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState icon={PlaySquare} title="No AI Shorts" sub="Turn your prompts into motion" />
+                  )
+                )}
+
+                {activeTab === 'prompts' && (
+                   myPrompts.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-6">
+                      {myPrompts.map(p => (
+                        <div key={p.id} className="group relative bg-[#0f0f13] rounded-2xl border border-white/5 overflow-hidden transition-all hover:border-primary/50 hover:shadow-2xl">
+                          <div className="aspect-square relative">
+                            <img src={p.preview_image || '/placeholder.svg'} className="w-full h-full object-cover" alt="" />
+                            <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg flex items-center gap-1 border border-white/10">
+                              <Coins size={10} className="text-primary" />
+                              <span className="text-[10px] font-black italic text-white uppercase">{p.price}</span>
+                            </div>
+                          </div>
+                          <div className="p-4">
+                            <h4 className="text-xs font-black uppercase italic italic text-white tracking-tighter truncate mb-2">{p.title}</h4>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[9px] font-black uppercase italic tracking-widest text-primary px-2 py-1 bg-primary/10 rounded-md border border-primary/20">
+                                {p.model_type}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <Star size={10} className="text-yellow-400 fill-yellow-400" />
+                                <span className="text-[10px] font-black italic text-white">{p.rating}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex gap-2.5 px-3 overflow-x-auto scrollbar-hide pb-1">
-                          {catPrompts.map(p => (
-                            <PromptMiniCard key={p.id} prompt={p} />
-                          ))}
-                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState icon={ShoppingBag} title="No Prompts Listed" sub="Monetize your best creations" />
+                  )
+                )}
+
+                {activeTab === 'about' && (
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="bg-[#0f0f13] border border-white/5 rounded-3xl p-8">
+                      <h3 className="text-sm font-black uppercase italic tracking-widest text-primary mb-6">Bio</h3>
+                      <p className="text-sm text-white/70 leading-relaxed font-medium italic">
+                        {profile?.bio || 'No bio added yet. Explore the potential of AI with Qpixa.'}
+                      </p>
+                    </div>
+                    <div className="bg-[#0f0f13] border border-white/5 rounded-3xl p-8">
+                      <h3 className="text-sm font-black uppercase italic tracking-widest text-primary mb-6">Creator Statistics</h3>
+                      <div className="grid grid-cols-2 gap-6">
+                        {[
+                          { label: 'Total Sales', value: earnings.totalSales },
+                          { label: 'Total Earnings', value: earnings.totalEarnings + ' Credits' },
+                          { label: 'Avg Rating', value: earnings.avgRating.toFixed(1) },
+                          { label: 'Member Since', value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—' }
+                        ].map(item => (
+                          <div key={item.label}>
+                            <p className="text-[10px] font-black uppercase italic tracking-widest text-white/30 mb-1">{item.label}</p>
+                            <p className="text-sm font-black italic text-white uppercase">{item.value}</p>
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })
-                ) : (
-                  <div className="flex gap-2.5 px-3 overflow-x-auto scrollbar-hide flex-wrap pb-1 pt-1">
-                    {filteredPrompts.map(p => (
-                      <PromptMiniCard key={p.id} prompt={p} />
-                    ))}
+                    </div>
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="w-16 h-16 rounded-full border-2 border-muted-foreground/30 flex items-center justify-center mb-3">
-                  <ShoppingBag size={28} className="text-muted-foreground/40" />
-                </div>
-                <p className="text-sm font-semibold text-foreground">No Prompts Yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Your marketplace prompts will appear here</p>
-              </div>
-            )
-          )}
+            </div>
+          </div>
+        ) : (
+          <div className="pb-10">
+            {/* Cover Photo */}
+            <div 
+              className={cn(
+                "relative w-full overflow-hidden bg-secondary transition-all duration-300",
+              )}
+              style={{ height: 180, marginTop: headerHeight }}
+            >
+              <img
+                src={profile?.cover_url || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80'}
+                alt="Cover"
+                className="w-full h-full object-cover"
+              />
+            </div>
 
-          {activeTab === 'about' && (
-            <div className="space-y-3 p-4">
-              <div className="bg-card border border-border rounded-xl p-4">
-                <h3 className="text-sm font-bold text-foreground mb-2">About</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {profile?.bio || 'No bio added yet. Tap Edit Profile to add one.'}
-                </p>
-              </div>
-              <div className="bg-card border border-border rounded-xl p-4">
-                <h3 className="text-sm font-bold text-foreground mb-3">Stats</h3>
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Total Posts</span>
-                    <span className="text-xs font-semibold text-foreground">{myPosts.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Prompts Listed</span>
-                    <span className="text-xs font-semibold text-foreground">{myPrompts.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Total Sales</span>
-                    <span className="text-xs font-semibold text-foreground">{earnings.totalSales}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Average Rating</span>
-                    <span className="text-xs font-semibold text-foreground flex items-center gap-1">
-                      <Star size={10} className="text-yellow-400 fill-yellow-400" />
-                      {earnings.avgRating > 0 ? earnings.avgRating.toFixed(1) : '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Member Since</span>
-                    <span className="text-xs font-semibold text-foreground">
-                      {profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
-                    </span>
+            {/* Profile Hero Mobile */}
+            <div className="px-4 pb-2 -mt-10 relative z-10">
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <div className="w-[88px] h-[88px] rounded-full p-[3px] bg-[#09090b]">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
+                        <span className="text-3xl font-black italic uppercase text-white/20">{initial}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                <h2 className="text-xl font-black italic uppercase tracking-tighter text-white mt-3 flex items-center gap-1">
+                  {displayName}
+                  {profile?.is_verified && <VerifiedBadge size={16} />}
+                </h2>
+                
+                {profile?.bio && (
+                  <p className="text-[13px] text-white/60 text-center max-w-[300px] leading-relaxed mt-2 uppercase font-black italic tracking-tighter opacity-80">{profile.bio}</p>
+                )}
+              </div>
+
+              {/* Stats Row */}
+              <div className="flex items-center justify-center gap-10 mt-8 mb-8">
+                <div className="text-center">
+                  <p className="text-xl font-black italic text-white leading-none">{followerCount > 1000 ? (followerCount/1000).toFixed(1) + 'k' : followerCount}</p>
+                  <p className="text-[9px] font-black uppercase italic tracking-widest text-white/40 mt-1.5">Followers</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-black italic text-white leading-none">{followingIds.size}</p>
+                  <p className="text-[9px] font-black uppercase italic tracking-widest text-white/40 mt-1.5">Following</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-black italic text-white leading-none">{myPosts.length}</p>
+                  <p className="text-[9px] font-black uppercase italic tracking-widest text-white/40 mt-1.5">Posts</p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2.5 px-2">
+                <button
+                  onClick={() => setShowEditProfile(true)}
+                  className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 text-white text-[11px] font-black uppercase italic tracking-widest active:scale-[0.98] transition-transform"
+                >
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="flex-1 py-3 rounded-2xl bg-primary text-white text-[11px] font-black uppercase italic tracking-widest active:scale-[0.98] transition-transform shadow-[0_4px_15px_rgba(var(--primary),0.3)]"
+                >
+                  Dashboard
+                </button>
               </div>
             </div>
-          )}
-        </div>
+
+            {/* Tabs Mobile */}
+            <div className="flex border-b border-white/5 mt-8 px-2 overflow-x-auto no-scrollbar">
+              {tabs.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setActiveTab(t.id)}
+                  className={cn(
+                    "flex-shrink-0 flex items-center justify-center gap-2 px-6 py-4 border-b-2 transition-all",
+                    activeTab === t.id 
+                      ? 'border-primary text-white' 
+                      : 'border-transparent text-white/30'
+                  )}
+                >
+                  <t.icon size={16} className={activeTab === t.id ? "text-primary" : ""} />
+                  <span className="text-[10px] font-black uppercase italic tracking-widest whitespace-nowrap">{t.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content Mobile */}
+            <div className="pt-0.5">
+              {activeTab === 'posts' && (
+                myPosts.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-0.5">
+                    {myPosts.map(p => (
+                      <button key={p.id} onClick={() => onPostTap?.(p)} className="relative aspect-square overflow-hidden active:opacity-80 transition-opacity">
+                        <img src={p.imageUrl || '/placeholder.svg'} alt={p.prompt} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState icon={ImageIcon} title="No Posts Yet" sub="Your creations will appear here" />
+                )
+              )}
+
+              {activeTab === 'shorts' && (
+                myShorts.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-0.5">
+                    {myShorts.map(s => (
+                      <button key={s.id} className="relative aspect-[9/16] overflow-hidden group active:opacity-80 transition-opacity bg-zinc-900">
+                        <img src={s.thumbnail} className="w-full h-full object-cover" alt="" />
+                        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md">
+                          <PlaySquare size={10} className="text-primary" />
+                          <span className="text-[9px] font-black italic text-white">{s.views || 0}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                   <EmptyState icon={PlaySquare} title="No Shorts Yet" sub="Your ai shorts will appear here" />
+                )
+              )}
+
+              {activeTab === 'prompts' && (
+                myPrompts.length > 0 ? (
+                  <div className="p-4 space-y-6">
+                    {['All', ...Array.from(new Set(myPrompts.map(p => p.category)))].filter(c => c !== 'All').map(cat => {
+                      const catPrompts = myPrompts.filter(p => p.category === cat);
+                      if (catPrompts.length === 0) return null;
+                      return (
+                        <div key={cat}>
+                          <div className="flex items-center justify-between mb-3 px-1">
+                            <h3 className="text-[11px] font-black uppercase italic tracking-widest text-[#a78bfa]">{cat}</h3>
+                            <ChevronRight size={14} className="text-white/20" />
+                          </div>
+                          <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                            {catPrompts.map(p => (
+                              <PromptMiniCard key={p.id} prompt={p} />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                   <EmptyState icon={ShoppingBag} title="No Prompts" sub="Your marketplace prompts" />
+                )
+              )}
+
+              {activeTab === 'about' && (
+                <div className="space-y-4 p-5">
+                  <div className="bg-[#0f0f13] border border-white/5 rounded-3xl p-6">
+                    <h3 className="text-xs font-black uppercase italic tracking-widest text-primary mb-3">Bio</h3>
+                    <p className="text-[13px] text-white/60 leading-relaxed font-medium italic">
+                      {profile?.bio || 'No bio added yet. Explore the potential of AI with Qpixa.'}
+                    </p>
+                  </div>
+                  <div className="bg-[#0f0f13] border border-white/5 rounded-3xl p-6">
+                    <h3 className="text-xs font-black uppercase italic tracking-widest text-primary mb-4">Stats</h3>
+                    <div className="space-y-4">
+                      {[
+                        { label: 'Total Posts', value: myPosts.length },
+                        { label: 'Prompts Listed', value: myPrompts.length },
+                        { label: 'Total Sales', value: earnings.totalSales },
+                        { label: 'Member Since', value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—' }
+                      ].map(item => (
+                        <div key={item.label} className="flex items-center justify-between border-b border-white/5 pb-3 last:border-0 last:pb-0">
+                          <span className="text-[10px] font-black uppercase italic tracking-widest text-white/30">{item.label}</span>
+                          <span className="text-[11px] font-black italic text-white uppercase">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {showEditProfile && (profile || user) && (
@@ -595,26 +700,36 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   );
 }
 
+const EmptyState = ({ icon: Icon, title, sub }: { icon: any, title: string, sub: string }) => (
+  <div className="flex flex-col items-center justify-center py-20 bg-[#0f0f13]/30 rounded-3xl border border-white/5 mx-4 mt-4">
+    <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mb-4 border border-white/5">
+      <Icon size={32} className="text-white/20" />
+    </div>
+    <h3 className="text-sm font-black uppercase italic tracking-widest text-white mb-2">{title}</h3>
+    <p className="text-[10px] font-black uppercase italic tracking-widest text-white/30">{sub}</p>
+  </div>
+);
+
 /* Compact prompt card for profile store */
 const PromptMiniCard: React.FC<{ prompt: { id: string; title: string; preview_image: string | null; price: number; rating: number; sales_count: number; model_type: string } }> = ({ prompt }) => {
   return (
-    <div className="flex-shrink-0 w-[130px] rounded-xl overflow-hidden bg-card border border-border">
+    <div className="flex-shrink-0 w-[140px] rounded-2xl overflow-hidden bg-[#0f0f13] border border-white/5 transition-all hover:border-primary/50 group">
       <div className="relative aspect-square w-full overflow-hidden">
-        <img src={prompt.preview_image || '/placeholder.svg'} alt="" className="w-full h-full object-cover" />
-        <div className="absolute top-1 left-1">
-          <span className="bg-primary/80 text-primary-foreground text-[7px] font-semibold px-1.5 py-0.5 rounded-full">
+        <img src={prompt.preview_image || '/placeholder.svg'} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+        <div className="absolute top-2 left-2">
+          <span className="bg-primary/80 backdrop-blur-md text-white text-[8px] font-black uppercase italic tracking-widest px-2 py-0.5 rounded-md">
             {prompt.model_type}
           </span>
         </div>
       </div>
-      <div className="p-2">
-        <h3 className="text-[10px] font-semibold text-foreground truncate">{prompt.title}</h3>
-        <div className="flex items-center justify-between mt-1">
+      <div className="p-3">
+        <h3 className="text-[10px] font-black uppercase italic italic text-white tracking-tighter truncate mb-2">{prompt.title}</h3>
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-0.5">
             <Star size={8} className="text-yellow-400 fill-yellow-400" />
-            <span className="text-[9px] font-medium text-foreground">{prompt.rating}</span>
+            <span className="text-[9px] font-black italic text-white">{prompt.rating}</span>
           </div>
-          <span className="flex items-center gap-0.5 text-[9px] font-bold text-primary">
+          <span className="flex items-center gap-0.5 text-[9px] font-black italic text-primary">
             <Coins size={8} />{prompt.price}
           </span>
         </div>

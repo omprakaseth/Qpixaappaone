@@ -27,6 +27,7 @@ import VerifiedBadge from '@/components/VerifiedBadge';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Comment {
@@ -93,16 +94,11 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   const [deleteTimer, setDeleteTimer] = useState<number | null>(null);
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
   
+  const [scrollY, setScrollY] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [scrollY, setScrollY] = useState(0);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  const isMobile = useIsMobile();
 
   const handleContainerScroll = (e: React.UIEvent<HTMLDivElement>) => {
     setScrollY(e.currentTarget.scrollTop);
@@ -324,351 +320,185 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   };
 
   return (
-    <div 
-      ref={scrollRef}
-      onScroll={handleContainerScroll}
-      className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide animate-in slide-in-from-bottom-4 duration-500"
-    >
-      {/* Undo Delete Overlay */}
-      <AnimatePresence>
-        {isDeleting && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-10 left-4 right-4 z-[100] bg-zinc-900 text-white rounded-2xl p-4 shadow-2xl flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full border-2 border-white/20 flex items-center justify-center text-[11px] font-bold">
-                {deleteTimer}
-              </div>
-              <p className="text-sm font-medium">Deleting post permanently...</p>
-            </div>
-            <button
-              onClick={cancelDelete}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-colors"
-            >
-              Undo
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Report Confirmation */}
-      <AlertDialog open={showReportConfirm} onOpenChange={setShowReportConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Report this post?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to report this post for a community guidelines violation?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleReport}>
-              Report
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Floating Header */}
+    <div className="fixed inset-0 z-[70] flex justify-end pointer-events-none">
+      {/* Backdrop */}
       <motion.div 
-        initial={{ y: 0, opacity: 1 }}
-        animate={{ 
-          y: scrollY > 50 ? -100 : 0, 
-          opacity: scrollY > 50 ? 0 : 1 
-        }}
-        transition={{ duration: 0.3, ease: "easeInOut" }}
-        className="fixed top-0 left-0 right-0 z-[80] flex items-center justify-between p-4 safe-top pointer-events-none"
-      >
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            onBack();
-          }} 
-          className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-all text-white shadow-xl pointer-events-auto"
-          aria-label="Go back"
-        >
-          <ArrowLeft size={22} />
-        </button>
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onBack}
+        className="absolute inset-0 bg-black/60 pointer-events-auto backdrop-blur-sm"
+      />
 
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <button onClick={handleShare} className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-all text-white shadow-xl">
-            <Share2 size={20} />
+      <motion.div 
+        ref={scrollRef}
+        onScroll={handleContainerScroll}
+        initial={isMobile ? { y: '100%' } : { x: '100%' }}
+        animate={isMobile ? { y: 0 } : { x: 0 }}
+        exit={isMobile ? { y: '100%' } : { x: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className={cn(
+          "relative h-full bg-background overflow-y-auto scrollbar-hide pointer-events-auto shadow-2xl flex flex-col",
+          isMobile ? "w-full" : "w-[600px] xl:w-[800px]"
+        )}
+      >
+        {/* Header Controls (Sticky) */}
+        <div className="sticky top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none">
+          <button 
+            onClick={onBack} 
+            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white pointer-events-auto active:scale-90 transition-all"
+          >
+            <ArrowLeft size={20} />
           </button>
-          <button onClick={handleDownload} className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-all text-white shadow-xl">
-            <Download size={20} />
-          </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="w-11 h-11 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center active:scale-90 transition-all text-white shadow-xl">
-                <MoreVertical size={20} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border">
-              {isOwner && (
-                <>
-                  <DropdownMenuItem onClick={() => setIsEditing(true)} className="gap-2">
-                    <Edit2 size={16} /> Edit Details
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={initiateDelete} className="gap-2 text-destructive">
-                    <Trash2 size={16} /> Delete Post
-                  </DropdownMenuItem>
-                </>
-              )}
-              {!isOwner && (
-                <DropdownMenuItem onClick={() => setShowReportConfirm(true)} className="gap-2 text-destructive">
-                  <ShieldAlert size={16} /> Report
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+
+          <div className="flex items-center gap-2 pointer-events-auto">
+            <button onClick={handleShare} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white">
+              <Share2 size={18} />
+            </button>
+            <button onClick={handleDownload} className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white">
+              <Download size={18} />
+            </button>
+          </div>
+        </div>
+
+        <div className={cn(
+          "flex flex-col",
+          !isMobile && "xl:flex-row h-full"
+        )}>
+          {/* Image Section */}
+          <div className={cn(
+            "relative bg-black flex items-center justify-center overflow-hidden shrink-0",
+            isMobile ? "h-[60vh] w-full" : "xl:w-1/2 xl:h-full"
+          )}>
+            <img
+              src={safePost.imageUrl}
+              alt={safePost.title}
+              className="w-full h-full object-contain"
+              referrerPolicy="no-referrer"
+            />
+            <button 
+              onClick={() => setShowFullViewer(true)}
+              className="absolute bottom-4 right-4 p-3 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:bg-black/60 transition-colors"
+            >
+              <Maximize size={18} />
+            </button>
+          </div>
+
+          {/* Details Scroll Area */}
+          <div className={cn(
+            "flex-1 bg-background",
+            !isMobile && "overflow-y-auto"
+          )}>
+            <div className="p-6 md:p-8">
+              {/* Title & Stats */}
+              <div className="mb-6">
+                <h1 className="text-2xl font-black tracking-tight mb-2 uppercase italic">{safePost.title}</h1>
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <span className="flex items-center gap-1 text-xs font-bold ring-1 ring-border px-2 py-1 rounded">
+                    <Eye size={12} /> {formatNumber(safePost.views)}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs font-bold ring-1 ring-border px-2 py-1 rounded">
+                    <Heart size={12} /> {formatNumber(safePost.likes)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Creator Card */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-secondary">
+                    {safePost.creator.avatar ? <img src={safePost.creator.avatar} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold">{safePost.creator.initials}</div>}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white flex items-center gap-1">
+                      {safePost.creator.name} {safePost.creator.isVerified && <VerifiedBadge size={12} />}
+                    </p>
+                    <p className="text-xs text-muted-foreground">@{safePost.creator.username}</p>
+                  </div>
+                </div>
+                {!isOwner && (
+                  <button 
+                    onClick={handleFollow}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                      following ? "bg-white/10 text-white" : "bg-primary text-white"
+                    )}
+                  >
+                    {following ? 'Following' : 'Follow'}
+                  </button>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-4 mb-8">
+                <button onClick={handleLike} className={cn("flex-1 h-12 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-all active:scale-95", safePost.isLiked ? "bg-red-500/10 border-red-500 text-red-500" : "bg-white/5 border-white/5 text-white")}>
+                  <Heart size={18} className={safePost.isLiked ? "fill-current" : ""} /> {formatNumber(safePost.likes)}
+                </button>
+                <button onClick={() => toggleSave(safePost.id)} className={cn("flex-1 h-12 rounded-xl font-bold flex items-center justify-center gap-2 border-2 transition-all active:scale-95", safePost.isSaved ? "bg-primary/10 border-primary text-primary" : "bg-white/5 border-white/5 text-white")}>
+                  <Bookmark size={18} className={safePost.isSaved ? "fill-current" : ""} /> Save
+                </button>
+              </div>
+
+              {/* Prompt Box */}
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/5 mb-8">
+                <p className="text-[10px] font-black tracking-widest text-primary uppercase mb-3">Generation Prompt</p>
+                <p className="text-sm text-foreground/80 leading-relaxed italic mb-4">"{safePost.prompt}"</p>
+                <button 
+                  onClick={handleCopy}
+                  className="w-full h-10 rounded-xl bg-white/10 text-xs font-bold flex items-center justify-center gap-2 hover:bg-white/20 transition-all"
+                >
+                  <Copy size={14} /> Copy Prompt
+                </button>
+              </div>
+
+              {/* Comments Section */}
+              <div className="space-y-6">
+                <h3 className="text-lg font-bold">Comments ({reviews.length})</h3>
+                
+                <div className="bg-white/5 p-4 rounded-xl space-y-4">
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder="Write a comment..."
+                    className="w-full bg-transparent text-sm outline-none resize-none"
+                    rows={2}
+                  />
+                  <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map(s => (
+                        <button key={s} onClick={() => setRating(s)}>
+                          <Star size={16} fill={s <= rating ? '#FFB800' : 'none'} className={s <= rating ? "text-yellow-400" : "text-white/20"} />
+                        </button>
+                      ))}
+                    </div>
+                    <button onClick={handleSubmitReview} className="bg-primary text-white px-4 py-2 rounded-lg text-xs font-bold">Post</button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {reviews.map(r => (
+                    <div key={r.id} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-white/10 shrink-0 overflow-hidden">
+                        {r.profiles?.avatar_url && <img src={r.profiles.avatar_url} alt="" className="w-full h-full object-cover" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-bold">{r.profiles?.display_name || 'User'}</p>
+                          <span className="text-[10px] text-muted-foreground opacity-50">{new Date(r.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{r.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </motion.div>
 
-      {/* Hero Image Section */}
-      <div className="relative w-full h-[65vh] bg-black flex items-center justify-center overflow-hidden">
-        <motion.button 
-          style={{ y: scrollY * 0.3 }}
-          className="w-full h-full p-0 border-none bg-transparent active:scale-[0.98] transition-transform"
-          onClick={() => setShowFullViewer(true)}
-        >
-          <img
-            src={safePost.imageUrl}
-            alt={safePost.title}
-            className="w-full h-full object-contain"
-            referrerPolicy="no-referrer"
-          />
-        </motion.button>
-      </div>
-
-      {/* Content Section */}
-      <div className="bg-background relative -mt-4 rounded-t-[24px] z-10 px-6 pt-8 pb-32">
-        {/* Title & Stats */}
-        <div className="mb-4">
-          {isEditing ? (
-            <input
-              type="text"
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              className="text-[18px] font-bold bg-secondary/30 w-full px-3 py-1.5 rounded-xl border border-primary/20 mb-2 focus:border-primary outline-none"
-            />
-          ) : (
-            <h1 className="text-[18px] font-bold tracking-tight text-foreground mb-1 leading-tight">
-              {safePost.title}
-            </h1>
-          )}
-          
-          <div className="flex items-center gap-3 text-muted-foreground/60">
-            <span className="flex items-center gap-1 text-[12px] font-medium">
-              <Eye size={12} /> {formatNumber(safePost.views)} views
-            </span>
-            <span className="flex items-center gap-1 text-[12px] font-medium">
-              <Heart size={12} /> {formatNumber(safePost.likes)} likes
-            </span>
-          </div>
-        </div>
-
-        {/* Creator Info */}
-        <div className="flex items-center justify-between mb-6">
-          <button
-            onClick={() => onCreatorTap?.(safePost.creator.name, safePost.creator.id)}
-            className="flex items-center gap-2 active:opacity-70 transition-opacity"
-          >
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-secondary border border-border">
-              {safePost.creator.avatar ? (
-                <img src={safePost.creator.avatar} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold">
-                  {safePost.creator.initials}
-                </div>
-              )}
-            </div>
-            <div className="text-left">
-              <p className="text-[14px] font-semibold text-foreground flex items-center gap-1 leading-none">
-                {safePost.creator.name} {safePost.creator.isVerified && <VerifiedBadge size={12} />}
-              </p>
-              <p className="text-[12px] text-muted-foreground">@{safePost.creator.username}</p>
-            </div>
-          </button>
-          
-          {!isOwner && (
-            <button
-              onClick={handleFollow}
-              disabled={followLoading}
-              className={cn(
-                "px-4 py-1.5 rounded-lg text-[12px] font-bold transition-all active:scale-95",
-                following ? "bg-secondary text-foreground" : "bg-primary text-primary-foreground"
-              )}
-            >
-              {following ? 'Following' : 'Follow'}
-            </button>
-          )}
-        </div>
-
-        {/* Action Buttons - Instagram Style */}
-        <div className="flex items-center gap-4 mb-6 border-y border-border/50 py-3">
-          <button
-            onClick={handleLike}
-            className={cn(
-              "flex items-center gap-1.5 transition-colors active:scale-90",
-              safePost.isLiked ? "text-red-500" : "text-foreground"
-            )}
-          >
-            <Heart size={22} className={safePost.isLiked ? "fill-current" : ""} />
-          </button>
-          <button className="text-foreground transition-colors active:scale-90">
-            <MessageSquare size={22} />
-          </button>
-          <button onClick={handleShare} className="text-foreground transition-colors active:scale-90">
-            <Share2 size={22} />
-          </button>
-          <div className="flex-1" />
-          <button onClick={() => toggleSave(safePost.id)} className="text-foreground transition-colors active:scale-90">
-            <Bookmark size={22} className={safePost.isSaved ? "fill-current" : ""} />
-          </button>
-        </div>
-
-
-
-        {/* Prompt Section */}
-        <div className="mb-8 overflow-hidden rounded-2xl border border-border bg-secondary/10">
-          <button 
-            onClick={() => setIsPromptExpanded(!isPromptExpanded)}
-            className="w-full flex items-center justify-between p-4 bg-secondary/20"
-          >
-            <span className="text-[13px] font-bold uppercase tracking-wider text-primary">Prompt Details</span>
-            <div className={cn("transition-transform", isPromptExpanded ? "rotate-180" : "")}>
-              <ArrowLeft size={16} className="-rotate-90" />
-            </div>
-          </button>
-          <AnimatePresence>
-            {isPromptExpanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-              >
-                <div className="p-4 pt-0">
-                  {isEditing ? (
-                    <textarea
-                      value={editedPrompt}
-                      onChange={(e) => setEditedPrompt(e.target.value)}
-                      className="w-full bg-secondary/30 p-4 rounded-xl border border-primary/20 focus:border-primary outline-none text-[14px] text-foreground leading-relaxed font-medium resize-none"
-                      rows={4}
-                    />
-                  ) : (
-                    <div className="pt-4">
-                      <p className="text-[15px] text-foreground leading-relaxed italic">
-                        "{safePost.prompt}"
-                      </p>
-                      <button 
-                        onClick={handleCopy}
-                        className="mt-4 flex items-center gap-2 text-[12px] font-bold text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <Copy size={14} /> Copy full prompt
-                      </button>
-                    </div>
-                  )}
-                  
-                  {isEditing && (
-                    <div className="mt-4 flex justify-end gap-3">
-                      <Button variant="ghost" onClick={() => setIsEditing(false)} className="text-[13px]">Cancel</Button>
-                      <Button onClick={handleUpdate} disabled={isUpdating} className="text-[13px]">
-                        Save Changes
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Meta / Tags */}
-        <div className="flex flex-wrap gap-2 mb-10">
-          {(safePost.tags || []).map(tag => (
-            <span key={tag} className="px-3 py-1.5 rounded-lg bg-secondary text-[12px] font-medium text-muted-foreground border border-border/50">
-              #{tag}
-            </span>
-          ))}
-        </div>
-
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black text-foreground">Comments</h2>
-            <span className="text-xs font-bold text-primary">{reviews.length} Total</span>
-          </div>
-          
-          <div className="bg-secondary/20 p-6 rounded-[2rem] border border-border/50">
-            <p className="text-sm font-bold text-foreground mb-4">Add a comment</p>
-            <textarea
-              value={reviewText}
-              onChange={(e) => setReviewText(e.target.value)}
-              placeholder="Share your thoughts on this creation..."
-              className="w-full bg-transparent text-sm text-foreground outline-none resize-none mb-4"
-              rows={2}
-            />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button key={star} onClick={() => setRating(star)}>
-                    <Star size={18} fill={star <= rating ? '#FFB800' : 'none'} className={cn(star <= rating ? "text-yellow-400" : "text-muted-foreground/30")} />
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={handleSubmitReview}
-                className="px-6 py-2.5 bg-primary text-primary-foreground text-xs font-black rounded-xl"
-              >
-                Post Comment
-              </button>
-            </div>
-          </div>
-
-          {reviews.length > 0 ? (
-            <div className="space-y-4">
-              {reviews.map((review) => (
-                <div key={review.id} className="flex gap-4">
-                  <div className="w-10 h-10 rounded-full bg-secondary shrink-0 overflow-hidden">
-                    {review.profiles?.avatar_url && <img src={review.profiles.avatar_url} alt="" className="w-full h-full object-cover" />}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-bold">{review.profiles?.display_name || 'User'}</p>
-                      <span className="text-[10px] text-muted-foreground">{new Date(review.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{review.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-10 text-center bg-secondary/10 rounded-3xl border border-dashed border-border/50">
-              <MessageSquare size={24} className="mx-auto text-muted-foreground/30 mb-2" />
-              <p className="text-xs text-muted-foreground font-medium">No comments yet. Be the first!</p>
-            </div>
-          )}
-
-          {relatedPosts.length > 0 && (
-            <div className="pt-10 border-t border-border mt-10">
-              <h2 className="text-xl font-black text-foreground mb-6">Related Creations</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {relatedPosts.map((p) => (
-                  <button 
-                    key={p.id} 
-                    onClick={() => onBack()} // In a real app we'd navigate to this post
-                    className="aspect-square rounded-2xl overflow-hidden bg-secondary active:scale-95 transition-transform"
-                  >
-                    <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Undo Delete Overlay */}
+      {/* ... */}
 
       <AnimatePresence>
         {showFullViewer && (
