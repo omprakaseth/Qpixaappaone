@@ -46,47 +46,42 @@ export const SplashScreen: React.FC = () => {
             }}
             className="relative"
           >
-            {/* New QP SVG Icon */}
+            {/* QP SVG Icon */}
             <svg 
-              width="100" 
-              height="100" 
-              viewBox="0 0 512 512" 
+              width="120" 
+              height="80" 
+              viewBox="0 0 130 80" 
               fill="none" 
               xmlns="http://www.w3.org/2000/svg"
             >
               <defs>
-                <linearGradient id="logo-grad" x1="80" y1="80" x2="432" y2="432" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#7B61FF" />
-                  <stop offset="1" stopColor="#4F46E5" />
+                <linearGradient id="splash-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#00E5FF" />
+                  <stop offset="100%" stopColor="#7B61FF" />
                 </linearGradient>
                 <filter id="splash-glow" x="-30%" y="-30%" width="160%" height="160%">
-                  <feGaussianBlur stdDeviation="15" result="blur" />
+                  <feGaussianBlur stdDeviation="4" result="blur" />
                   <feMerge>
                     <feMergeNode in="blur" />
                     <feMergeNode in="SourceGraphic" />
                   </feMerge>
                 </filter>
               </defs>
-              <motion.circle 
-                cx="256" 
-                cy="256" 
-                r="240" 
-                stroke="url(#logo-grad)" 
-                strokeWidth="20" 
+              <motion.path 
+                d="M 62 70 V 40 A 18 18 0 1 0 26 40 A 18 18 0 0 0 62 40 C 62 32 68 32 68 40 A 18 18 0 0 1 104 40 A 18 18 0 1 1 68 40 V 70"
+                stroke="url(#splash-gradient)"
+                strokeWidth="8"
                 strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 1.5, ease: "easeInOut" }}
-              />
-              <motion.g
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8, duration: 0.5 }}
+                strokeLinejoin="round"
                 filter="url(#splash-glow)"
-              >
-                <path d="M245 240C245 201.34 213.66 170 175 170C136.34 170 105 201.34 105 240C105 278.66 136.34 310 175 310H245V410" stroke="white" strokeWidth="42" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M267 240C267 201.34 298.34 170 337 170C375.66 170 407 201.34 407 240C407 278.66 375.66 310 337 310H267V410" stroke="white" strokeWidth="42" strokeLinecap="round" strokeLinejoin="round" />
-              </motion.g>
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ 
+                  duration: 1.5, 
+                  ease: "easeInOut",
+                  delay: 0.2
+                }}
+              />
             </svg>
 
             {/* Pulsing background glow */}

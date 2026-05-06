@@ -11,7 +11,6 @@ import QuickActions from '@/components/QuickActions';
 import FeedAdCard from '@/components/ads/FeedAdCard';
 import { Logo } from '@/components/Logo';
 import { LogoLoader } from '@/components/LogoLoader';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { useAppState } from '@/context/AppContext';
 import { Post } from '@/context/AppContext';
 import { useFollows } from '@/hooks/useFollows';
@@ -37,7 +36,6 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro, navVisible = true }: HomeScreenProps) {
-  const isMobile = useIsMobile();
   const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user, initialLoading, uploadingPost, retryUpload, clearUpload } = useAppState();
   console.log('HomeScreen: posts length', posts.length);
   const { followingIds } = useFollows();
@@ -216,151 +214,110 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
   return (
     <div
       ref={scrollRef}
-      className={cn(
-        "h-full overflow-y-auto scrollbar-hide bg-background",
-        !isMobile && "md:px-8"
-      )}
+      className="h-full overflow-y-auto scrollbar-hide bg-background"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Header Container - Mobile Only */}
-      {isMobile && (
+      {/* Header Container - Slides Up by exactly the Top Row height */}
+      <div 
+        className="fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out bg-background/95 backdrop-blur-md border-b border-border/50"
+        style={{ 
+          transform: showTopHeader ? 'translateY(0)' : `translateY(-${topHeaderHeight}px)`
+        }}
+      >
+        {/* Row 1: Logo & Actions (This row hides) */}
         <div 
-          className="fixed top-0 left-0 right-0 z-40 transition-all duration-300 ease-in-out bg-background/95 backdrop-blur-md border-b border-border/50"
-          style={{ 
-            transform: showTopHeader ? 'translateY(0)' : `translateY(-${topHeaderHeight}px)`
-          }}
+          ref={topHeaderRef}
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
         >
-          {/* Row 1: Logo & Actions */}
-          <div 
-            ref={topHeaderRef}
-            className="px-4 py-3 flex items-center justify-between"
-            style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
-          >
-            <div className="flex items-center gap-2.5">
-              <Logo size={32} />
-              <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
-            </div>
-            <div className="flex items-center gap-1">
-              {uploadingPost && (
-                <div className="flex items-center gap-2 mr-2">
-                  <div className="relative w-8 h-8 flex items-center justify-center">
-                    <svg className="w-8 h-8 -rotate-90">
-                      <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" className="text-secondary" />
-                      <circle
-                        cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2"
-                        strokeDasharray={88}
-                        strokeDashoffset={88 - (88 * uploadingPost.progress) / 100}
-                        className={cn("transition-all duration-300", uploadingPost.status === 'error' ? "text-destructive" : "text-primary")}
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      {uploadingPost.status === 'uploading' && <Upload size={14} className="text-primary animate-bounce" />}
-                      {uploadingPost.status === 'success' && <Sparkles size={14} className="text-primary" />}
-                      {uploadingPost.status === 'error' && <button onClick={retryUpload} className="text-destructive"><X size={14} /></button>}
-                    </div>
+          <div className="flex items-center gap-2.5 md:hidden">
+            <Logo size={32} />
+            <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
+          </div>
+          <div className="flex items-center gap-1">
+            {uploadingPost && (
+              <div className="flex items-center gap-2 mr-2">
+                <div className="relative w-8 h-8 flex items-center justify-center">
+                  <svg className="w-8 h-8 -rotate-90">
+                    <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2" className="text-secondary" />
+                    <circle
+                      cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2"
+                      strokeDasharray={88}
+                      strokeDashoffset={88 - (88 * uploadingPost.progress) / 100}
+                      className={cn("transition-all duration-300", uploadingPost.status === 'error' ? "text-destructive" : "text-primary")}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    {uploadingPost.status === 'uploading' && <Upload size={14} className="text-primary animate-bounce" />}
+                    {uploadingPost.status === 'success' && <Sparkles size={14} className="text-primary" />}
+                    {uploadingPost.status === 'error' && <button onClick={retryUpload} className="text-destructive"><X size={14} /></button>}
                   </div>
                 </div>
-              )}
-              <button onClick={() => navigate('/market')} className="p-1.5 transition-opacity active:opacity-60">
-                <Store size={22} className="text-foreground" />
-              </button>
-              <button onClick={() => setShowNotifications(true)} className="p-1.5 transition-opacity active:opacity-60 relative">
-                <Bell size={22} className="text-foreground" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
-              </button>
-            </div>
-          </div>
-
-          {/* Row 2: Search Bar */}
-          <div className="px-4 py-2 flex gap-2">
-            <div className="flex-1 flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">
-              <Search size={16} className="text-muted-foreground mr-2" />
-              <input
-                type="search"
-                autoComplete="off"
-                placeholder="Search prompts..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
-              />
-            </div>
-            <button
-              onClick={onCreatePost}
-              className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
-            >
-              <Plus size={20} />
+              </div>
+            )}
+            <button onClick={() => navigate('/market')} className="p-1.5 transition-opacity active:opacity-60">
+              <Store size={22} className="text-foreground" />
             </button>
-          </div>
-
-          {/* Row 3: Categories */}
-          <div className="flex items-center gap-0.5 px-4 pb-3">
-            <button
-              onClick={() => setFilterOpen(true)}
-              className={cn(
-                "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90",
-                Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-foreground'
-              )}
-            >
-              <SlidersHorizontal size={14} />
+            <button onClick={() => setShowNotifications(true)} className="p-1.5 transition-opacity active:opacity-60 relative">
+              <Bell size={22} className="text-foreground" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
             </button>
-            <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 ml-0.5">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => cat === 'Shorts' ? navigate('/shorts') : setActiveCategory(cat)}
-                  className={cn(
-                    "flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95",
-                    activeCategory === cat
-                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                      : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'
-                  )}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
           </div>
         </div>
-      )}
 
-      {/* Categories for Desktop (Sticky below Header) */}
-      {!isMobile && (
-        <div className="sticky top-0 z-30 pt-6 pb-4 bg-background">
-          <div className="flex items-center gap-2 mb-6">
-            <button
-              onClick={() => setFilterOpen(true)}
-              className={cn(
-                "flex-shrink-0 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold transition-all active:scale-95",
-                Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
-                  ? 'bg-primary text-white'
-                  : 'bg-white/5 border border-white/5 text-muted-foreground hover:text-white'
-              )}
-            >
-              <SlidersHorizontal size={16} /> Filters
-            </button>
-            <div className="h-4 w-[1px] bg-white/10 mx-2" />
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-              {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => cat === 'Shorts' ? navigate('/shorts') : setActiveCategory(cat)}
-                  className={cn(
-                    "flex-shrink-0 px-5 py-2 rounded-xl text-sm font-bold transition-all",
-                    activeCategory === cat
-                      ? 'bg-primary text-white shadow-xl shadow-primary/20'
-                      : 'bg-white/5 border border-white/5 text-muted-foreground hover:bg-white/10 hover:text-white'
-                  )}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+        {/* Row 2: Search Bar */}
+        <div className="px-4 py-2 flex gap-2">
+          <div className="flex-1 flex items-center bg-secondary/80 focus-within:bg-secondary search-glow rounded-xl px-3 h-10 transition-colors">
+            <Search size={16} className="text-muted-foreground mr-2" />
+            <input
+              type="search"
+              autoComplete="off"
+              placeholder="Search prompts..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none flex-1"
+            />
+          </div>
+          <button
+            onClick={onCreatePost}
+            className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center active:scale-95 transition-transform"
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+        {/* Row 3: Categories */}
+        <div className="flex items-center gap-0.5 px-4 pb-3">
+          <button
+            onClick={() => setFilterOpen(true)}
+            className={cn(
+              "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90",
+              Object.values(filters).some(v => v !== 'All' && v !== 'All Time')
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-foreground'
+            )}
+          >
+            <SlidersHorizontal size={14} />
+          </button>
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 ml-0.5">
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => cat === 'Shorts' ? navigate('/shorts') : setActiveCategory(cat)}
+                className={cn(
+                  "flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95",
+                  activeCategory === cat
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                    : 'bg-secondary/50 text-secondary-foreground hover:bg-secondary'
+                )}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
-      )}
+      </div>
 
       {refreshing && (
         <div className="flex justify-center py-4 mt-[160px]">
@@ -368,11 +325,10 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Content Area - Padded top to account for fixed header */}
       <div 
         className={cn(
-          "px-4 pb-safe-nav", 
-          isMobile ? "pt-[170px]" : "pt-4 pb-12",
+          "px-4 pb-safe-nav pt-[170px]", 
           isMounted && "transition-all duration-300"
         )}
       >
@@ -447,11 +403,8 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-8">
-            <div className={cn(
-              "grid gap-3 md:gap-6",
-              isMobile ? "grid-cols-[repeat(auto-fill,minmax(160px,1fr))]" : "grid-cols-2 lg:grid-cols-3"
-            )}>
+          <>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
               {(initialLoading && posts.length === 0) ? (
                 <div className="col-span-full flex flex-col items-center justify-center py-20">
                   <LogoLoader size={80} text="Discovering masterpieces" />
@@ -459,13 +412,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
               ) : (
                 <>
                   {(filteredPosts.length > 0 ? filteredPosts : posts).slice(0, visibleCount).map((post, index) => (
-                    <div 
-                      key={post.id}
-                      className={cn(
-                        "group transition-all duration-500 hover:scale-[1.02]",
-                        !isMobile && "hover:shadow-2xl hover:shadow-primary/10"
-                      )}
-                    >
+                    <React.Fragment key={post.id}>
                       <ImageCard
                         post={post}
                         onTap={() => onPostTap(post)}
@@ -480,16 +427,14 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
                           slotId={adSettings.adsenseFeedSlot}
                         />
                       )}
-                    </div>
+                    </React.Fragment>
                   ))}
-                  {loading && Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={`sk-${i}`} />)}
+                  {loading && Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={`sk-${i}`} />)}
                 </>
               )}
             </div>
-            <div ref={loadMoreRef} className="h-10 flex items-center justify-center">
-              {loading && <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
-            </div>
-          </div>
+            <div ref={loadMoreRef} className="h-4" />
+          </>
         )}
       </div>
 

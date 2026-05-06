@@ -24,6 +24,7 @@ export default defineConfig(({mode}) => {
             type: 'module'
           },
           includeAssets: [
+            'favicon.svg',
             'favicon.ico', 
             'apple-touch-icon.png',
             'favicon-32x32.png',

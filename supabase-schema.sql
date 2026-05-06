@@ -109,17 +109,17 @@ ALTER TABLE public.generations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.follows ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+
+-- Profiles: Anyone can read, users can update their own
 CREATE POLICY "Public profiles are viewable by everyone." ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert their own profile." ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
- CREATE POLICY "Users can update own profile." ON public.profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admins can manage all profiles." ON public.profiles FOR ALL USING (public.has_role(auth.uid(), 'admin'));
+CREATE POLICY "Users can update own profile." ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
 -- Posts: Anyone can read, authenticated users can create, users can update/delete their own
 CREATE POLICY "Posts are viewable by everyone." ON public.posts FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can create posts." ON public.posts FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "Users can update own posts." ON public.posts FOR UPDATE USING (auth.uid() = creator_id);
 CREATE POLICY "Users can delete own posts." ON public.posts FOR DELETE USING (auth.uid() = creator_id);
-CREATE POLICY "Admins can manage all posts." ON public.posts FOR ALL USING (public.has_role(auth.uid(), 'admin'));
 
 -- Post Likes: Anyone can read, authenticated users can insert/delete their own
 CREATE POLICY "Likes are viewable by everyone." ON public.post_likes FOR SELECT USING (true);
@@ -245,35 +245,6 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
   UNIQUE(user_id, role)
 );
 
--- Admin Security Helpers
-CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role TEXT)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = _user_id
-    AND role = _role
-  );
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.is_super_admin(_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.user_roles
-    WHERE user_id = _user_id
-    AND role = 'super_admin'
-  );
-END;
-$$;
-
 CREATE TABLE IF NOT EXISTS public.admin_permissions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
@@ -294,16 +265,6 @@ CREATE TABLE IF NOT EXISTS public.admin_tasks (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-
--- Enable RLS for admin tables
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.admin_permissions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.admin_tasks ENABLE ROW LEVEL SECURITY;
-
--- Admins can read everything in these tables
-CREATE POLICY "Admins can view roles" ON public.user_roles FOR SELECT USING (public.has_role(auth.uid(), 'admin'));
-CREATE POLICY "Admins can view permissions" ON public.admin_permissions FOR SELECT USING (public.has_role(auth.uid(), 'admin'));
-CREATE POLICY "Admins can view tasks" ON public.admin_tasks FOR ALL USING (public.has_role(auth.uid(), 'admin'));
 
 -- 11. User Notifications Table
 CREATE TABLE IF NOT EXISTS public.user_notifications (

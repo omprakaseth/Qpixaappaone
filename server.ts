@@ -42,6 +42,29 @@ async function startServer() {
     res.json({ status: "ok", env: process.env.NODE_ENV });
   });
 
+  // Helper for exponential backoff retries
+  async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 1000): Promise<Response> {
+    try {
+      const response = await fetch(url, options);
+      
+      // If we hit a rate limit (429), try to retry with backoff
+      if (response.status === 429 && retries > 0) {
+        console.warn(`[Retry] Rate limited (429) on ${url}. Retrying in ${backoff}ms... (${retries} retries left)`);
+        await new Promise(resolve => setTimeout(resolve, backoff));
+        return fetchWithRetry(url, options, retries - 1, backoff * 2);
+      }
+      
+      return response;
+    } catch (error: any) {
+      if (retries > 0 && error.name === 'AbortError') {
+        console.warn(`[Retry] Timeout/Abort on ${url}. Retrying in ${backoff}ms... (${retries} retries left)`);
+        await new Promise(resolve => setTimeout(resolve, backoff));
+        return fetchWithRetry(url, options, retries - 1, backoff * 2);
+      }
+      throw error;
+    }
+  }
+
   // Reusable image gen logic to avoid localhost fetch loops
   async function generatePollinationsImage(prompt: string, model: string, width: number, height: number, seed: number, nologo: boolean, enhance: boolean) {
     const queryParams = new URLSearchParams({
@@ -59,7 +82,26 @@ async function startServer() {
     const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
     
     try {
-      const response = await fetch(imageUrl, { signal: controller.signal });
+      const response = await fetchWithRetry(imageUrl, { signal: controller.signal }, 2, 2000);
+      
+      // If still failing with 429 after retries, try a different model as fallback
+      if (response.status === 429) {
+        console.warn("[Fallback] Pollinations is still rate limiting. Trying fallback model...");
+        const fallbackModel = model === 'flux' ? 'turbo' : 'flux';
+        const fallbackParams = new URLSearchParams(queryParams);
+        fallbackParams.set('model', fallbackModel);
+        const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${fallbackParams.toString()}`;
+        
+        const fallbackResponse = await fetch(fallbackUrl, { signal: controller.signal });
+        if (!fallbackResponse.ok) throw new Error(`Pollinations returned ${fallbackResponse.status}`);
+        
+        const arrayBuffer = await fallbackResponse.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64 = buffer.toString('base64');
+        const contentType = fallbackResponse.headers.get('content-type') || 'image/jpeg';
+        return `data:${contentType};base64,${base64}`;
+      }
+
       if (!response.ok) throw new Error(`Pollinations returned ${response.status}`);
       
       const arrayBuffer = await response.arrayBuffer();
@@ -163,7 +205,18 @@ async function startServer() {
       if (!prompt) return res.status(400).json({ error: "Prompt is required" });
 
       const url = `https://text.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=${model || 'openai'}`;
-      const response = await fetch(url);
+      const response = await fetchWithRetry(url, {}, 2, 2000);
+      
+      if (response.status === 429) {
+        // Fallback for text: Try a simpler model or return a custom error
+         console.warn("[Fallback] Text Pollinations is rate limiting. Trying simpler model...");
+         const fallbackUrl = `https://text.pollinations.ai/prompt/${encodeURIComponent(prompt)}?model=mistral`;
+         const fallbackRes = await fetch(fallbackUrl);
+         if (!fallbackRes.ok) throw new Error("Failed even with fallback model");
+         const text = await fallbackRes.text();
+         return res.json({ text });
+      }
+
       if (!response.ok) throw new Error("Failed to fetch from Pollinations Text");
       
       const text = await response.text();

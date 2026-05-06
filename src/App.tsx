@@ -12,13 +12,13 @@ import PrivacyPage from "./hooks/pages/PrivacyPage";
 import TermsPage from "./hooks/pages/TermsPage";
 import ContactPage from "./hooks/pages/ContactPage";
 import AboutPage from "./hooks/pages/AboutPage";
-import { PWAInstallBanner } from "./components/PWAInstallBanner";
+import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { SplashScreen } from "./components/SplashScreen";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-    <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -27,7 +27,6 @@ const App = () => (
           <SplashScreen />
           <BrowserRouter>
             <Routes>
-              {/* ... routes ... */}
               <Route path="/" element={<Index />} />
               <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/home/prompt/:id" element={<Index />} />
@@ -64,7 +63,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <PWAInstallBanner />
+            <PWAInstallPrompt />
           </BrowserRouter>
         </NotificationProvider>
       </AppProvider>
