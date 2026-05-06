@@ -68,6 +68,7 @@ interface ChatMessage {
   createdAt: string;
   aspectRatio?: string;
   status?: 'pending' | 'success' | 'error';
+  error?: string;
 }
 
 interface ChatSession {
@@ -147,7 +148,7 @@ function AiMessageBubble({ msg, isPro, onOpenViewer, onDelete }: any) {
 }
 
 export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPublish }: StudioScreenProps) {
-  const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user } = useAppState();
+  const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user, profile } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('flux');
@@ -440,17 +441,23 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         return s;
       }));
 
-      // 2. Clear from Supabase if it's cloud history
-      if (sessionId === 'cloud-history' && user && !isPlaceholder) {
+      // 2. Clear from Supabase if the user is logged in
+      // Note: We check if messageId is a UUID to distinguish from temporary session IDs
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageId);
+      
+      if (user && !isPlaceholder && isUUID) {
         const { error } = await supabase
           .from('generations')
           .delete()
           .eq('id', messageId)
-          .eq('user_id', user.id); // Security: ensure user owns it
+          .eq('user_id', user.id);
           
         if (error) {
           console.error('Supabase delete error:', error);
-          throw error;
+          // Only show error toast if it's a real server error
+          if (error.code !== 'PGRST116') {
+            throw error;
+          }
         }
       }
       
@@ -466,11 +473,10 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         localStorage.setItem('qpixa_studio_sessions', JSON.stringify(updated));
       }
 
-      toast.success('Permanently deleted');
+      toast.success('Deleted from history');
     } catch (err: any) {
       console.error('Delete error:', err);
       toast.error('Failed to delete permanently');
-      // If error occurs, you might want to refresh sessions here to recover state
     }
   };
 
@@ -640,6 +646,37 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       let generatedImageUrl = '';
       const stylePrompt = STYLE_PRESETS.find(s => s.id === selectedStyle)?.prompt || '';
       let finalPrompt = stylePrompt ? `${userPrompt}, ${stylePrompt}` : userPrompt;
+      
+      // Pro Identity Transfer: If an image is attached, describe it first using Gemini 
+      // to ensure the character/subject is preserved in the final image generation.
+      if (imageToSend) {
+        toast.info('Analyzing image for perfect character transfer...');
+        try {
+          const describeRes = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: "CRITICAL: Describe the EXACT facial features, hair, clothing, and physical build of the person in this image. I need to recreate this IDENTICAL person in a different setting. Focus on unique identifiers. Be extremely specific but concise.",
+              image: imageToSend,
+              type: 'text',
+              model: 'gemini-1.5-flash'
+            })
+          });
+          
+          if (describeRes.ok) {
+            const describeData = await describeRes.json();
+            const characterDesc = describeData.text;
+            if (characterDesc) {
+              // Enhanced Pro Prompt with Identity Locking
+              finalPrompt = `STRICT IDENTITY LOCK: Recreate the exact same person with these features: [${characterDesc}]. Ensure facial structure and clothing remain consistent. PLACE THIS PERSON in this new scene: ${userPrompt}. Artistic style: ${stylePrompt}`;
+              console.log('Final Pro Prompt (Identity Locked):', finalPrompt);
+            }
+          }
+        } catch (e) {
+          console.warn('Image analysis failed, proceeding with basic prompt.', e);
+        }
+      }
+
       if (negativePrompt.trim()) {
         finalPrompt += `. Avoid: ${negativePrompt.trim()}`;
       }
@@ -669,13 +706,13 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       setMessages(finalMessages);
       updateSessionMessages(activeSessionId, finalMessages);
 
-      // Deduct credit
-      if (user && user.email !== 'omprakashseth248@gmail.com') {
+      // Deduct credit (skip for verified/pro creators if applicable)
+      if (user && !profile?.is_verified) {
         await supabase.from('profiles').update({ credits: credits - 1 }).eq('id', user.id);
         setCredits(prev => prev - 1);
       }
 
-      // Save to DB
+      // Save to DB and update AI message with REAL ID
       if (user && !isPlaceholder) {
         let finalImageUrl = generatedImageUrl;
         if (generatedImageUrl.startsWith('data:')) {
@@ -691,7 +728,25 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
             }
           } catch (e) { console.error(e); }
         }
-        await supabase.from('generations').insert({ user_id: user.id, prompt: userPrompt, image_url: finalImageUrl });
+        
+        const { data: dbGen, error: dbError } = await supabase
+          .from('generations')
+          .insert({ user_id: user.id, prompt: userPrompt, image_url: finalImageUrl })
+          .select()
+          .single();
+
+        if (!dbError && dbGen) {
+          // Update the message with the real DB ID so deletion works!
+          const linkedAiMsg: ChatMessage = {
+            ...finalAiMsg,
+            id: dbGen.id
+          };
+          const linkedMessages = [...messages, userMsg, linkedAiMsg];
+          setMessages(linkedMessages);
+          updateSessionMessages(activeSessionId, linkedMessages);
+        } else {
+          console.error('Failed to sync generation with DB:', dbError);
+        }
       }
 
       await refreshProfile();
@@ -699,12 +754,19 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     } catch (err: any) {
       clearInterval(progressInterval);
       abortControllerRef.current = null;
+      setGenerating(false);
+      setGenerationProgress(0);
+      
+      console.error('GENERATE ERROR:', err);
+      const errorMessage = err.message || 'An unknown error occurred';
+      toast.error(`Generation failed: ${errorMessage}`);
       
       // Update AI Message to error
       const errorAiMsg: ChatMessage = {
         ...pendingAiMsg,
         status: 'error',
-        text: `Error: ${err.message || 'Generation failed'}`
+        error: errorMessage,
+        text: `Error: ${errorMessage}`
       };
       const errorMessages = [...messages, userMsg, errorAiMsg];
       setMessages(errorMessages);
@@ -740,7 +802,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         body: JSON.stringify({ 
           prompt: `Enhance this image generation prompt to be more descriptive and artistic, but keep it concise (under 50 words): "${prompt}"`,
           type: 'text',
-          model: 'gemini-3-flash-preview'
+          model: 'gemini-1.5-flash'
         })
       });
 
@@ -1283,18 +1345,34 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         )}
 
         {attachedPreview && (
-          <div className="mb-2 relative inline-block">
-            <img src={attachedPreview} alt="Attached" className={cn("h-20 rounded-xl object-cover border border-border", isUploadingAttachment && "opacity-50")} />
-            {isUploadingAttachment ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <RotateCcw size={20} className="text-primary animate-spin" />
+          <div className="flex items-center gap-2 p-2 bg-secondary/50 rounded-xl mb-4 border border-border/50 group relative">
+            <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 shadow-lg border border-white/10">
+              <img src={attachedPreview} alt="Attached" className="w-full h-full object-cover" />
+              {isUploadingAttachment ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                  <RotateCcw size={16} className="text-primary animate-spin" />
+                </div>
+              ) : (
+                <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                  <Zap size={12} className="text-white fill-primary animate-pulse" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 pr-8">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Sparkles size={10} className="text-primary" />
+                <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Identity Locked</p>
               </div>
-            ) : (
-              <button
+              <p className="text-[11px] text-muted-foreground truncate font-medium">
+                {isUploadingAttachment ? 'Uploading your identity...' : 'Recreating this subject in new setting...'}
+              </p>
+            </div>
+            {!isUploadingAttachment && (
+              <button 
                 onClick={removeAttachment}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-secondary hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full transition-all active:scale-90"
               >
-                <X size={12} />
+                <X size={14} />
               </button>
             )}
           </div>

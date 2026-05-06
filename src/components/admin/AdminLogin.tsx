@@ -35,18 +35,10 @@ export default function AdminLogin({ onSuccess }: AdminLoginProps) {
       });
 
       if (roleError || !hasAdminRole) {
-        // Fallback check for initial setup if RPC fails or isn't there yet
-        // In a real app, you'd solely rely on roles, but for the first admin, 
-        // we might check a restricted set of emails IF configured in ENV
-        const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(',') || [];
-        const isEmailAdmin = adminEmails.includes(user.email || '');
-
-        if (!isEmailAdmin) {
-          await supabase.auth.signOut();
-          toast.error('Access denied. Admin privileges required.');
-          setLoading(false);
-          return;
-        }
+        await supabase.auth.signOut();
+        toast.error('Access denied. Admin privileges required.');
+        setLoading(false);
+        return;
       }
 
       toast.success('Welcome back, Admin!');

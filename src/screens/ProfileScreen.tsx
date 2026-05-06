@@ -102,7 +102,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     try {
       const { data, error } = await (supabase
         .from('posts')
-        .select('*, profiles(username, avatar_url)')
+        .select('*, profiles:creator_id(username, avatar_url)')
         .eq('creator_id', user.id)
         .eq('is_short', true)
         .order('created_at', { ascending: false }) as any);
@@ -114,7 +114,8 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           id: p.id,
           thumbnail: p.image_url,
           views: p.views || 0,
-          likes: p.likes_count || 0,
+          likes: p.likes || 0,
+          comments: p.comments || 0,
           prompt: p.prompt || '',
           creator: {
             username: p.profiles?.username || profile?.username || 'User',
@@ -131,51 +132,78 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
 
   const fetchMyPosts = async () => {
     if (!user || isPlaceholder) return;
-    const { data, error } = await supabase
-      .from('posts')
-      .select(`
-        *,
-        profiles:creator_id (
-          username,
-          display_name,
-          avatar_url,
-          is_verified
-        )
-      `)
-      .eq('creator_id', user.id)
-      .order('created_at', { ascending: false });
-      
-    if (error) {
-      console.error('Error fetching posts:', error);
-      setMyPosts([]);
-    } else if (data && data.length > 0) {
-      const formattedPosts = data.map((p: any) => ({
-        id: p.id,
-        title: p.title || 'Untitled',
-        imageUrl: p.image_url,
-        creator: {
-          id: p.creator_id || user?.id || '',
-          name: p.profiles?.display_name || profile?.display_name || 'Unknown',
-          username: p.profiles?.username ? `@${p.profiles.username}` : (profile?.username ? `@${profile.username}` : '@user'),
-          avatar: p.profiles?.avatar_url || profile?.avatar_url || '',
-          initials: (p.profiles?.display_name || profile?.display_name || 'U').substring(0, 2).toUpperCase(),
-          isVerified: p.profiles?.is_verified || profile?.is_verified || false,
-        },
-        prompt: p.prompt || '',
-        tags: p.tags || [],
-        likes: p.likes || 0,
-        views: p.views || 0,
-        saves: p.saves || 0,
-        comments: p.comments || 0,
-        isLiked: false,
-        isSaved: false,
-        category: p.category,
-        style: p.style,
-        aspectRatio: p.aspect_ratio,
-        creator_id: p.creator_id
-      }));
-      setMyPosts(formattedPosts);
-    } else {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:creator_id (
+            username,
+            display_name,
+            avatar_url,
+            is_verified
+          )
+        `)
+        .eq('creator_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.warn('Profile fetch post error (retrying simple):', error);
+        // Fallback to simple fetch
+        const { data: simpleData, error: simpleError } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('creator_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (simpleError) throw simpleError;
+        if (simpleData) {
+          const formatted = simpleData.map((p: any) => ({
+            ...p,
+            imageUrl: p.image_url,
+            creator: {
+               id: user.id,
+               name: profile?.display_name || 'You',
+               username: `@${profile?.username || 'user'}`,
+               avatar: profile?.avatar_url || '',
+               initials: (profile?.display_name || 'U').substring(0, 2).toUpperCase(),
+               isVerified: profile?.is_verified || false
+            }
+          }));
+          setMyPosts(formatted);
+        }
+      } else if (data) {
+        const formattedPosts = data.map((p: any) => ({
+          id: p.id,
+          title: p.title || 'Untitled',
+          imageUrl: p.image_url,
+          creator: {
+            id: p.creator_id || user?.id || '',
+            name: p.profiles?.display_name || profile?.display_name || 'Unknown',
+            username: p.profiles?.username ? `@${p.profiles.username}` : (profile?.username ? `@${profile.username}` : '@user'),
+            avatar: p.profiles?.avatar_url || profile?.avatar_url || '',
+            initials: (p.profiles?.display_name || profile?.display_name || 'U').substring(0, 2).toUpperCase(),
+            isVerified: p.profiles?.is_verified || profile?.is_verified || false,
+          },
+          prompt: p.prompt || '',
+          tags: p.tags || [],
+          likes: p.likes || 0,
+          views: p.views || 0,
+          saves: p.saves || 0,
+          comments: p.comments || 0,
+          isLiked: false,
+          isSaved: false,
+          category: p.category,
+          style: p.style,
+          aspectRatio: p.aspect_ratio,
+          creator_id: p.creator_id
+        }));
+        setMyPosts(formattedPosts);
+      } else {
+        setMyPosts([]);
+      }
+    } catch (err) {
+      console.error('Critical error in fetchMyPosts:', err);
       setMyPosts([]);
     }
   };

@@ -70,6 +70,7 @@ interface AppState {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  isAdmin: boolean;
   isLoggedIn: boolean;
   isPro: boolean;
   credits: number;
@@ -102,6 +103,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [uploadingPost, setUploadingPost] = useState<UploadingPost | null>(null);
 
   const { deferredPrompt, promptInstall: installApp } = usePWAInstall();
@@ -205,17 +207,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const safeTitle = (typeof rawTitle === 'string' ? rawTitle : 'Untitled').trim() || 'Untitled';
       const safePrompt = (typeof rawPrompt === 'string' ? rawPrompt : 'No prompt provided').trim() || 'No prompt provided';
       
-      const postData: any = {
-        creator_id: user.id,
-        title: safeTitle,
-        prompt: safePrompt,
-        image_url: finalUrl || '',
-      };
+      // Robust tag handling (Instagram style: multiple separators, no duplicates)
+      const tagsString = upload.tags || '';
+      const tagsArray = tagsString
+        .replace(/#/g, ' ') // Treat hashtag symbols as separators
+        .split(/[,;\s]+/)   // Split by comma, semicolon, or whitespace
+        .map(t => t.trim().toLowerCase())
+        .filter(t => t.length > 0 && t !== '#')
+        .slice(0, 30);      // Limit to 30 tags
 
       // Smart Category Logic: Check if tags match any known categories
-      const availableCategories = ['Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature', 'Shorts'];
-      const tagsArray = (upload.tags || '').split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
-      let detectedCategory = 'Trending';
+      const availableCategories = ['Portrait', 'Anime', 'Cars', 'Fantasy', 'Nature', 'Shorts', 'Summer', 'IPL 2026', 'Trending'];
+      let detectedCategory = upload.type === 'short' ? 'Shorts' : 'Trending';
       
       for (const cat of availableCategories) {
         if (tagsArray.includes(cat.toLowerCase())) {
@@ -224,46 +227,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Add optional fields only if they exist in the schema (we'll try to insert them and fallback if it fails)
-      const extendedData = {
-        ...postData,
+      const postData: any = {
+        creator_id: user.id,
+        title: safeTitle,
+        prompt: safePrompt,
+        image_url: finalUrl || '',
+        tags: tagsArray,
+        category: detectedCategory,
         is_short: upload.type === 'short',
-        tags: (upload.tags || '').split(',').map(t => t.trim()).filter(Boolean),
-        category: detectedCategory, // Smart category detection
         is_hidden: false,
+        views: 0,
+        likes: 0,
+        comments: 0,
+        created_at: new Date().toISOString()
       };
 
-      console.log('Final check before insert - Title:', extendedData.title);
-      if (!extendedData.title) {
-        console.error('CRITICAL: Title is still null or empty despite safeTitle logic!');
-        extendedData.title = 'Untitled Creation';
-      }
-
-      console.log('Attempting to insert post:', extendedData);
-      const { data: insertedData, error } = await supabase.from('posts').insert(extendedData).select(`
+      console.log('Attempting to insert post with full metadata:', postData);
+      
+      const { data: insertedData, error } = await supabase.from('posts').insert(postData).select(`
         *,
         profiles:creator_id (*)
       `).single();
       
       if (error) {
-        console.warn('Failed to insert with extended fields, trying minimal insert:', error);
-        // Fallback to minimal insert if columns are missing
-        const { data: retryData, error: retryError } = await supabase.from('posts').insert(postData).select(`
+        console.error('Failed to insert post:', error);
+        
+        // Final fallback if the above still fails (dropping optional fields)
+        const minimalData = {
+          creator_id: user.id,
+          title: safeTitle,
+          prompt: safePrompt,
+          image_url: finalUrl || '',
+        };
+        
+        const { data: retryData, error: retryError } = await supabase.from('posts').insert(minimalData).select(`
           *,
           profiles:creator_id (*)
         `).single();
-        if (retryError) throw retryError;
+        
+        if (retryError) {
+          throw new Error(`Critical upload failure: ${retryError.message}`);
+        }
         
         if (retryData) {
           const newPost = formatPost(retryData);
           setPosts(prev => [newPost, ...prev]);
         }
-        toast.info('Post published (some metadata like title/tags might be missing due to DB schema)');
+        toast.info('Post published with limited metadata.');
       } else if (insertedData) {
         const newPost = formatPost(insertedData);
         setPosts(prev => [newPost, ...prev]);
-        analytics.trackPostPublished(upload.id, 'Trending', upload.type === 'short');
-        toast.success(`${upload.type === 'short' ? 'Short' : 'Post'} published!`);
+        analytics.trackPostPublished(upload.id, detectedCategory, upload.type === 'short');
+        toast.success(`${upload.type === 'short' ? 'Short' : 'Post'} published successfully!`);
       }
 
       setUploadingPost(prev => prev ? { ...prev, progress: 100, status: 'success' } : null);
@@ -434,6 +449,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (data) {
       setProfile(data as Profile);
       setCredits(data.credits);
+      
+      // Check admin status securely via RPC
+      const { data: hasAdminRole } = await supabase.rpc('has_role', {
+        _user_id: currentUser.id,
+        _role: 'admin'
+      });
+      setIsAdmin(!!hasAdminRole);
     }
   };
 
@@ -460,6 +482,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         fetchProfile(sess.user);
       } else {
         setProfile(null);
+        setIsAdmin(false);
         setCredits(40);
       }
     });
@@ -630,7 +653,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      posts, setPosts, initialLoading, user, session, profile, isLoggedIn, isPro, credits, setCredits,
+      posts, setPosts, initialLoading, user, session, profile, isAdmin, isLoggedIn, isPro, credits, setCredits,
       uploadingPost, startUpload, retryUpload, clearUpload,
       toggleLike, toggleSave, addPost, deletePost, updatePost, signOut, refreshProfile, fetchPosts, fetchPostById,
       deferredPrompt, installApp

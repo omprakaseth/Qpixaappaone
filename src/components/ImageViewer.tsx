@@ -240,16 +240,6 @@ export function ImageViewer({ url, alt, onClose, onDelete, onDownload, onShare, 
           />
         </div>
       </div>
-
-      {/* Bottom Controls */}
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 z-10">
-        <button onClick={() => setScale(s => Math.max(1, s - 0.5))} className="p-2 text-white/70 hover:text-white"><ZoomOut size={18} /></button>
-        <div className="w-[1px] h-4 bg-white/10" />
-        <span className="text-[10px] font-bold text-white/50 w-8 text-center">{Math.round(scale * 100)}%</span>
-        <div className="w-[1px] h-4 bg-white/10" />
-        <button onClick={() => setScale(s => Math.min(4, s + 0.5))} className="p-2 text-white/70 hover:text-white"><ZoomIn size={18} /></button>
-        <button onClick={reset} className="p-2 text-white/70 hover:text-white"><RotateCcw size={16} /></button>
-      </div>
     </motion.div>
   );
 

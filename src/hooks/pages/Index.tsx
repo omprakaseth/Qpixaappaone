@@ -24,6 +24,7 @@ import { useSmartScroll } from '@/hooks/useSmartScroll';
 import { useAdSettings } from '@/hooks/useAdSettings';
 import { Post } from '@/context/AppContext';
 import { Loader2, Sparkles, Key, RotateCcw, Upload, X, Bell } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { generatePromptMeta } from '@/lib/seo-utils';
 
@@ -67,6 +68,18 @@ function AppShell() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [studioPrompt, setStudioPrompt] = useState('');
   const [viewingCreator, setViewingCreator] = useState<string | null>(null);
+
+  const [lastBackPress, setLastBackPress] = useState(0);
+  const { toast } = useToast();
+
+  // History guard to handle exit logic
+  useEffect(() => {
+    // Push a guard state so we can intercept the first back press on root
+    if (!window.history.state?.guard) {
+      window.history.replaceState({ guard: true, root: true }, '');
+      window.history.pushState({ guard: true }, '');
+    }
+  }, []);
 
   // Sync tab stacks with global overlay state
   useEffect(() => {
@@ -132,7 +145,7 @@ function AppShell() {
 
   // --- History-based back navigation ---
   const pushHistory = useCallback((state: string, path?: string) => {
-    window.history.pushState({ overlay: state }, '', path);
+    window.history.pushState({ overlay: state, guard: true }, '', path);
   }, []);
 
   const closeOverlay = useCallback((setter: (v: any) => void, value: any = null) => {
@@ -162,16 +175,40 @@ function AppShell() {
       if (showSettings) { setShowSettings(false); return; }
       if (showSubscription) { setShowSubscription(false); return; }
       
-      // 2. Tab-specific back behavior
-      // If at non-home root, go back to home as requested
-      if (activeTab !== 'home' && !location.pathname.includes('/prompt/') && !location.pathname.includes('/creator/')) {
-        navigate('/', { replace: true });
-        return;
+      // 2. Handle Subpages vs Root
+      // Root paths are exactly matching activeTab's base path
+      const rootPath = tabRootPaths[activeTab] || '/';
+      const isActuallyRoot = location.pathname === rootPath || (rootPath === '/' && location.pathname === '');
+      
+      if (isActuallyRoot) {
+        // We are on a tab root
+        const now = Date.now();
+        if (now - lastBackPress < 2000) {
+          // Allow exit
+          return;
+        } else {
+          // Block exit, show toast, re-push guard
+          setLastBackPress(now);
+          if (navigator.vibrate) navigator.vibrate(10);
+          toast({
+            description: "Press back again to exit",
+            duration: 2000,
+          });
+          window.history.pushState({ guard: true }, '');
+        }
+      } else {
+        // We are on a subpage or another tab's history tried to leak in
+        // Back should return to that tab's root screen
+        navigate(rootPath, { replace: true });
+        // Re-push guard for the root
+        if (!window.history.state?.guard) {
+          window.history.pushState({ guard: true }, '');
+        }
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [showAuth, showCreatePost, showSettings, showSubscription, viewingCreator, selectedPost, activeTab, navigate, location.pathname]);
+  }, [showAuth, showCreatePost, showSettings, showSubscription, viewingCreator, selectedPost, activeTab, navigate, location.pathname, lastBackPress, toast]);
 
   const tabRootPaths: Record<string, string> = {
     home: '/',
@@ -232,8 +269,8 @@ function AppShell() {
       return;
     }
 
-    // Use push for tab switches to allow back button to return to home
-    navigate(tabRootPaths[tab]);
+    // Tab switches MUST NOT create a history stack path, use replace: true
+    navigate(tabRootPaths[tab], { replace: true });
   }, [navigate, activeTab]);
 
   const openCreator = useCallback((creatorName: string, creatorId?: string) => {

@@ -153,7 +153,7 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
   }, [activeIndex]);
 
   return (
-    <div className="h-full w-full bg-black relative overflow-hidden flex flex-col pb-14">
+    <div className="h-full w-full bg-black relative overflow-hidden flex flex-col pb-16">
       {/* Top Navigation - Glass Pill Style */}
       <motion.div 
         initial={{ y: 0, opacity: 1 }}
@@ -511,7 +511,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
               className="absolute inset-0 pointer-events-none z-20"
             >
               {/* Right Side Actions - AI Focused */}
-              <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3 pointer-events-auto h-[300px] justify-end">
+              <div className="absolute right-3 bottom-20 flex flex-col items-center gap-3 pointer-events-auto min-h-[300px] justify-end">
                 <div className="flex flex-col items-center gap-1">
                   <button 
                     onClick={() => {
@@ -567,18 +567,6 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
                   </button>
                   <span className="text-[11px] font-bold text-white drop-shadow-md">{reel.shares}</span>
                 </div>
-
-                {reel.prompt && (
-                  <div className="flex flex-col items-center gap-1">
-                    <button 
-                      onClick={() => toast.success('Analyzing content to generate similar...')}
-                      className="w-11 h-11 flex items-center justify-center transition-all active:scale-90 group"
-                    >
-                      <Sparkles className="w-6 h-6 text-primary drop-shadow-md group-hover:text-primary/80" />
-                    </button>
-                    <span className="text-[11px] font-bold text-primary drop-shadow-md">Remix</span>
-                  </div>
-                )}
 
                 <button 
                   onClick={() => setIsMoreMenuOpen(true)}

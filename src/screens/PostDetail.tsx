@@ -133,22 +133,35 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   useEffect(() => {
     const fetchReviews = async () => {
       setLoadingReviews(true);
-      const { data, error } = await (supabase as any)
-        .from('post_comments')
-        .select(`
-          *,
-          profiles:user_id (
-            display_name,
-            avatar_url
-          )
-        `)
-        .eq('post_id', post.id)
-        .order('created_at', { ascending: false });
+      try {
+        const { data, error } = await (supabase as any)
+          .from('post_comments')
+          .select(`
+            *,
+            profiles:user_id (
+              display_name,
+              avatar_url
+            )
+          `)
+          .eq('post_id', post.id)
+          .order('created_at', { ascending: false });
 
-      if (!error && data) {
-        setReviews(data as unknown as Comment[]);
+        if (error) {
+          if (error.message?.includes('not found') || error.code === 'PGRST116') {
+            console.warn('Comments table not yet available in this database instance.');
+          } else {
+            console.error('Error fetching comments:', error);
+          }
+          setReviews([]);
+        } else if (data) {
+          setReviews(data as unknown as Comment[]);
+        }
+      } catch (err) {
+        console.error('Catch fetching comments:', err);
+        setReviews([]);
+      } finally {
+        setLoadingReviews(false);
       }
-      setLoadingReviews(false);
     };
 
     fetchReviews();
@@ -349,7 +362,15 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       </AlertDialog>
 
       {/* Floating Header */}
-      <div className="fixed top-0 left-0 right-0 z-[80] flex items-center justify-between p-4 safe-top pointer-events-none">
+      <motion.div 
+        initial={{ y: 0, opacity: 1 }}
+        animate={{ 
+          y: scrollY > 50 ? -100 : 0, 
+          opacity: scrollY > 50 ? 0 : 1 
+        }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="fixed top-0 left-0 right-0 z-[80] flex items-center justify-between p-4 safe-top pointer-events-none"
+      >
         <button 
           onClick={(e) => {
             e.stopPropagation();
@@ -393,7 +414,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
+      </motion.div>
 
       {/* Hero Image Section */}
       <div className="relative w-full h-[65vh] bg-black flex items-center justify-center overflow-hidden">
@@ -409,61 +430,55 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
             referrerPolicy="no-referrer"
           />
         </motion.button>
-        <div className="absolute bottom-4 right-4 text-[10px] bg-black/20 text-white/40 px-2 py-0.5 rounded backdrop-blur-sm pointer-events-none">
-          Tap to zoom
-        </div>
       </div>
 
       {/* Content Section */}
       <div className="bg-background relative -mt-4 rounded-t-[24px] z-10 px-6 pt-8 pb-32">
         {/* Title & Stats */}
-        <div className="mb-6">
+        <div className="mb-4">
           {isEditing ? (
             <input
               type="text"
               value={editedTitle}
               onChange={(e) => setEditedTitle(e.target.value)}
-              className="text-2xl font-bold bg-secondary/30 w-full px-4 py-2 rounded-xl border border-primary/20 mb-2 focus:border-primary outline-none"
+              className="text-[18px] font-bold bg-secondary/30 w-full px-3 py-1.5 rounded-xl border border-primary/20 mb-2 focus:border-primary outline-none"
             />
           ) : (
-            <h1 className="text-[24px] font-bold tracking-tight text-foreground mb-1 leading-tight">
+            <h1 className="text-[18px] font-bold tracking-tight text-foreground mb-1 leading-tight">
               {post.title}
             </h1>
           )}
           
-          <div className="flex items-center gap-4 text-muted-foreground/70">
-            <span className="flex items-center gap-1 text-[13px] font-medium">
-              <Eye size={12} /> {formatNumber(post.views)}
+          <div className="flex items-center gap-3 text-muted-foreground/60">
+            <span className="flex items-center gap-1 text-[12px] font-medium">
+              <Eye size={12} /> {formatNumber(post.views)} views
             </span>
-            <span className="flex items-center gap-1 text-[13px] font-medium">
-              <Heart size={12} /> {formatNumber(post.likes)}
-            </span>
-            <span className="flex items-center gap-1 text-[13px] font-medium">
-              <MessageSquare size={12} /> {reviews.length}
+            <span className="flex items-center gap-1 text-[12px] font-medium">
+              <Heart size={12} /> {formatNumber(post.likes)} likes
             </span>
           </div>
         </div>
 
         {/* Creator Info */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => onCreatorTap?.(post.creator.name, post.creator.id)}
-            className="flex items-center gap-3 active:opacity-70 transition-opacity"
+            className="flex items-center gap-2 active:opacity-70 transition-opacity"
           >
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-secondary border border-border">
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-secondary border border-border">
               {post.creator.avatar ? (
                 <img src={post.creator.avatar} alt="" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs font-bold">
+                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold">
                   {post.creator.initials}
                 </div>
               )}
             </div>
             <div className="text-left">
-              <p className="text-[15px] font-semibold text-foreground flex items-center gap-1 leading-none">
-                {post.creator.name} {post.creator.isVerified && <VerifiedBadge size={14} />}
+              <p className="text-[14px] font-semibold text-foreground flex items-center gap-1 leading-none">
+                {post.creator.name} {post.creator.isVerified && <VerifiedBadge size={12} />}
               </p>
-              <p className="text-[13px] text-muted-foreground">@{post.creator.username}</p>
+              <p className="text-[12px] text-muted-foreground">@{post.creator.username}</p>
             </div>
           </button>
           
@@ -472,7 +487,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
               onClick={handleFollow}
               disabled={followLoading}
               className={cn(
-                "px-5 py-2 rounded-full text-[13px] font-bold transition-all active:scale-95",
+                "px-4 py-1.5 rounded-lg text-[12px] font-bold transition-all active:scale-95",
                 following ? "bg-secondary text-foreground" : "bg-primary text-primary-foreground"
               )}
             >
@@ -481,55 +496,30 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
           )}
         </div>
 
-        {/* Action Bar */}
-        <div className="flex items-center gap-3 mb-8">
+        {/* Action Buttons - Instagram Style */}
+        <div className="flex items-center gap-4 mb-6 border-y border-border/50 py-3">
           <button
             onClick={handleLike}
             className={cn(
-              "flex-1 h-12 rounded-2xl flex items-center justify-center gap-2 text-[14px] font-semibold transition-all active:scale-95",
-              post.isLiked ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-secondary text-foreground"
+              "flex items-center gap-1.5 transition-colors active:scale-90",
+              post.isLiked ? "text-red-500" : "text-foreground"
             )}
           >
-            <Heart size={18} className={post.isLiked ? "fill-current" : ""} />
-            {formatNumber(post.likes)}
+            <Heart size={22} className={post.isLiked ? "fill-current" : ""} />
           </button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button 
-                className="w-12 h-12 rounded-2xl bg-secondary flex items-center justify-center text-muted-foreground active:scale-90 transition-all shrink-0"
-              >
-                <MoreVertical size={20} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border">
-              <DropdownMenuItem onClick={handleShare} className="gap-2">
-                <Share2 size={16} /> Share
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDownload} className="gap-2">
-                <Download size={16} /> Download
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button className="text-foreground transition-colors active:scale-90">
+            <MessageSquare size={22} />
+          </button>
+          <button onClick={handleShare} className="text-foreground transition-colors active:scale-90">
+            <Share2 size={22} />
+          </button>
+          <div className="flex-1" />
+          <button onClick={() => toggleSave(post.id)} className="text-foreground transition-colors active:scale-90">
+            <Bookmark size={22} className={post.isSaved ? "fill-current" : ""} />
+          </button>
         </div>
 
-        {/* Sticky Bottom Actions */}
-        <div className={cn(
-          "fixed bottom-0 left-0 right-0 z-50 p-6 pb-10 transition-all duration-500 ease-out",
-          scrollY > 400 
-            ? "translate-y-0 opacity-100" 
-            : "translate-y-full opacity-0"
-        )}>
-          <div className="max-w-md mx-auto relative group">
-            <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <Button 
-               onClick={() => toggleSave(post.id)}
-               className="w-full h-16 rounded-3xl bg-primary/95 backdrop-blur-xl text-primary-foreground text-[16px] font-black shadow-2xl shadow-primary/20 flex items-center justify-center gap-3 border border-white/10 relative"
-            >
-              <Bookmark size={22} className={post.isSaved ? "fill-current" : ""} />
-              {post.isSaved ? "Saved to Favorites" : "Save Image"}
-            </Button>
-          </div>
-        </div>
+
 
         {/* Prompt Section */}
         <div className="mb-8 overflow-hidden rounded-2xl border border-border bg-secondary/10">
@@ -626,22 +616,29 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
             </div>
           </div>
 
-          <div className="space-y-4">
-            {reviews.map((review) => (
-              <div key={review.id} className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-secondary shrink-0 overflow-hidden">
-                  {review.profiles?.avatar_url && <img src={review.profiles.avatar_url} alt="" className="w-full h-full object-cover" />}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-bold">{review.profiles?.display_name || 'User'}</p>
-                    <span className="text-[10px] text-muted-foreground">{new Date(review.created_at).toLocaleDateString()}</span>
+          {reviews.length > 0 ? (
+            <div className="space-y-4">
+              {reviews.map((review) => (
+                <div key={review.id} className="flex gap-4">
+                  <div className="w-10 h-10 rounded-full bg-secondary shrink-0 overflow-hidden">
+                    {review.profiles?.avatar_url && <img src={review.profiles.avatar_url} alt="" className="w-full h-full object-cover" />}
                   </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{review.content}</p>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-bold">{review.profiles?.display_name || 'User'}</p>
+                      <span className="text-[10px] text-muted-foreground">{new Date(review.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{review.content}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-10 text-center bg-secondary/10 rounded-3xl border border-dashed border-border/50">
+              <MessageSquare size={24} className="mx-auto text-muted-foreground/30 mb-2" />
+              <p className="text-xs text-muted-foreground font-medium">No comments yet. Be the first!</p>
+            </div>
+          )}
 
           {relatedPosts.length > 0 && (
             <div className="pt-10 border-t border-border mt-10">

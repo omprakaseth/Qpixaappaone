@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Upload, X, Video, Store, Image as ImageIcon, Music } from 'lucide-react';
+import { ArrowLeft, Upload, X, Video, Store, Image as ImageIcon, Music, Sparkles, TrendingUp } from 'lucide-react';
 import { useAppState } from '@/context/AppContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -209,33 +209,41 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
         <input ref={videoFileRef} type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
 
         <div className="space-y-4">
-          <div>
-            <label className="text-[10px] font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">TITLE</label>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">TITLE</label>
+              <span className={cn("text-[9px]", title.length > 50 ? "text-destructive" : "text-muted-foreground/40")}>{title.length}/50</span>
+            </div>
             <input
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value.slice(0, 50))}
               placeholder={type === 'short' ? "Short description..." : "Give your creation a name"}
-              className="w-full bg-secondary rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none border border-transparent focus:border-primary/20 transition-colors"
+              className="w-full bg-secondary rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none border border-transparent focus:border-primary/20 transition-all focus:bg-secondary/80"
             />
           </div>
 
           {type === 'post' && (
-            <div>
-              <label className="text-[10px] font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">PROMPT</label>
-              <textarea
-                value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                placeholder="Describe how you created this"
-                rows={3}
-                className="w-full bg-secondary rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none border border-transparent focus:border-primary/20 transition-colors"
-              />
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider px-1">PROMPT</label>
+              <div className="relative">
+                <textarea
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  placeholder="Describe how you created this"
+                  rows={3}
+                  className="w-full bg-secondary rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none border border-transparent focus:border-primary/20 transition-all focus:bg-secondary/80"
+                />
+                <div className="absolute bottom-2.5 right-3 opacity-20 pointer-events-none">
+                  <Sparkles size={14} className="text-primary" />
+                </div>
+              </div>
             </div>
           )}
 
           {type === 'short' && (
-            <div className="bg-secondary/30 p-4 rounded-2xl border border-white/5">
-              <label className="text-[10px] font-bold text-white/40 mb-2 block uppercase tracking-wider">AUDIO DETAILS</label>
-              <div className="flex items-center gap-3 bg-black/20 rounded-xl px-4 py-3 border border-white/5">
+            <div className="bg-secondary/30 p-4 rounded-2xl border border-white/5 space-y-2">
+              <label className="text-[10px] font-bold text-white/40 mb-1 block uppercase tracking-wider">AUDIO DETAILS</label>
+              <div className="flex items-center gap-3 bg-black/20 rounded-xl px-4 py-3 border border-white/5 focus-within:border-primary/20 transition-colors">
                 <Music size={16} className="text-primary" />
                 <input
                   value={audioName}
@@ -247,14 +255,31 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
             </div>
           )}
 
-          <div>
-            <label className="text-[10px] font-bold text-muted-foreground mb-1.5 block uppercase tracking-wider">TAGS</label>
-            <input
-              value={tags}
-              onChange={e => setTags(e.target.value)}
-              placeholder="ai, digital, cyberpunk"
-              className="w-full bg-secondary rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none border border-transparent focus:border-primary/20 transition-colors"
-            />
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">TAGS (VIRAL LOGIC)</label>
+              <span className="text-[9px] text-muted-foreground/40 lowercase">space or comma separated</span>
+            </div>
+            <div className="relative group">
+              <input
+                value={tags}
+                onChange={e => setTags(e.target.value)}
+                placeholder="#ai #art #trending"
+                className="w-full bg-secondary rounded-xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground outline-none border border-transparent focus:border-primary/20 transition-all pl-10 focus:bg-secondary/80"
+              />
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/30 group-focus-within:text-primary transition-colors">
+                <TrendingUp size={16} />
+              </div>
+            </div>
+            {tags.trim() && (
+              <div className="flex flex-wrap gap-1.5 px-1 pt-1">
+                {tags.replace(/#/g, ' ').split(/[,;\s]+/).filter(Boolean).slice(0, 8).map((t, idx) => (
+                  <span key={idx} className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-bold border border-primary/5">
+                    #{t.toLowerCase()}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

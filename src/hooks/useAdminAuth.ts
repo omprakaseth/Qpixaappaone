@@ -17,14 +17,8 @@ export function useAdminAuth() {
       return;
     }
     setUser(session.user);
-
-    if (session.user.email === 'qpixerapp@gmail.com' || session.user.email === 'omprakashseth248@gmail.com') {
-      setIsAdmin(true);
-      setIsSuperAdmin(true);
-      setLoading(false);
-      return;
-    }
-
+    
+    // Identity verification relies solely on secure database roles
     const [adminResult, superResult] = await Promise.all([
       supabase.rpc('has_role', { _user_id: session.user.id, _role: 'admin' }),
       supabase.rpc('is_super_admin', { _user_id: session.user.id }),

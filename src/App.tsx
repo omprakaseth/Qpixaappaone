@@ -28,6 +28,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/home/prompt/:id" element={<Index />} />
               <Route path="/home/creator/:id" element={<Index />} />
 

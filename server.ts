@@ -23,10 +23,16 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '50mb' }));
 
+  // Debug Logging Middleware
+  app.use("/api/", (req, res, next) => {
+    console.log(`[API] ${req.method} ${req.url}`);
+    next();
+  });
+
   // Rate Limiting
   const limiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 30, // Limit each IP to 30 requests per minute
+    max: 100, // Limit each IP to 100 requests per minute (increased from 30)
     message: { error: "Too many requests, please try again later." }
   });
   app.use("/api/", limiter);
@@ -36,51 +42,88 @@ async function startServer() {
     res.json({ status: "ok", env: process.env.NODE_ENV });
   });
 
+  // Reusable image gen logic to avoid localhost fetch loops
+  async function generatePollinationsImage(prompt: string, model: string, width: number, height: number, seed: number, nologo: boolean, enhance: boolean) {
+    const queryParams = new URLSearchParams({
+      prompt,
+      width: width.toString(),
+      height: height.toString(),
+      seed: seed.toString(),
+      nologo: nologo ? 'true' : 'false',
+      enhance: enhance ? 'true' : 'false',
+      model: model || 'flux'
+    });
+
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${queryParams.toString()}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    
+    try {
+      const response = await fetch(imageUrl, { signal: controller.signal });
+      if (!response.ok) throw new Error(`Pollinations returned ${response.status}`);
+      
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const base64 = buffer.toString('base64');
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      return `data:${contentType};base64,${base64}`;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   // API Route for Hugging Face Proxy
   app.post("/api/hf", async (req, res) => {
     try {
       const { modelId, inputs, options } = req.body;
       
-      // Simple validation
-      if (!modelId || typeof modelId !== 'string') {
+      // Strict validation for modelId and inputs
+      if (!modelId || typeof modelId !== 'string' || modelId.length > 255) {
         return res.status(400).json({ error: "Invalid modelId" });
       }
-      if (!inputs) {
-        return res.status(400).json({ error: "Inputs are required" });
+      if (!inputs || (typeof inputs !== 'string' && typeof inputs !== 'object')) {
+        return res.status(400).json({ error: "Inputs are required and must be valid" });
       }
 
       const token = process.env.HF_TOKEN || process.env.HUGGING_FACE_TOKEN;
-
       if (!token) {
         return res.status(500).json({ error: "HF_TOKEN is not configured on the server." });
       }
 
-      const response = await fetch(
-        `https://router.huggingface.co/models/${modelId}`,
-        {
-          headers: { 
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          },
-          method: "POST",
-          body: JSON.stringify({ 
-            inputs,
-            options: options || { wait_for_model: true }
-          }),
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000); // 90s timeout for HF
+
+      try {
+        const response = await fetch(
+          `https://router.huggingface.co/models/${modelId}`,
+          {
+            headers: { 
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json"
+            },
+            method: "POST",
+            body: JSON.stringify({ 
+              inputs,
+              options: options || { wait_for_model: true }
+            }),
+            signal: controller.signal
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          return res.status(response.status).json({ error: errorText || "Hugging Face API error" });
         }
-      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        return res.status(response.status).json({ error: errorText || "Hugging Face API error" });
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        const base64 = buffer.toString('base64');
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
+
+        res.json({ imageUrl: `data:${contentType};base64,${base64}` });
+      } finally {
+        clearTimeout(timeout);
       }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const base64 = buffer.toString('base64');
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-
-      res.json({ imageUrl: `data:${contentType};base64,${base64}` });
     } catch (error: any) {
       console.error("Hugging Face Proxy Error:", error);
       res.status(500).json({ error: error.message || "Internal Server Error" });
@@ -96,28 +139,17 @@ async function startServer() {
         return res.status(400).json({ error: "Prompt is required" });
       }
 
-      const queryParams = new URLSearchParams({
-        prompt,
-        width: width?.toString() || '1024',
-        height: height?.toString() || '1024',
-        seed: seed?.toString() || Math.floor(Math.random() * 1000000).toString(),
-        nologo: nologo ? 'true' : 'false',
-        enhance: enhance ? 'true' : 'false',
-        model: model || 'flux'
-      });
+      const imageUrl = await generatePollinationsImage(
+        prompt, 
+        model || 'flux', 
+        width || 1024, 
+        height || 1024, 
+        seed || Math.floor(Math.random() * 1000000), 
+        nologo, 
+        enhance
+      );
 
-      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${queryParams.toString()}`;
-      
-      // Fetch the image and return as base64 for consistency and to avoid mixed content/cors issues in some environments
-      const response = await fetch(imageUrl);
-      if (!response.ok) throw new Error("Failed to fetch from Pollinations");
-      
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const base64 = buffer.toString('base64');
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-
-      res.json({ imageUrl: `data:${contentType};base64,${base64}` });
+      res.json({ imageUrl });
     } catch (error: any) {
       console.error("Pollinations Proxy Error:", error);
       res.status(500).json({ error: error.message || "Internal Server Error" });
@@ -152,20 +184,53 @@ async function startServer() {
         return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
       }
 
+      const ai = new GoogleGenAI({ apiKey });
+      
       if (type === 'text') {
-        const ai = new GoogleGenAI({ apiKey });
+        const modelName = model || "gemini-1.5-flash";
+        
+        let contents: any[] = [];
+        if (image) {
+          const base64Data = image.split(',')[1];
+          const mimeType = image.split(';')[0].split(':')[1] || 'image/png';
+          contents = [
+            {
+              parts: [
+                { inlineData: { data: base64Data, mimeType } },
+                { text: prompt }
+              ]
+            }
+          ];
+        } else {
+          contents = [{ parts: [{ text: prompt }] }];
+        }
+
         const response = await ai.models.generateContent({
-          model: model || "gemini-3-flash-preview",
-          contents: [{ parts: [{ text: prompt }] }]
+          model: modelName,
+          contents,
+          config: config?.config
         });
+
         return res.json({ text: response.text });
       }
 
-      // For image generation, Gemini direct API with @google/genai doesn't support Imagen 3 yet in standard SDK easily
-      // Usually it's Vertex AI. But if the user refers to text-to-image via a specific multimodal model, 
-      // we handle it. However, most free 'Gemini' image gen is via Pollinations or HF anyway.
-      // Let's implement a placeholder for text responses if they use it for enhancing prompts.
-      res.status(400).json({ error: "Image generation via direct Gemini SDK is not yet supported in this proxy. Use Pollinations or Hugging Face." });
+      // For image generation: Direct Google Gemini SDK doesn't support Imagen 3 easily yet.
+      // We map "gemini-*-image" requests to our advanced Pollinations/HF models for the best results.
+      console.log('Redirecting Gemini image request to internal generator for quality');
+      try {
+        const imageUrl = await generatePollinationsImage(
+          prompt,
+          'flux-realism', // Default to high-end flux for Gemini image requests
+          1024,
+          1024,
+          Math.floor(Math.random() * 1000000),
+          true,
+          true
+        );
+        return res.json({ imageUrl });
+      } catch (err: any) {
+        return res.status(500).json({ error: "Could not fulfill image request via fallback: " + err.message });
+      }
     } catch (error: any) {
       console.error("Gemini Proxy Error:", error);
       res.status(500).json({ error: error.message || "Internal Server Error" });
