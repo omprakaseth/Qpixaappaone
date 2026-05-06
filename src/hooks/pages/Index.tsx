@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
-import { AppProvider, useAppState } from '@/context/AppContext';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useAppState } from '@/context/AppContext';
 import { SEO } from '@/components/SEO';
 import BottomNav from '@/components/BottomNav';
 import HomeScreen from '@/screens/HomeScreen';
@@ -11,60 +10,36 @@ import FavoritesScreen from '@/screens/FavoritesScreen';
 import ProfileScreen from '@/screens/ProfileScreen';
 import ShortsScreen from '@/screens/ShortsScreen';
 import NotificationScreen from '@/screens/NotificationScreen';
-import PostDetail from '@/screens/PostDetail';
-import CreatePost from '@/screens/CreatePost';
-import SettingsScreen from '@/screens/SettingsScreen';
-import SubscriptionScreen from '@/screens/SubscriptionScreen';
-import AuthScreen from '@/screens/AuthScreen';
-import CreatorProfileOverlay from '@/components/profile/CreatorProfileOverlay';
 import BannerAd from '@/components/ads/BannerAd';
 import RewardButton from '@/components/ads/RewardButton';
 import RewardedAdModal from '@/components/ads/RewardedAdModal';
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar';
 import { DesktopHeader } from '@/components/layout/DesktopHeader';
 import { DesktopRightPanel } from '@/components/layout/DesktopRightPanel';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { useSmartScroll } from '@/hooks/useSmartScroll';
 import { useAdSettings } from '@/hooks/useAdSettings';
-import { Post } from '@/context/AppContext';
-import { Loader2, Sparkles, Key, RotateCcw, Upload, X, Bell, Search } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { generatePromptMeta } from '@/lib/seo-utils';
+import { useNavigationState } from '@/hooks/useNavigationState';
+import { AppOverlays } from '@/components/layout/AppOverlays';
 
 function AppShell() {
-  const isMobile = useIsMobile();
+  const {
+    isMobile, activeTab, selectedPost, setSelectedPost,
+    viewingCreator, setViewingCreator, openPost, openCreator,
+    handleTabChange, lastBackPress, setLastBackPress, tabRootPaths
+  } = useNavigationState();
+
   const location = useLocation();
   const navigate = useNavigate();
-
-  const [tabStacks, setTabStacks] = useState<Record<string, { selectedPost?: Post | null; viewingCreator?: string | null }>>({
-    home: {},
-    discover: {},
-    shorts: {},
-    studio: {},
-    notifications: {},
-    favorites: {},
-    profile: {}
-  });
-
-  const activeTab = useMemo(() => {
-    const path = location.pathname;
-    if (path.startsWith('/market')) return 'discover';
-    if (path.startsWith('/shorts')) return 'shorts';
-    if (path.startsWith('/studio')) return 'studio';
-    if (path.startsWith('/notifications')) return 'notifications';
-    if (path.startsWith('/favorites')) return 'favorites';
-    if (path.startsWith('/profile')) return 'profile';
-    return 'home';
-  }, [location.pathname]);
-
-  const { posts, isPro, isLoggedIn, user, profile, fetchPostById } = useAppState();
+  const { posts, isPro, isLoggedIn, profile } = useAppState();
   const { settings: adSettings } = useAdSettings();
+  const { toast } = useToast();
+
   const [showRewardAd, setShowRewardAd] = useState(false);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
-  const upgradeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [createPostData, setCreatePostData] = useState<{ imageUrl?: string; prompt?: string }>({});
   const [showSettings, setShowSettings] = useState(false);
@@ -72,520 +47,191 @@ function AppShell() {
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [studioPrompt, setStudioPrompt] = useState('');
-  const [viewingCreator, setViewingCreator] = useState<string | null>(null);
-
-  const [lastBackPress, setLastBackPress] = useState(0);
-  const { toast } = useToast();
-
-  // History guard to handle exit logic
-  useEffect(() => {
-    // Push a guard state so we can intercept the first back press on root
-    if (!window.history.state?.guard) {
-      window.history.replaceState({ guard: true, root: true }, '');
-      window.history.pushState({ guard: true }, '');
-    }
-  }, []);
-
-  // Sync tab stacks with global overlay state
-  useEffect(() => {
-    const currentStack = tabStacks[activeTab];
-    if (currentStack) {
-      setSelectedPost(currentStack.selectedPost || null);
-      setViewingCreator(currentStack.viewingCreator || null);
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    setTabStacks(prev => ({
-      ...prev,
-      [activeTab]: {
-        selectedPost,
-        viewingCreator
-      }
-    }));
-  }, [selectedPost, viewingCreator, activeTab]);
-
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!visitedTabs.has(activeTab)) {
-      setVisitedTabs(prev => new Set(prev).add(activeTab));
-    }
-  }, [activeTab, visitedTabs]);
 
   useEffect(() => {
     if ('visualViewport' in window && window.visualViewport) {
       const vv = window.visualViewport;
-      const handleResize = () => {
-        setKeyboardVisible(window.innerHeight - vv.height > 150);
-      };
+      const handleResize = () => setKeyboardVisible(window.innerHeight - vv.height > 150);
       vv.addEventListener('resize', handleResize);
       return () => vv.removeEventListener('resize', handleResize);
     }
   }, []);
 
-  const { id } = useParams();
+  const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      setSelectedPost(null);
+      setViewingCreator(null);
+      setShowAuth(false);
+      setShowCreatePost(false);
+      setShowSettings(false);
+      setShowSubscription(false);
+    }
+  }, [setSelectedPost, setViewingCreator]);
 
   useEffect(() => {
-    const handleDeepLink = async () => {
-      if (location.pathname.includes('/prompt/') && id) {
-        // First check local posts
-        const post = posts.find(p => p.id === id);
-        if (post) {
-          setSelectedPost(post);
-        } else {
-          // If not found, fetch from DB
-          const fetchedPost = await fetchPostById(id);
-          if (fetchedPost) {
-            setSelectedPost(fetchedPost);
-          }
-        }
-      } else if (location.pathname.includes('/creator/') && id) {
-        setViewingCreator(id);
-      }
-    };
-    handleDeepLink();
-  }, [location.pathname, id, posts, fetchPostById]);
-
-  // --- History-based back navigation ---
-  const pushHistory = useCallback((state: string, path?: string) => {
-    window.history.pushState({ overlay: state, guard: true }, '', path);
-  }, []);
-
-  const closeOverlay = useCallback((setter: (v: any) => void, value: any = null) => {
-    setter(value);
-  }, []);
-
-  useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      // 1. Handle Overlays (Stack popping)
+    const handlePopState = () => {
       if (showAuth) { setShowAuth(false); return; }
-      if (showCreatePost) { setShowCreatePost(false); setCreatePostData({}); return; }
-      if (selectedPost) { 
-        setSelectedPost(null); 
-        // Sync URL back to tab root if we were on a prompt path
-        if (location.pathname.includes('/prompt/')) {
-          navigate(location.pathname.split('/prompt/')[0] || '/', { replace: true });
-        }
-        return; 
-      }
-      if (viewingCreator) { 
-        setViewingCreator(null); 
-        if (location.pathname.includes('/creator/')) {
-          navigate(location.pathname.split('/creator/')[0] || '/', { replace: true });
-        }
-        return; 
-      }
+      if (showCreatePost) { setShowCreatePost(false); return; }
+      if (selectedPost) { setSelectedPost(null); return; }
+      if (viewingCreator) { setViewingCreator(null); return; }
       if (showSettings) { setShowSettings(false); return; }
       if (showSubscription) { setShowSubscription(false); return; }
       
-      // 2. Handle Subpages vs Root
-      // Root paths are exactly matching activeTab's base path
       const rootPath = tabRootPaths[activeTab] || '/';
-      const isActuallyRoot = location.pathname === rootPath || (rootPath === '/' && location.pathname === '');
-      
-      if (isActuallyRoot) {
-        // We are on a tab root
+      if (location.pathname === rootPath) {
         const now = Date.now();
-        if (now - lastBackPress < 2000) {
-          // Allow exit
-          return;
-        } else {
-          // Block exit, show toast, re-push guard
-          setLastBackPress(now);
-          if (navigator.vibrate) navigator.vibrate(10);
-          toast({
-            description: "Press back again to exit",
-            duration: 2000,
-          });
-          window.history.pushState({ guard: true }, '');
-        }
+        if (now - lastBackPress < 2000) return;
+        setLastBackPress(now);
+        toast({ description: "Press back again to exit" });
+        window.history.pushState({ guard: true }, '');
       } else {
-        // We are on a subpage or another tab's history tried to leak in
-        // Back should return to that tab's root screen
         navigate(rootPath, { replace: true });
-        // Re-push guard for the root
-        if (!window.history.state?.guard) {
-          window.history.pushState({ guard: true }, '');
-        }
       }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [showAuth, showCreatePost, showSettings, showSubscription, viewingCreator, selectedPost, activeTab, navigate, location.pathname, lastBackPress, toast]);
+  }, [showAuth, showCreatePost, showSettings, showSubscription, viewingCreator, selectedPost, activeTab, lastBackPress, toast, navigate, location.pathname, tabRootPaths, setLastBackPress, setSelectedPost, setViewingCreator]);
 
-  const tabRootPaths: Record<string, string> = {
-    home: '/',
-    discover: '/market',
-    shorts: '/shorts',
-    studio: '/studio',
-    notifications: '/notifications',
-    favorites: '/favorites',
-    profile: '/profile'
-  };
-
-  const getSubPath = useCallback((type: 'prompt' | 'creator', id: string) => {
-    const root = tabRootPaths[activeTab];
-    const prefix = root === '/' ? '/home' : root;
-    return `${prefix}/${type}/${id}`;
-  }, [activeTab]);
-
-  // Push history when overlays open
-  const openPost = useCallback((post: Post) => {
-    pushHistory('post', getSubPath('prompt', post.id));
-    setSelectedPost(post);
-  }, [pushHistory, getSubPath]);
-
-  const openCreatePost = useCallback(() => {
-    pushHistory('createPost');
-    setShowCreatePost(true);
-  }, [pushHistory]);
-
-  const openSettings = useCallback(() => {
-    pushHistory('settings');
-    setShowSettings(true);
-  }, [pushHistory]);
-
-  const openSubscription = useCallback(() => {
-    pushHistory('subscription');
-    setShowSubscription(true);
-  }, [pushHistory]);
-
-  const openAuth = useCallback((mode: 'login' | 'signup') => {
-    pushHistory('auth');
-    setAuthMode(mode);
-    setShowAuth(true);
-  }, [pushHistory]);
-
-  const scrollToTopRef = useRef<() => void>(() => {});
-  const handleTabChange = useCallback((tab: string) => {
-    if (tab === activeTab) {
-      // Tapping active tab resets it to root
-      scrollToTopRef.current();
-      
-      // Clear stack state for this tab
-      setTabStacks(prev => ({
-        ...prev,
-        [tab]: {}
-      }));
-      
-      navigate(tabRootPaths[tab], { replace: true });
-      return;
-    }
-
-    // Tab switches MUST NOT create a history stack path, use replace: true
-    navigate(tabRootPaths[tab], { replace: true });
-  }, [navigate, activeTab]);
-
-  const openCreator = useCallback((creatorName: string, creatorId?: string) => {
-    if (user && creatorId === user.id) {
-      if (selectedPost) setSelectedPost(null);
-      if (viewingCreator) setViewingCreator(null);
-      handleTabChange('profile');
-      return;
-    }
-    if (profile && !creatorId && (creatorName === profile.display_name || creatorName === profile.username)) {
-      if (selectedPost) setSelectedPost(null);
-      if (viewingCreator) setViewingCreator(null);
-      handleTabChange('profile');
-      return;
-    }
-    
-    const creatorIdToUse = creatorId || creatorName;
-    pushHistory('creator', getSubPath('creator', creatorIdToUse));
-    setSelectedPost(null);
-    setViewingCreator(creatorIdToUse);
-  }, [pushHistory, user, profile, handleTabChange, selectedPost, viewingCreator, getSubPath]);
-
-  // Close helpers that go back in history
-  const goBack = useCallback(() => {
-    if (window.history.length > 1) {
-      window.history.back();
-    }
-    
-    // Safety timeout: if popstate doesn't fire (e.g. no history entries), manual close
-    setTimeout(() => {
-      if (selectedPost) setSelectedPost(null);
-      if (viewingCreator) setViewingCreator(null);
-      if (showAuth) setShowAuth(false);
-      if (showCreatePost) {
-        setShowCreatePost(false);
-        setCreatePostData({});
-      }
-      if (showSettings) setShowSettings(false);
-      if (showSubscription) setShowSubscription(false);
-    }, 100);
-  }, [selectedPost, viewingCreator, showAuth, showCreatePost, showSettings, showSubscription]);
-
-  const smartScrollEnabled = activeTab === 'home' || activeTab === 'discover' || activeTab === 'favorites' || activeTab === 'profile';
+  const smartScrollEnabled = ['home', 'discover', 'favorites', 'profile'].includes(activeTab);
   const { visible: navVisible, scrollRef } = useSmartScroll(smartScrollEnabled);
 
   const seoMeta = useMemo(() => {
     if (selectedPost) {
-      const meta = generatePromptMeta({
-        prompt: selectedPost.prompt,
-        category: selectedPost.category,
-        tags: selectedPost.tags
-      });
-      return {
-        ...meta,
-        image: selectedPost.imageUrl,
-        canonical: `/prompt/${selectedPost.id}`
-      };
+      const meta = generatePromptMeta({ prompt: selectedPost.prompt, category: selectedPost.category, tags: selectedPost.tags });
+      return { ...meta, image: selectedPost.imageUrl, canonical: `/prompt/${selectedPost.id}` };
     }
-    
-    const tabTitles: Record<string, string> = {
-      discover: 'Marketplace - Buy & Sell AI Prompts',
-      shorts: 'AI Shorts - Watch Amazing AI Videos',
-      studio: 'AI Studio - Create Your Own AI Art',
-      notifications: 'Notifications',
-      favorites: 'Your Favorites',
-      profile: profile?.display_name || 'Your Profile'
-    };
-    
-    return {
-      title: tabTitles[activeTab] || undefined,
-      description: undefined,
-      image: undefined,
-      keywords: [],
-      isLowQuality: false,
-      canonical: location.pathname
-    };
-  }, [selectedPost, activeTab, profile, location.pathname]);
-
-  // Keep scrollToTop in sync with scrollRef
-  useEffect(() => {
-    scrollToTopRef.current = () => {
-      scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-  }, [scrollRef]);
+    return { title: activeTab.toUpperCase(), canonical: location.pathname };
+  }, [selectedPost, activeTab, location.pathname]);
 
   const handleUsePrompt = useCallback((prompt: string) => {
     setStudioPrompt(prompt);
     setSelectedPost(null);
-    navigate('/studio');
-  }, [navigate]);
+    handleTabChange('studio');
+  }, [handleTabChange, setSelectedPost]);
 
   return (
     <div className="h-[100dvh] w-screen overflow-hidden bg-[#09090b] flex">
-      <SEO 
-        title={seoMeta.title}
-        description={seoMeta.description}
-        image={seoMeta.image}
-        canonical={seoMeta.canonical}
-        noindex={seoMeta.isLowQuality}
-        keywords={seoMeta.keywords}
-      />
-
-      {/* Desktop Sidebar */}
+      <SEO title={seoMeta.title} image={seoMeta.image} canonical={seoMeta.canonical} />
+      
       {!isMobile && (
         <DesktopSidebar 
           activeTab={activeTab} 
           onTabChange={handleTabChange} 
-          onAuth={openAuth}
-          isLoggedIn={isLoggedIn}
+          onAuth={(m) => { setAuthMode(m); setShowAuth(true); }} 
+          isLoggedIn={isLoggedIn} 
         />
       )}
 
       <div className={cn(
-        "flex-1 flex flex-col min-w-0 h-full relative",
-        !isMobile && "md:ml-[240px] md:mr-0 lg:mr-[320px]"
+        "flex-1 flex flex-col min-w-0 h-full relative", 
+        !isMobile && "md:ml-[240px] lg:mr-[320px]"
       )}>
-        {/* Desktop Header */}
         {!isMobile && (
           <DesktopHeader 
-            onSearch={(q) => console.log('Searching:', q)}
-            onUpload={openCreatePost}
-            onNotifications={() => handleTabChange('notifications')}
+            onSearch={() => {}} 
+            onUpload={() => setShowCreatePost(true)} 
+            onNotifications={() => handleTabChange('notifications')} 
           />
         )}
-
+        
         <div className="flex-1 relative overflow-hidden">
           <div className="absolute inset-0">
             {activeTab === 'home' && (
-              <HomeScreen
-                scrollRef={scrollRef}
-                onPostTap={openPost}
-                onCreatePost={openCreatePost}
-                onGetPro={openSubscription}
-                onCreatorTap={openCreator}
-                adSettings={adSettings}
-                isPro={isPro}
-                navVisible={navVisible}
+              <HomeScreen 
+                scrollRef={scrollRef} 
+                onPostTap={openPost} 
+                onCreatorTap={openCreator} 
+                navVisible={navVisible} 
+                adSettings={adSettings} 
+                isPro={isPro} 
               />
             )}
             {activeTab === 'discover' && (
-              <MarketplaceScreen
-                scrollRef={scrollRef}
-                onUsePrompt={handleUsePrompt}
-                onOpenAuth={openAuth}
-                onCreatorTap={openCreator}
-                navVisible={navVisible}
-                onBack={() => handleTabChange('home')}
+              <MarketplaceScreen 
+                scrollRef={scrollRef} 
+                onUsePrompt={handleUsePrompt} 
+                onCreatorTap={openCreator} 
+                navVisible={navVisible} 
               />
             )}
             {activeTab === 'shorts' && (
-              <ShortsScreen 
-                onBack={() => handleTabChange('home')} 
-                onCreatorTap={openCreator}
-              />
+              <ShortsScreen onCreatorTap={openCreator} onBack={() => handleTabChange('home')} />
             )}
             {activeTab === 'studio' && (
               isLoggedIn ? (
-                <StudioScreen
-                  initialPrompt={studioPrompt}
-                  onClearInitialPrompt={() => setStudioPrompt('')}
-                  onPublish={(imageUrl, prompt) => {
-                    setCreatePostData({ imageUrl, prompt });
-                    openCreatePost();
-                  }}
+                <StudioScreen 
+                  initialPrompt={studioPrompt} 
+                  onPublish={(img, p) => { 
+                    setCreatePostData({ imageUrl: img, prompt: p }); 
+                    setShowCreatePost(true); 
+                  }} 
                 />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                  </div>
-                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
-                  <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
-                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                    Sign In
-                  </button>
-                  <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
-                    Create Account
-                  </button>
+                <div className="h-full flex flex-col items-center justify-center">
+                  <Bell className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p>Please log in to use Studio</p>
                 </div>
               )
             )}
-            {activeTab === 'notifications' && (
-              isLoggedIn ? (
-                <NotificationScreen />
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <Bell size={36} className="text-primary" />
-                  </div>
-                  <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
-                  <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
-                  <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                    Sign In
-                  </button>
-                </div>
-              )
+            {activeTab === 'notifications' && <NotificationScreen />}
+            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} navVisible={navVisible} />}
+            {activeTab === 'profile' && (
+              <ProfileScreen 
+                scrollRef={scrollRef} 
+                onOpenSettings={() => setShowSettings(true)} 
+                onPostTap={openPost} 
+                navVisible={navVisible} 
+              />
             )}
-            {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
-            {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
           </div>
         </div>
-
+        
         {isMobile && (
-          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
+          <BottomNav 
+            activeTab={activeTab} 
+            onTabChange={handleTabChange} 
+            visible={navVisible && !keyboardVisible} 
+          />
         )}
-
-        {/* ... mobile only ads ... */}
       </div>
-
-      {/* Desktop Right Panel */}
+      
       {!isMobile && <DesktopRightPanel />}
-
-      {/* Banner Ad - free users only */}
-      {adSettings.enabled && adSettings.placementBanner && !isPro && navVisible && (
-        <BannerAd publisherId={adSettings.adsensePublisherId} slotId={adSettings.adsenseBannerSlot} />
-      )}
-
-      {/* Reward Ad Button - logged in free users, positioned to avoid scroll-to-top */}
+      
+      <AppOverlays
+        selectedPost={selectedPost} 
+        onClosePost={goBack} 
+        onUsePrompt={handleUsePrompt} 
+        onCreatorTap={openCreator}
+        viewingCreator={viewingCreator} 
+        onCloseCreator={goBack} 
+        posts={posts}
+        showCreatePost={showCreatePost} 
+        onCloseCreatePost={() => setShowCreatePost(false)} 
+        createPostData={createPostData}
+        showSettings={showSettings} 
+        onCloseSettings={() => setShowSettings(false)}
+        showSubscription={showSubscription} 
+        onCloseSubscription={() => setShowSubscription(false)}
+        showAuth={showAuth} 
+        initialAuthMode={authMode} 
+        onCloseAuth={() => setShowAuth(false)}
+      />
+      
+      <RewardedAdModal 
+        open={showRewardAd} 
+        onClose={() => { setShowRewardAd(false); setShowUpgradePopup(true); }} 
+        rewardCredits={adSettings.rewardCredits} 
+        publisherId={adSettings.adsensePublisherId} 
+      />
+      
       {adSettings.enabled && adSettings.placementReward && !isPro && isLoggedIn && (
         <RewardButton onClick={() => setShowRewardAd(true)} />
       )}
-
-      {/* Rewarded Ad Modal */}
-      <RewardedAdModal
-        open={showRewardAd}
-        onClose={() => {
-          setShowRewardAd(false);
-          // After watching ad, briefly show upgrade popup then auto-hide
-          if (!isPro) {
-            setTimeout(() => {
-              setShowUpgradePopup(true);
-              setTimeout(() => setShowUpgradePopup(false), 4000);
-            }, 500);
-          }
-        }}
-        rewardCredits={adSettings.rewardCredits}
-        publisherId={adSettings.adsensePublisherId}
-      />
-
-      {/* Smart Upgrade Popup */}
-      {showUpgradePopup && !isPro && adSettings.enableSubscriptions && (
-        <div className="fixed top-16 left-4 right-4 z-50 animate-in slide-in-from-top-4 fade-in duration-300">
-          <div className="bg-card border border-border rounded-2xl p-4 shadow-xl flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-foreground">Upgrade to Pro ✨</p>
-              <p className="text-xs text-muted-foreground truncate">Unlimited generations, no ads, priority access</p>
-            </div>
-            <button
-              onClick={() => {
-                setShowUpgradePopup(false);
-                clearTimeout(upgradeTimerRef.current);
-                openSubscription();
-              }}
-              className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold shrink-0"
-            >
-              Go Pro
-            </button>
-            <button
-              onClick={() => {
-                setShowUpgradePopup(false);
-                clearTimeout(upgradeTimerRef.current);
-              }}
-              className="p-1 shrink-0"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedPost && (
-        <PostDetail
-          post={selectedPost}
-          onBack={goBack}
-          onUsePrompt={handleUsePrompt}
-          onCreatorTap={openCreator}
-        />
-      )}
-
-      {viewingCreator && (
-        <CreatorProfileOverlay
-          creatorName={viewingCreator}
-          posts={posts}
-          onBack={goBack}
-          onPostTap={(post) => {
-            // Don't clear creator — just open post on top of it
-            openPost(post);
-          }}
-        />
-      )}
-
-      {showCreatePost && (
-        <CreatePost
-          onBack={goBack}
-          initialImageUrl={createPostData.imageUrl}
-          initialPrompt={createPostData.prompt}
-        />
-      )}
-      {showSettings && <SettingsScreen onBack={goBack} />}
-      {showSubscription && <SubscriptionScreen onBack={goBack} />}
-      {showAuth && <AuthScreen onBack={goBack} initialMode={authMode} />}
     </div>
   );
 }
 
-export default function Index() {
-  return (
-    <AppShell />
-  );
-}
+export default function Index() { return <AppShell />; }
