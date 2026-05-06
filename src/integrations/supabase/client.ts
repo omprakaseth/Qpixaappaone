@@ -4,13 +4,21 @@ import type { Database } from './types';
 
 // Safely get and validate the Supabase URL
 let SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
 if (!SUPABASE_URL || !SUPABASE_URL.startsWith('http')) {
+  console.warn('VITE_SUPABASE_URL is missing or invalid. Falling back to placeholder. Please check your Vercel Environment Variables.');
   SUPABASE_URL = 'https://placeholder-project.supabase.co';
 }
 
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key';
 
-export const isPlaceholder = !import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || SUPABASE_ANON_KEY === 'placeholder-anon-key';
+if (SUPABASE_ANON_KEY === 'placeholder-anon-key') {
+  console.warn('VITE_SUPABASE_ANON_KEY is missing. Please check your Vercel Environment Variables.');
+}
+
+export const isPlaceholder = !import.meta.env.VITE_SUPABASE_URL || 
+  import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || 
+  SUPABASE_ANON_KEY === 'placeholder-anon-key';
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
@@ -22,3 +30,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     autoRefreshToken: true,
   }
 });
+
+// For cross-origin/CSP debugging
+if (import.meta.env.DEV) {
+  console.log('Supabase initialized with URL:', SUPABASE_URL);
+}

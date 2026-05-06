@@ -44,12 +44,12 @@ export default function AuthScreen({ onBack, initialMode = 'login' }: AuthScreen
         if (data?.session) {
           analytics.trackUserGrowth(data.session.user.id, data.session.user.email, 'email');
           toast.success('Account created successfully!');
-          onBack(); // Close auth screen if auto-logged in
+          onBack(); 
         } else {
           analytics.track('User Signup Started', { method: 'email' });
           toast.success('Account created! Please check your email to confirm.');
-          setMode('login'); // Switch to login mode
-          setPassword(''); // Clear password for safety
+          setMode('login');
+          setPassword('');
         }
       } else if (mode === 'otp') {
         const { error } = await supabase.auth.signInWithOtp({
@@ -71,8 +71,10 @@ export default function AuthScreen({ onBack, initialMode = 'login' }: AuthScreen
         toast.success('Welcome back!');
         onBack();
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Authentication failed');
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Authentication Error:', error);
+      toast.error(error.message || 'Authentication failed');
     } finally {
       setLoading(false);
     }
