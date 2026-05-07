@@ -106,13 +106,10 @@ function AppShell() {
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setVisitedTabs(prev => {
-      if (prev.has(activeTab)) return prev;
-      const next = new Set(prev);
-      next.add(activeTab);
-      return next;
-    });
-  }, [activeTab]);
+    if (!visitedTabs.has(activeTab)) {
+      setVisitedTabs(prev => new Set(prev).add(activeTab));
+    }
+  }, [activeTab, visitedTabs]);
 
   useEffect(() => {
     if ('visualViewport' in window && window.visualViewport) {
