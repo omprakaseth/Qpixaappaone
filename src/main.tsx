@@ -11,18 +11,24 @@ if ('serviceWorker' in navigator) {
 }
 
 // Initialize theme
-const mode = localStorage.getItem('qpixa-theme') || 'dark';
-const root = document.documentElement;
-let effectiveTheme = mode;
+let effectiveTheme = 'dark';
+try {
+  const mode = localStorage.getItem('qpixa-theme') || 'dark';
+  const root = document.documentElement;
+  effectiveTheme = mode;
 
-if (mode === 'system') {
-  effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
+  if (mode === 'system') {
+    effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
 
-if (effectiveTheme === 'dark') {
-  root.classList.add('dark');
-} else {
-  root.classList.remove('dark');
+  if (effectiveTheme === 'dark') {
+    root.classList.add('dark');
+  } else {
+    root.classList.remove('dark');
+  }
+} catch (e) {
+  console.warn('Storage access restricted, defaulting to dark theme:', e);
+  document.documentElement.classList.add('dark');
 }
 
 import { HelmetProvider } from 'react-helmet-async';

@@ -1,8 +1,8 @@
 import React from 'react';
-import { Home, PlaySquare, Sparkles, Heart, User } from 'lucide-react';
+import { Home, PlaySquare, Sparkles, User, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/context/NotificationContext';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 
 interface BottomNavProps {
   activeTab: string;
@@ -12,15 +12,16 @@ interface BottomNavProps {
 
 const tabs = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'shorts', label: 'Shorts', icon: PlaySquare },
+  { id: 'discover', label: 'Market', icon: Globe },
   { id: 'studio', label: 'Studio', icon: Sparkles },
-  { id: 'favorites', label: 'Favorites', icon: Heart },
+  { id: 'shorts', label: 'Shorts', icon: PlaySquare },
   { id: 'profile', label: 'Profile', icon: User },
 ];
 
 const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
   ({ activeTab, onTabChange, visible }, ref) => {
-    const { unreadCount } = useNotifications();
+    const notificationContext = useNotifications();
+    const unreadCount = notificationContext?.unreadCount || 0;
 
     return (
       <nav
@@ -72,8 +73,8 @@ const BottomNav = React.forwardRef<HTMLElement, BottomNavProps>(
                   </span>
                 </div>
                 
-                {id === 'studio' && unreadCount > 0 && !isActive && (
-                  <span className="absolute top-4 right-1/4 w-2 h-2 bg-primary rounded-full border-2 border-background shadow-sm" />
+                {((id === 'profile' && unreadCount > 0) || (id === 'studio' && false)) && !isActive && (
+                  <span className="absolute top-4 right-1/4 w-2 h-2 bg-primary rounded-full border-2 border-background shadow-sm animate-pulse" />
                 )}
               </button>
             );

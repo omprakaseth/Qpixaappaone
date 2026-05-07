@@ -1,7 +1,9 @@
 User-agent: *
 Allow: /
-Disallow: /admin
+Allow: /marketplace
+Allow: /studio
+Disallow: /api/
 Disallow: /settings
-Disallow: /auth
+Disallow: /private/
 
-Sitemap: https://www.qpixa.in/sitemap.xml
+Sitemap: https://qpixa.in/sitemap.xml

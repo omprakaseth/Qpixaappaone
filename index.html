@@ -4,31 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#000000" />
-    <meta name="description" content="Qpixa - Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community for digital artists." />
-    <meta name="keywords" content="AI, Image Generator, Video Generator, AI Art, Qpixa, AI Community, Digital Art, Prompt Engineering" />
-    <meta name="author" content="Qpixa" />
-    <link rel="canonical" href="https://www.qpixa.in" />
+    <meta name="description" content="Qpixa is the premier AI creative community. Generate, share, and remix stunning AI images and videos with ease. Join thousands of artists at Qpixa." />
+    <meta name="keywords" content="AI generator, text to image AI, AI video creation, digital art marketplace, Qpixa AI, creative community, AI shorts, prompt engineering" />
+    <meta name="author" content="Qpixa Team" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://qpixa.in/" />
     
     <!-- Google Search Console Verification -->
     <meta name="google-site-verification" content="YOUR_VERIFICATION_CODE_HERE" />
     
     <!-- Open Graph / Social Media -->
     <meta property="og:site_name" content="Qpixa" />
-    <meta property="og:title" content="Qpixa - AI Image & Video Generator | Creative Community" />
-    <meta property="og:description" content="Create, share, and remix stunning AI-generated images and videos. Join the ultimate AI creative community today." />
+    <meta property="og:title" content="Qpixa - AI Image & Video Generator Community" />
+    <meta property="og:description" content="Join Qpixa to create, share, and remix incredible AI-generated visual content. The hub for AI creators." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.qpixa.in" />
-    <meta property="og:image" content="/icons/pwa-icon-512.png" />
+    <meta property="og:url" content="https://qpixa.in/" />
+    <meta property="og:image" content="https://qpixa.in/icons/pwa-icon-512-v4.png" />
     
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Qpixa - AI Image & Video Generator" />
-    <meta name="twitter:description" content="Create, share, and remix stunning AI-generated images and videos. The ultimate AI creative community." />
-    <meta name="twitter:image" content="/icons/pwa-icon-512.png" />
+    <meta name="twitter:title" content="Qpixa - AI Visual Creation Hub" />
+    <meta name="twitter:description" content="Design stunning AI art and videos. Share with the Qpixa community and grow your audience." />
+    <meta name="twitter:image" content="https://qpixa.in/icons/pwa-icon-512-v4.png" />
     
     <!-- PWA Icons & Favicons -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/pwa-icon-192-v4.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -39,7 +40,7 @@
     <meta name="apple-mobile-web-app-title" content="Qpixa" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="Qpixa" />
-    <meta name="msapplication-TileImage" content="/icons/pwa-icon-512.png" />
+    <meta name="msapplication-TileImage" content="/icons/pwa-icon-512-v4.png" />
     
     <!-- Structured Data for Sitelinks -->
     <script type="application/ld+json">
@@ -47,10 +48,10 @@
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Qpixa",
-      "url": "https://www.qpixa.in/",
+      "url": "/",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://www.qpixa.in/marketplace?q={search_term_string}",
+        "target": "/marketplace?q={search_term_string}",
         "query-input": "required name=search_term_string"
       }
     }
@@ -60,8 +61,8 @@
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "Qpixa",
-      "url": "https://www.qpixa.in/",
-      "logo": "https://www.qpixa.in/icons/pwa-icon-512-v4.png",
+      "url": "/",
+      "logo": "/icons/pwa-icon-512-v4.png",
       "sameAs": [
         "https://twitter.com/qpixa",
         "https://www.instagram.com/qpixa"
@@ -159,28 +160,45 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Check if splash has already been shown in this session
-      const hasShownSplash = sessionStorage.getItem('hasShownSplash');
-      const splash = document.getElementById('splash-screen');
-      
-      if (hasShownSplash && splash) {
-        splash.style.display = 'none';
-        document.body.style.overflow = 'auto';
-      } else {
-        // Remove splash screen after a short delay or when window loads
-        window.addEventListener('load', () => {
+      (function() {
+        // Robust splash removal with error handling
+        let hasShownSplash = false;
+        try {
+          hasShownSplash = sessionStorage.getItem('hasShownSplash') === 'true';
+        } catch (e) {
+          console.warn('Storage restricted');
+        }
+
+        const splash = document.getElementById('splash-screen');
+        
+        const removeSplash = () => {
+          if (!splash) return;
+          splash.style.opacity = '0';
           setTimeout(() => {
-            if (splash) {
-              splash.style.opacity = '0';
-              setTimeout(() => {
-                splash.remove();
-                document.body.style.overflow = 'auto';
-                sessionStorage.setItem('hasShownSplash', 'true');
-              }, 600);
-            }
-          }, 2000); // Increased delay to show the animation
-        });
-      }
+            splash.remove();
+            document.body.style.overflow = 'auto';
+            // Force root visibility in case of CSS conflicts
+            const root = document.getElementById('root');
+            if (root) root.style.opacity = '1';
+            try {
+              sessionStorage.setItem('hasShownSplash', 'true');
+            } catch (e) {}
+          }, 600);
+        };
+
+        if (hasShownSplash && splash) {
+          splash.remove();
+          document.body.style.overflow = 'auto';
+        } else if (splash) {
+          // Fallback timer in case load event never fires or takes too long
+          const fallback = setTimeout(removeSplash, 4000);
+          
+          window.addEventListener('load', () => {
+            clearTimeout(fallback);
+            setTimeout(removeSplash, 1500);
+          });
+        }
+      })();
     </script>
   </body>
 </html>
