@@ -758,16 +758,8 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       setGenerationProgress(0);
       
       console.error('GENERATE ERROR:', err);
-      let errorMessage = err.message || 'An unknown error occurred';
-      
-      // Handle specific rate limit errors
-      if (errorMessage.includes('429')) {
-        errorMessage = "Pollinations is currently busy (Too Many Requests). Please try again in 30 seconds or try switching to the Gemini or Hugging Face model.";
-      } else if (errorMessage.includes('503')) {
-        errorMessage = "The AI service is temporarily unavailable. Please try again in a moment.";
-      }
-      
-      toast.error(errorMessage);
+      const errorMessage = err.message || 'An unknown error occurred';
+      toast.error(`Generation failed: ${errorMessage}`);
       
       // Update AI Message to error
       const errorAiMsg: ChatMessage = {
@@ -782,6 +774,8 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
       if (err.message === 'Aborted') {
         toast.info('Generation stopped');
+      } else {
+        toast.error(err.message || 'Something went wrong');
       }
     } finally {
       setGenerating(false);
@@ -1012,79 +1006,14 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
   const containerStyle: React.CSSProperties = isKeyboardVisible
     ? { position: 'fixed', top: `${vpOffsetTop}px`, left: 0, right: 0, height: `${vpHeight}px`, zIndex: 30 }
-    : { position: 'relative', height: '100%', zIndex: 30 };
+    : { position: 'fixed', top: 0, left: 0, right: 0, bottom: '56px', zIndex: 30 };
 
   return (
     <>
-    <div style={containerStyle} className="flex flex-col md:flex-row overflow-hidden bg-background">
-      {/* Desktop History Sidebar */}
-      <aside className="hidden md:flex flex-col w-72 h-full border-r border-border bg-card/10 shrink-0 overflow-hidden">
-        <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
-          <h2 className="text-sm font-bold flex items-center gap-2">
-            <Clock size={16} className="text-primary" />
-            Chat History
-          </h2>
-          <button 
-            onClick={handleNewChat}
-            className="p-1.5 rounded-lg hover:bg-secondary text-primary transition-colors"
-            title="New Chat"
-          >
-            <Plus size={18} />
-          </button>
-        </div>
-        
-        <div className="p-3 shrink-0">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={14} />
-            <input
-              type="text"
-              placeholder="Search chats..."
-              value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
-              className="w-full bg-secondary/50 text-xs rounded-lg pl-9 pr-3 py-2 outline-none focus:ring-1 focus:ring-primary/30"
-            />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
-          {sessions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Clock size={32} className="mb-2 opacity-20" />
-              <p className="text-xs">No chat history yet</p>
-            </div>
-          ) : (
-            sessions.filter(s => s.title.toLowerCase().includes(historySearch.toLowerCase())).map(session => (
-              <div
-                key={session.id}
-                className={cn(
-                  "group relative flex items-center gap-3 w-full p-3 rounded-xl transition-all cursor-pointer",
-                  currentSessionId === session.id ? "bg-primary/10 border border-primary/20" : "bg-card hover:bg-secondary border border-border/50"
-                )}
-                onClick={() => handleSelectSession(session)}
-              >
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <MessageSquare size={16} className="text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-foreground truncate">{session.title}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {new Date(session.updatedAt).toLocaleDateString()}
-                  </p>
-                </div>
-                {session.messages.some(m => m.status === 'pending') && (
-                  <RotateCcw size={12} className="text-primary animate-spin shrink-0" />
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </aside>
-
-      <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        {/* Header */}
-        <div className="flex-shrink-0 flex items-center justify-between px-3 pt-2 pb-3 bg-background/95 backdrop-blur-sm border-b border-border z-20" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
-          <div className="md:hidden">
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+    <div style={containerStyle} className="flex flex-col overflow-hidden bg-background">
+      {/* Header */}
+      <div className="flex-shrink-0 flex items-center justify-between px-3 pt-2 pb-3 bg-background/95 backdrop-blur-sm border-b border-border z-20" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
             <button className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors">
               <Menu size={22} className="text-foreground" />
@@ -1580,8 +1509,6 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         />
       )}
     </AnimatePresence>
-      </div>
-    </div>
     </>
   );
 }

@@ -327,14 +327,9 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
     <div 
       ref={scrollRef}
       onScroll={handleContainerScroll}
-      className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-0 md:p-8"
-      onClick={onBack}
+      className="fixed inset-0 z-[70] bg-background overflow-y-auto scrollbar-hide animate-in slide-in-from-bottom-4 duration-500"
     >
-      <div 
-        className="w-full h-full md:max-w-5xl md:h-full md:max-h-[90vh] bg-background overflow-y-auto scrollbar-hide animate-in slide-in-from-bottom-4 duration-500 md:rounded-[32px] md:shadow-2xl relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Undo Delete Overlay */}
+      {/* Undo Delete Overlay */}
       <AnimatePresence>
         {isDeleting && (
           <motion.div
@@ -688,7 +683,6 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
           />
         )}
       </AnimatePresence>
-      </div>
     </div>
   );
 }

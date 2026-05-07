@@ -231,7 +231,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           className="px-4 py-3 flex items-center justify-between"
           style={{ paddingTop: 'max(env(safe-area-inset-top), 0.75rem)' }}
         >
-          <div className="flex items-center gap-2.5 md:hidden">
+          <div className="flex items-center gap-2.5">
             <Logo size={32} />
             <h1 className="text-xl font-bold tracking-tight text-foreground">Qpixa</h1>
           </div>

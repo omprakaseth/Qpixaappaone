@@ -3,34 +3,21 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export const SplashScreen: React.FC = () => {
   const [isVisible, setIsVisible] = useState(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        return !sessionStorage.getItem('hasShownSplash');
-      }
-    } catch (e) {
-      console.warn('Storage access restricted:', e);
-      return true;
+    if (typeof window !== 'undefined') {
+      return !sessionStorage.getItem('hasShownSplash');
     }
     return true;
   });
 
   useEffect(() => {
-    try {
-      if (typeof window !== 'undefined' && sessionStorage.getItem('hasShownSplash')) {
-        return;
-      }
-    } catch (e) {
-      console.warn('Storage access restricted:', e);
+    if (typeof window !== 'undefined' && sessionStorage.getItem('hasShownSplash')) {
+      return;
     }
 
     const timer = setTimeout(() => {
       setIsVisible(false);
-      try {
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('hasShownSplash', 'true');
-        }
-      } catch (e) {
-        console.warn('Storage write restricted:', e);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('hasShownSplash', 'true');
       }
     }, 2500);
     return () => clearTimeout(timer);

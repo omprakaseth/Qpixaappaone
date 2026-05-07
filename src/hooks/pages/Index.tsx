@@ -28,8 +28,6 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { generatePromptMeta } from '@/lib/seo-utils';
 
-import { DesktopSidebar } from '@/components/DesktopSidebar';
-
 function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -106,13 +104,10 @@ function AppShell() {
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    setVisitedTabs(prev => {
-      if (prev.has(activeTab)) return prev;
-      const next = new Set(prev);
-      next.add(activeTab);
-      return next;
-    });
-  }, [activeTab]);
+    if (!visitedTabs.has(activeTab)) {
+      setVisitedTabs(prev => new Set(prev).add(activeTab));
+    }
+  }, [activeTab, visitedTabs]);
 
   useEffect(() => {
     if ('visualViewport' in window && window.visualViewport) {
@@ -368,7 +363,7 @@ function AppShell() {
   }, [navigate]);
 
   return (
-    <div className="h-[100dvh] w-screen overflow-hidden bg-background flex flex-col md:flex-row">
+    <div className="h-[100dvh] w-screen overflow-hidden bg-background flex flex-col">
       <SEO 
         title={seoMeta.title}
         description={seoMeta.description}
@@ -377,18 +372,9 @@ function AppShell() {
         noindex={seoMeta.isLowQuality}
         keywords={seoMeta.keywords}
       />
-      
-      {/* Desktop Navigation */}
-      <DesktopSidebar 
-        activeTab={activeTab} 
-        onTabChange={handleTabChange} 
-        onOpenAuth={openAuth}
-      />
-
-      <main className="flex-1 relative overflow-hidden flex flex-col">
-        <div className="flex-1 relative overflow-hidden">
-          <div className="absolute inset-0 max-w-7xl mx-auto">
-            {activeTab === 'home' && (
+      <div className="flex-1 relative overflow-hidden">
+        <div className="absolute inset-0">
+          {activeTab === 'home' && (
             <HomeScreen
               scrollRef={scrollRef}
               onPostTap={openPost}
@@ -460,13 +446,10 @@ function AppShell() {
           )}
           {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
           {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
-          </div>
         </div>
-      </main>
-
-      <div className="md:hidden">
-        <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
       </div>
+
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} visible={navVisible && !keyboardVisible} />
 
       {/* Banner Ad - free users only */}
       {adSettings.enabled && adSettings.placementBanner && !isPro && navVisible && (
