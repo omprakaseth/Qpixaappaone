@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, PlaySquare, Sparkles, Heart, User, Store, Bell, Settings, LogOut } from 'lucide-react';
+import { Home, PlaySquare, Sparkles, Heart, User, Globe, Bell, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications } from '@/context/NotificationContext';
 import { useAppState } from '@/context/AppContext';
@@ -14,15 +14,17 @@ interface DesktopSidebarProps {
 
 const tabs = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'discover', label: 'Marketplace', icon: Store },
+  { id: 'discover', label: 'Marketplace', icon: Globe },
   { id: 'shorts', label: 'AI Shorts', icon: PlaySquare },
   { id: 'studio', label: 'AI Studio', icon: Sparkles },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'favorites', label: 'Favorites', icon: Heart },
   { id: 'profile', label: 'Profile', icon: User },
 ];
 
 export const DesktopSidebar = ({ activeTab, onTabChange, onOpenAuth }: DesktopSidebarProps) => {
-  const { unreadCount } = useNotifications();
+  const notificationContext = useNotifications();
+  const unreadCount = notificationContext?.unreadCount || 0;
   const { isLoggedIn, profile } = useAppState();
 
   return (
