@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
+import { MOCK_POSTS } from './mock_posts';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { analytics } from '@/lib/analytics';
@@ -10,7 +11,9 @@ import { usePWAInstall } from '@/hooks/usePWAInstall';
 export interface Post {
   id: string;
   title: string;
-  imageUrl: string;
+  imageUrl: string; // Used as thumbnail or main image
+  videoUrl?: string; // New field for video posts
+  type: 'image' | 'video'; // Explicit content type
   creator: {
     id: string;
     name: string;
@@ -32,7 +35,6 @@ export interface Post {
   isLiked: boolean;
   isSaved: boolean;
   isShort: boolean;
-  isMock?: boolean;
 }
 
 interface Profile {
@@ -55,11 +57,14 @@ export interface UploadingPost {
   title: string;
   prompt: string;
   tags: string;
-  type: 'post' | 'short';
+  type: 'image' | 'video' | 'short'; // Consistent with Post type
   file: File | null;
   previewUrl: string | null;
+  thumbnailUrl?: string; // New field
+  videoBlob?: Blob;      // For trimmed video
+  duration?: number;     // In seconds
   progress: number;
-  status: 'uploading' | 'error' | 'success';
+  status: 'uploading' | 'processing' | 'publishing' | 'error' | 'success'; // Added 'processing' and 'publishing'
   error?: string;
 }
 
@@ -94,11 +99,23 @@ interface AppState {
 
 export const AppContext = createContext<AppState | null>(null);
 
-import { MOCK_POSTS } from './mock_posts';
-
 export function AppProvider({ children }: { children: ReactNode }) {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+  const [userInterests, setUserInterests] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('qpixa_user_interests');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [initialLoading, setInitialLoading] = useState(true);
+
+  // Persist interests
+  useEffect(() => {
+    localStorage.setItem('qpixa_user_interests', JSON.stringify(userInterests));
+  }, [userInterests]);
   const [credits, setCredits] = useState(40);
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -231,7 +248,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         creator_id: user.id,
         title: safeTitle,
         prompt: safePrompt,
-        image_url: finalUrl || '',
+        image_url: upload.thumbnailUrl || finalUrl,
+        video_url: upload.type === 'video' || upload.type === 'short' ? finalUrl : null,
+        type: (upload.type === 'short' || upload.type === 'video') ? 'video' : 'image',
         tags: tagsArray,
         category: detectedCategory,
         is_short: upload.type === 'short',
@@ -305,6 +324,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     id: p.id,
     title: p.title || 'Untitled',
     imageUrl: p.image_url || '',
+    videoUrl: p.video_url || undefined,
+    type: p.type || (p.video_url ? 'video' : 'image'),
     creator: {
       id: p.creator_id,
       name: p.profiles?.display_name || 'Unknown',
@@ -329,12 +350,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const fetchPosts = async () => {
-    console.log('fetchPosts called');
-    if (isPlaceholder) {
-      setPosts(MOCK_POSTS);
-      setInitialLoading(false);
+    console.log('fetchPosts called, isPlaceholder:', isPlaceholder);
+    
+    // Prevent redundant fetches if posts are fresh (within 2 minutes)
+    const now = Date.now();
+    if (posts.length > 0 && (now - lastFetchTime) < 120000) {
+      console.log('Reusing cached posts');
       return;
     }
+
+    if (isPlaceholder) {
+      console.log('Using mock data because Supabase is not configured');
+      setPosts(rankPosts(MOCK_POSTS));
+      setInitialLoading(false);
+      setLastFetchTime(now);
+      return;
+    }
+
     try {
       console.log('Fetching posts from Supabase...');
       // Fetch posts with creator profile
@@ -344,18 +376,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           *,
           profiles:creator_id (*)
         `)
-        .eq('is_hidden', false)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(200); // Increased limit for better ranking
 
       if (error) {
         console.warn('Error fetching posts with join, trying simple fetch:', error);
         const { data: simpleData, error: simpleError } = await supabase
           .from('posts')
           .select('*')
-          .eq('is_hidden', false)
           .order('created_at', { ascending: false })
-          .limit(100);
+          .limit(200);
           
         if (simpleError) {
           console.error('Simple fetch also failed:', simpleError);
@@ -365,50 +395,75 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (simpleData) {
           console.log(`Fetched ${simpleData.length} posts (simple)`);
           const formattedPosts: Post[] = simpleData.map(formatPost);
-          
-          // Logic: Real posts first. Only add mock if real posts < 10
-          let finalPosts = formattedPosts;
-          if (formattedPosts.length < 10) {
-            // Deduplicate: Don't add mock posts that have the same ID as real posts
-            const realIds = new Set(formattedPosts.map(p => p.id));
-            const uniqueMockPosts = MOCK_POSTS.filter(p => !realIds.has(p.id));
-            finalPosts = [...formattedPosts, ...uniqueMockPosts];
-          }
-          
-          setPosts(finalPosts);
-          console.log('setPosts called with', finalPosts.length, 'posts');
+          setPosts(rankPosts(formattedPosts));
         }
       } else if (data) {
         console.log(`Fetched ${data.length} posts (with join)`);
         const formattedPosts: Post[] = data.map(formatPost);
-        
-        // Logic: Real posts first. Only add mock if real posts < 10
-        let finalPosts = formattedPosts;
-        if (formattedPosts.length < 10) {
-          // Deduplicate
-          const realIds = new Set(formattedPosts.map(p => p.id));
-          const uniqueMockPosts = MOCK_POSTS.filter(p => !realIds.has(p.id));
-          finalPosts = [...formattedPosts, ...uniqueMockPosts];
-        }
-        
-        setPosts(finalPosts);
-        console.log('setPosts called with', finalPosts.length, 'posts');
+        setPosts(rankPosts(formattedPosts));
       } else {
-        // Fallback if data is null but no error
-        console.log('No data and no error, setting mock posts');
-        setPosts(MOCK_POSTS);
+        setPosts([]);
       }
+      setLastFetchTime(now);
     } catch (err) {
       console.error('Error fetching posts:', err);
-      // Always fallback to mock posts on error
-      setPosts(MOCK_POSTS);
     } finally {
       setInitialLoading(false);
     }
   };
 
+  // --- AI Discovery Algorithm V2.5 ---
+  const rankPosts = (postsToRank: Post[]): Post[] => {
+    const now = new Date().getTime();
+    
+    return [...postsToRank].sort((a, b) => {
+      const getScore = (p: Post) => {
+        // 1. Recency Decay (Newton's cooling law simulation)
+        const ageHours = (now - new Date(p.createdAt).getTime()) / (1000 * 60 * 60);
+        // Base score starts at 1, drops as age increases
+        const recencyFactor = 1 / Math.pow(ageHours + 2, 1.8);
+        
+        // 2. Engagement Rate Score (Quality over Quantity)
+        const engagementRate = p.views > 0 ? (p.likes / p.views) : 0.05;
+        const engagementScore = (p.likes * 10) + (p.views * 0.2) + (p.saves * 25);
+        
+        // 3. User Interest Alignment (Personalization)
+        let interestBoost = 0;
+        if (userInterests[p.category]) interestBoost += userInterests[p.category] * 20;
+        p.tags.forEach(tag => {
+          if (userInterests[tag]) interestBoost += userInterests[tag] * 8;
+        });
+
+        // 4. Social Status & Credibility
+        const statusScore = p.creator.isVerified ? 50 : 0;
+        
+        // 5. Video Content Boost (Platform priority for videos)
+        const formatBoost = p.type === 'video' ? 30 : 0;
+
+        // Final score combines all with emphasis on hot content
+        return ((engagementScore * (1 + engagementRate)) + interestBoost + formatBoost) * recencyFactor + statusScore;
+      };
+
+      return getScore(b) - getScore(a);
+    });
+  };
+
+  // Update interests when interacting
+  const trackInterest = (category: string, tags: string[]) => {
+    setUserInterests(prev => {
+      const next = { ...prev };
+      next[category] = (next[category] || 0) + 1;
+      tags.forEach(t => {
+        next[t] = (next[t] || 0) + 1;
+      });
+      return next;
+    });
+  };
+
   const fetchPostById = async (id: string): Promise<Post | null> => {
-    if (isPlaceholder) return MOCK_POSTS.find(p => p.id === id) || null;
+    if (isPlaceholder || id.startsWith('mock-')) {
+      return MOCK_POSTS.find(p => p.id === id) || null;
+    }
     try {
       const { data, error } = await supabase
         .from('posts')
@@ -428,6 +483,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchProfile = async (currentUser: User) => {
+    if (isPlaceholder) return;
     let { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -460,20 +516,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (isPlaceholder) {
-      console.log('🚀 Supabase Mode: Placeholder/Mock Data (Check your AI Studio Secrets)');
-    } else {
-      console.log('✅ Supabase Connected: Real Database is active');
-    }
-    
     fetchPosts().catch(console.error); // Fetch posts on mount
-
-    if (isPlaceholder) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
       setSession(sess);
       setUser(sess?.user ?? null);
-      if (sess?.user) {
+      if (sess?.user && !isPlaceholder) {
         if (_event === 'SIGNED_IN') {
           analytics.trackUserGrowth(sess.user.id, sess.user.email, sess.user.app_metadata.provider || 'email');
         } else {
@@ -487,11 +535,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Real-time updates for posts (likes, views, etc.)
+    let channel: any = null;
+    
+    if (!isPlaceholder) {
+      channel = supabase
+        .channel('public:posts')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, payload => {
+          const updatedPost = payload.new;
+          setPosts(prev => prev.map(p => p.id === updatedPost.id ? { 
+            ...p, 
+            likes: updatedPost.likes, 
+            views: updatedPost.views, 
+            comments: updatedPost.comments,
+            saves: updatedPost.saves
+          } : p));
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, payload => {
+          // Only add if not already in list (prevents duplicates from local optimistic adds)
+          const newPost = payload.new;
+          setPosts(prev => {
+            if (prev.some(p => p.id === newPost.id)) return prev;
+            // We need to fetch the profile to format it properly, or just use payload.new and fetch later
+            // For simplicity, let's just trigger a fetch if it's a new post we don't have
+            fetchPosts(); // Standard refetch is safer for new posts to get profiles
+            return prev;
+          });
+        })
+        .subscribe();
+    }
+
+    return () => {
+      subscription.unsubscribe();
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   const toggleLike = async (id: string) => {
-    if (!user || isPlaceholder) return; // Must be logged in
+    if (!user) return; // Must be logged in
     
     const post = posts.find(p => p.id === id);
     if (!post) return;
@@ -504,7 +585,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       p.id === id ? { ...p, isLiked: !wasLiked, likes: wasLiked ? originalLikes - 1 : originalLikes + 1 } : p
     ));
 
-    if (post.isMock) return; // Don't call Supabase for mock posts
+    if (!wasLiked) {
+      trackInterest(post.category, post.tags);
+    }
 
     try {
       if (wasLiked) {
@@ -537,7 +620,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const toggleSave = async (id: string) => {
-    if (!user || isPlaceholder) return; // Must be logged in
+    if (!user) return; // Must be logged in
     
     const post = posts.find(p => p.id === id);
     if (!post) return;
@@ -549,8 +632,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPosts(prev => prev.map(p =>
       p.id === id ? { ...p, isSaved: !wasSaved, saves: wasSaved ? originalSaves - 1 : originalSaves + 1 } : p
     ));
-
-    if (post.isMock) return; // Don't call Supabase for mock posts
 
     try {
       if (wasSaved) {
@@ -624,16 +705,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Clear local storage items that might leak data between accounts
     localStorage.removeItem('qpixa_studio_sessions');
     localStorage.removeItem('qpixa_recent_models');
-    
-    if (isPlaceholder) {
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-      setCredits(40);
-      setPosts([]);
-      analytics.reset();
-      return;
-    }
     
     await supabase.auth.signOut();
     analytics.reset();

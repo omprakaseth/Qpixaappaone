@@ -127,12 +127,6 @@ export default function SettingsScreen({ onBack }: SettingsScreenProps) {
     if (!e.target.files || e.target.files.length === 0 || !profile) return;
     const file = e.target.files[0];
     
-    // Check if it's a mock project
-    if (import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co') {
-      toast.error('Avatar upload is not available in demo mode');
-      return;
-    }
-
     setUploadingAvatar(true);
     try {
       const fileExt = file.name.split('.').pop();

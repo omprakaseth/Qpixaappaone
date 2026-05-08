@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Heart } from 'lucide-react';
+import { Heart, Play, Film } from 'lucide-react';
 import { formatNumber, cn } from '@/lib/utils';
 import { Post } from '@/context/AppContext';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
@@ -83,17 +83,38 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
         {!imgLoaded && (
           <div className="absolute inset-0 skeleton-shimmer" />
         )}
-        <img
-          src={post.imageUrl}
-          alt={post.title}
-          className={cn(
-            "w-full h-full object-cover transition-all duration-500",
-            imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
-            isClicking && "brightness-50 scale-110"
-          )}
-          loading="lazy"
-          onLoad={() => setImgLoaded(true)}
-        />
+        {post.type === 'video' || post.videoUrl ? (
+          <video
+            src={post.videoUrl || post.imageUrl}
+            className={cn(
+              "w-full h-full object-cover transition-all duration-500",
+              imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
+              isClicking && "brightness-50 scale-110"
+            )}
+            onLoadedData={() => setImgLoaded(true)}
+            onError={(e) => {
+              console.error("Video load error:", post.videoUrl);
+              setImgLoaded(true); // Don't block UI
+            }}
+            muted
+            playsInline
+            loop
+            onMouseOver={e => e.currentTarget.play()}
+            onMouseOut={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+          />
+        ) : (
+          <img
+            src={post.imageUrl}
+            alt={post.title}
+            className={cn(
+              "w-full h-full object-cover transition-all duration-500",
+              imgLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-105',
+              isClicking && "brightness-50 scale-110"
+            )}
+            loading="lazy"
+            onLoad={() => setImgLoaded(true)}
+          />
+        )}
 
         {/* Loading spinner when clicking */}
         {isClicking && (
@@ -102,17 +123,32 @@ export default function ImageCard({ post, onTap, onDoubleTap, onLongPress, onCre
           </div>
         )}
 
-        {/* AI Badge - top left */}
-        <div className="absolute top-2 left-2 flex gap-1">
-          <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
-            AI
-          </span>
-          {post.isMock && (
-            <span className="bg-primary/80 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md">
-              SAMPLE
+        {/* AI/Video Badges - top left */}
+        <div className="absolute top-2 left-2 flex gap-1 z-10">
+          {(post.type === 'video' || post.videoUrl) ? (
+            <span className="bg-primary backdrop-blur-sm text-white text-[9px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-1 shadow-lg border border-white/20">
+              <Play size={8} fill="white" /> VIDEO
+            </span>
+          ) : (
+            <span className="bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-white/10">
+              AI
+            </span>
+          )}
+          {(post.isShort || post.videoUrl) && (
+            <span className="bg-purple-500/90 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-white/10">
+              <Film size={8} /> REEL
             </span>
           )}
         </div>
+
+        {/* Video Play Icon Indicator (Left side as requested) */}
+        {(post.type === 'video' || post.videoUrl) && !isClicking && (
+          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 z-10">
+            <div className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center border border-white/10 group-active:scale-95 transition-transform">
+              <Play size={14} fill="white" className="ml-0.5" />
+            </div>
+          </div>
+        )}
 
         {/* Heart burst animation */}
         {showHeart && (

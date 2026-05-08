@@ -38,6 +38,7 @@ const App = () => (
               <Route path="/marketplace" element={<Navigate to="/market" replace />} />
 
               <Route path="/shorts" element={<Index />} />
+              <Route path="/shorts/prompt/:id" element={<Index />} />
               <Route path="/shorts/creator/:id" element={<Index />} />
 
               <Route path="/studio" element={<Index />} />

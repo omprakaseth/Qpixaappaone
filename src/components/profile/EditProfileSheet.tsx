@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, Camera, Loader2, ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import ImageCropper from './ImageCropper';
 
 interface Profile {
   id: string;
@@ -24,6 +25,11 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
   const [bio, setBio] = useState(profile.bio || '');
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
   const [coverUrl, setCoverUrl] = useState(profile.cover_url || '');
+  
+  // Cropper states
+  const [cropMode, setCropMode] = useState<'avatar' | 'cover' | null>(null);
+  const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
+
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -34,13 +40,34 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
 
   const initial = (displayName || username || 'U').charAt(0).toUpperCase();
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, mode: 'avatar' | 'cover') => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image must be under 2MB');
-      return;
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      setTempImageUrl(reader.result as string);
+      setCropMode(mode);
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset input value to allow selecting same file again
+    e.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    const mode = cropMode;
+    setCropMode(null);
+    setTempImageUrl(null);
+
+    if (mode === 'avatar') {
+      await uploadAvatar(croppedBlob);
+    } else {
+      await uploadCover(croppedBlob);
     }
+  };
+
+  const uploadAvatar = async (file: Blob | File) => {
     setUploading(true);
     setUploadProgress(0);
     try {
@@ -48,32 +75,31 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
         setUploadProgress(prev => prev >= 90 ? 90 : prev + 10);
       }, 200);
 
-      const ext = file.name.split('.').pop();
-      const path = `${profile.id}/avatar-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      const path = `${profile.id}/avatar-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { 
+        contentType: 'image/jpeg',
+        upsert: true 
+      });
       
       clearInterval(progressInterval);
       setUploadProgress(100);
 
       if (error) throw error;
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-      setAvatarUrl(data.publicUrl);
-      toast.success('Photo uploaded!');
-    } catch {
-      toast.error('Upload failed');
+      // Add timestamp to bust cache
+      const finalUrl = `${data.publicUrl}?t=${Date.now()}`;
+      setAvatarUrl(finalUrl);
+      toast.success('Profile photo ready!');
+    } catch (err: any) {
+      console.error('Avatar upload error:', err);
+      toast.error('Avatar upload failed');
     } finally {
       setUploading(false);
       setUploadProgress(0);
     }
   };
 
-  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Cover image must be under 5MB');
-      return;
-    }
+  const uploadCover = async (file: Blob | File) => {
     setUploadingCover(true);
     setCoverProgress(0);
     try {
@@ -81,19 +107,24 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
         setCoverProgress(prev => prev >= 90 ? 90 : prev + 10);
       }, 200);
 
-      const ext = file.name.split('.').pop();
-      const path = `${profile.id}/cover-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+      const path = `${profile.id}/cover-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from('avatars').upload(path, file, { 
+        contentType: 'image/jpeg',
+        upsert: true 
+      });
       
       clearInterval(progressInterval);
       setCoverProgress(100);
 
       if (error) throw error;
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-      setCoverUrl(data.publicUrl);
-      toast.success('Cover uploaded!');
-    } catch {
-      toast.error('Upload failed');
+      // Add timestamp to bust cache
+      const finalUrl = `${data.publicUrl}?t=${Date.now()}`;
+      setCoverUrl(finalUrl);
+      toast.success('Cover photo ready!');
+    } catch (err: any) {
+       console.error('Cover upload error:', err);
+      toast.error('Cover upload failed');
     } finally {
       setUploadingCover(false);
       setCoverProgress(0);
@@ -118,54 +149,24 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
         cover_url: coverUrl || null,
       };
 
-      console.log('Updating profile for user:', currentUser.id, updateData);
+      console.log('Finalizing profile update:', updateData);
 
-      // Try to update first
-      let { error } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('id', currentUser.id);
         
-      if (error) {
-        console.warn('Profile update error, checking for missing columns:', error);
-        // If error is about updated_at or cover_url column, try again without them
-        if (
-          error.message?.includes('updated_at') || 
-          error.message?.includes('cover_url') || 
-          error.hint?.includes('updated_at') || 
-          error.hint?.includes('cover_url')
-        ) {
-          delete updateData.cover_url;
-          const { error: retryError } = await supabase
-            .from('profiles')
-            .update(updateData)
-            .eq('id', currentUser.id);
-          error = retryError;
-        }
-      }
-
-      // If update failed with RLS error, it might be because the row doesn't exist yet
-      // (though it should have been created on login)
-      if (error && (error.message?.includes('row-level security') || error.code === '42501')) {
-        console.log('Update failed with RLS, trying upsert as fallback...');
-        const upsertData = { ...updateData, id: currentUser.id };
-        const { error: upsertError } = await supabase
-          .from('profiles')
-          .upsert(upsertData, { onConflict: 'id' });
-        error = upsertError;
-      }
-        
       if (error) throw error;
 
-      toast.success('Profile updated!');
+      toast.success('Profile updated successfully!');
       onSaved();
       onClose();
     } catch (err: any) {
       console.error('Profile update error:', err);
       if (err.code === '23505') {
-        toast.error('Username is already taken');
+        toast.error('Username already exists');
       } else {
-        toast.error(`Failed to save profile: ${err.message || 'Unknown error'}`);
+        toast.error(`Update failed: ${err.message}`);
       }
     } finally {
       setSaving(false);
@@ -174,6 +175,20 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
 
   return (
     <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-bottom duration-200">
+      {/* Cropper Modal Injection */}
+      {cropMode && tempImageUrl && (
+        <ImageCropper
+          image={tempImageUrl}
+          aspect={cropMode === 'avatar' ? 1 : 2.5} // 2.5:1 for cover
+          circular={cropMode === 'avatar'}
+          onCropComplete={handleCropComplete}
+          onCancel={() => {
+            setCropMode(null);
+            setTempImageUrl(null);
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <button onClick={onClose} className="text-sm text-muted-foreground">Cancel</button>
@@ -183,15 +198,15 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
           disabled={saving}
           className="text-sm font-bold text-primary disabled:opacity-50"
         >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : 'Done'}
+          {saving ? <Loader2 size={16} className="animate-spin" /> : 'Save'}
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {/* Cover Photo Section */}
-        <div className="relative h-[120px] w-full overflow-hidden bg-secondary">
+        <div className="relative h-[130px] w-full overflow-hidden bg-secondary">
           <img
-            src={coverUrl || '/default-cover.jpg'}
+            src={(coverUrl ? `${coverUrl}${coverUrl.includes('?') ? '&' : '?'}t=${Date.now()}` : 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80')}
             alt=""
             className="w-full h-full object-cover"
           />
@@ -199,7 +214,7 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
             <button
               onClick={() => coverFileRef.current?.click()}
               disabled={uploadingCover}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/80 text-foreground text-[11px] font-semibold"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/80 text-foreground text-[11px] font-semibold shadow-lg active:scale-95 transition-transform"
             >
               {uploadingCover ? (
                 <div className="flex items-center gap-1.5">
@@ -219,85 +234,97 @@ export default function EditProfileSheet({ profile, onClose, onSaved }: EditProf
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={handleCoverUpload}
+            onChange={(e) => handleFileSelect(e, 'cover')}
           />
         </div>
 
         {/* Avatar section */}
-        <div className="flex flex-col items-center py-6 -mt-8">
+        <div className="flex flex-col items-center py-6 -mt-10">
           <div className="relative">
-            <div className="w-20 h-20 rounded-full overflow-hidden bg-secondary">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-2xl font-bold text-secondary-foreground">{initial}</span>
-                </div>
-              )}
+            <div className="w-24 h-24 rounded-full p-1 bg-background shadow-xl">
+              <div className="w-full h-full rounded-full overflow-hidden bg-secondary flex items-center justify-center">
+                {avatarUrl ? (
+                  <img 
+                    src={`${avatarUrl}${avatarUrl.includes('?') ? '&' : '?'}t=${Date.now()}`} 
+                    alt="" 
+                    className="w-full h-full object-cover" 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span className="text-3xl font-bold text-secondary-foreground">{initial}</span>
+                )}
+              </div>
             </div>
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-primary flex items-center justify-center shadow-lg"
+              className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-lg border-2 border-background active:scale-90 transition-transform"
             >
               {uploading ? (
-                <div className="flex items-center justify-center w-full h-full bg-black/50 rounded-full">
-                  <span className="text-[10px] text-white font-bold">{uploadProgress}%</span>
-                </div>
+                <Loader2 size={14} className="text-primary-foreground animate-spin" />
               ) : (
-                <Camera size={13} className="text-primary-foreground" />
+                <Camera size={14} className="text-primary-foreground" />
               )}
             </button>
           </div>
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="text-xs font-semibold text-primary mt-2"
-          >
-            Change Photo
-          </button>
           <input
             ref={fileRef}
             type="file"
             accept="image/*"
             className="hidden"
-            onChange={handleAvatarUpload}
+            onChange={(e) => handleFileSelect(e, 'avatar')}
           />
+          <p className="text-[10px] text-muted-foreground mt-2 font-medium">Recommended: Square Photo</p>
         </div>
 
         {/* Fields */}
-        <div className="px-4 space-y-0">
-          <div className="flex items-center py-3 border-t border-border">
-            <label className="w-24 text-xs text-muted-foreground flex-shrink-0">Username</label>
-            <input
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="flex-1 text-sm text-foreground bg-transparent outline-none"
-              placeholder="username"
-            />
+        <div className="px-4 space-y-4 py-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-muted-foreground uppercase px-1">Display Name</label>
+            <div className="bg-secondary/40 rounded-xl px-4 py-3 border border-border/50 focus-within:border-primary/50 transition-colors">
+              <input
+                value={displayName}
+                onChange={e => setDisplayName(e.target.value)}
+                className="w-full text-sm text-foreground bg-transparent outline-none"
+                placeholder="Ex: John Doe"
+              />
+            </div>
           </div>
-          <div className="flex items-center py-3 border-t border-border">
-            <label className="w-24 text-xs text-muted-foreground flex-shrink-0">Name</label>
-            <input
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
-              className="flex-1 text-sm text-foreground bg-transparent outline-none"
-              placeholder="Display name"
-            />
+          
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-muted-foreground uppercase px-1">Username</label>
+            <div className="bg-secondary/40 rounded-xl px-4 py-3 border border-border/50 focus-within:border-primary/50 transition-colors flex items-center gap-1.5">
+              <span className="text-muted-foreground text-sm">@</span>
+              <input
+                value={username}
+                onChange={e => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
+                className="w-full text-sm text-foreground bg-transparent outline-none"
+                placeholder="username"
+              />
+            </div>
           </div>
-          <div className="flex items-start py-3 border-t border-b border-border">
-            <label className="w-24 text-xs text-muted-foreground flex-shrink-0 pt-0.5">Bio</label>
-            <textarea
-              value={bio}
-              onChange={e => setBio(e.target.value)}
-              maxLength={150}
-              rows={3}
-              className="flex-1 text-sm text-foreground bg-transparent outline-none resize-none"
-              placeholder="Tell about yourself..."
-            />
+
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center px-1">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase">Bio</label>
+              <span className="text-[10px] text-muted-foreground">{bio.length}/150</span>
+            </div>
+            <div className="bg-secondary/40 rounded-xl px-4 py-3 border border-border/50 focus-within:border-primary/50 transition-colors">
+              <textarea
+                value={bio}
+                onChange={e => setBio(e.target.value)}
+                maxLength={150}
+                rows={4}
+                className="w-full text-sm text-foreground bg-transparent outline-none resize-none"
+                placeholder="Share your story or social links..."
+              />
+            </div>
           </div>
-          <p className="text-right text-[10px] text-muted-foreground pt-1">{bio.length}/150</p>
         </div>
       </div>
     </div>
   );
 }
+

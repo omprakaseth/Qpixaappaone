@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
-import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield } from 'lucide-react';
+import { Settings, LogIn, UserPlus, Grid3X3, Sparkles, Coins, ShoppingBag, Star, Edit3, Share2, Image as ImageIcon, Info, SlidersHorizontal, PlaySquare, Bell, Shield, FileText, Loader2, AlertCircle, CheckCircle2, RotateCcw, X, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppState } from '@/context/AppContext';
+import { useAppState, Post } from '@/context/AppContext';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import EditProfileSheet from '@/components/profile/EditProfileSheet';
 import DashboardSheet from '@/components/profile/DashboardSheet';
 import VerifiedBadge from '@/components/VerifiedBadge';
 import { useFollows } from '@/hooks/useFollows';
 import AdminScreen from './AdminScreen';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface ProfileScreenProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
@@ -35,54 +36,109 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   const [isMounted, setIsMounted] = useState(false);
   const [showTopHeader, setShowTopHeader] = useState(true);
   const lastScrollY = useRef(0);
-  const { isLoggedIn, profile, user, refreshProfile } = useAppState();
+  const { isLoggedIn, profile, user, refreshProfile, uploadingPost, clearUpload, retryUpload, startUpload, deferredPrompt, installApp: handleInstallApp } = useAppState();
+  const [drafts, setDrafts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const savedDrafts = localStorage.getItem('qpixa_drafts');
+    if (savedDrafts) setDrafts(JSON.parse(savedDrafts));
+  }, []);
+
+  const deleteDraft = (id: string) => {
+    const updated = drafts.filter(d => d.id !== id);
+    setDrafts(updated);
+    localStorage.setItem('qpixa_drafts', JSON.stringify(updated));
+    toast.success('Draft removed');
+  };
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    const el = scrollRef?.current;
-    if (!el) return;
-
-    const handleScroll = () => {
-      const currentScrollY = el.scrollTop;
-      if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
-
-      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        setShowTopHeader(false);
-      } else {
-        setShowTopHeader(true);
-      }
-      lastScrollY.current = currentScrollY;
-    };
-
-    el.addEventListener('scroll', handleScroll);
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [scrollRef]);
+    // Sync local showTopHeader with navVisible prop
+    setShowTopHeader(navVisible);
+  }, [navVisible]);
 
   const { followingIds } = useFollows();
-  const [activeTab, setActiveTab] = useState<'posts' | 'shorts' | 'prompts' | 'about'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'shorts' | 'prompts' | 'about' | 'drafts'>('posts');
   const [myPrompts, setMyPrompts] = useState<UserPrompt[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
-  const [myShorts, setMyShorts] = useState<any[]>([]);
+  const userPosts = useMemo(() => myPosts.filter(p => !p.isShort && p.type !== 'video' && !p.videoUrl), [myPosts]);
+  const userShorts = useMemo(() => myPosts.filter(p => p.isShort || p.type === 'video' || p.videoUrl), [myPosts]);
+  const postEngagement = useMemo(() => {
+    return myPosts.reduce((acc, post) => ({
+      totalLikes: acc.totalLikes + (post.likes || 0),
+      totalComments: acc.totalComments + (post.comments || 0),
+      totalViews: acc.totalViews + (post.views || 0)
+    }), { totalLikes: 0, totalComments: 0, totalViews: 0 });
+  }, [myPosts]);
   const [followerCount, setFollowerCount] = useState(0);
   const [earnings, setEarnings] = useState({ totalSales: 0, totalEarnings: 0, avgRating: 0 });
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [promptFilter, setPromptFilter] = useState<string>('All');
   
-  const { deferredPrompt, installApp: handleInstallApp } = useAppState();
-
   useEffect(() => {
     if (user) {
+      if (isPlaceholder) {
+        setMyPosts([]);
+        setMyPrompts([]);
+        setFollowerCount(250); // Simulate some followers
+        setRecentActivity([]);
+        return;
+      }
       fetchMyPrompts();
       fetchMyPosts();
-      fetchMyShorts();
       fetchFollowerCount();
+      fetchDashboardActivity();
     }
   }, [user]);
+
+  const fetchDashboardActivity = async () => {
+    if (!user) return;
+    try {
+      // Fetch purchases of prompts created by this user
+      const { data, error } = await supabase
+        .from('prompt_purchases')
+        .select(`
+          id,
+          purchased_at,
+          user_id,
+          profiles:user_id (
+            username,
+            avatar_url
+          ),
+          marketplace_prompts!inner (
+            title,
+            creator_id,
+            price
+          )
+        `)
+        .eq('marketplace_prompts.creator_id', user.id)
+        .order('purchased_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      
+      if (data) {
+        const formatted = data.map((p: any) => ({
+          id: p.id,
+          type: 'sale',
+          title: 'Prompt Sale',
+          description: `Sold "${p.marketplace_prompts?.title || 'Unknown'}"`,
+          amount: p.marketplace_prompts?.price || 0,
+          timestamp: p.purchased_at,
+          user: p.profiles?.username || 'Someone'
+        }));
+        setRecentActivity(formatted);
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard activity:', err);
+    }
+  };
 
   useEffect(() => {
     if (!headerRef.current) return;
@@ -97,41 +153,8 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     return () => observer.disconnect();
   }, []);
 
-  const fetchMyShorts = async () => {
-    if (!user || isPlaceholder) return;
-    try {
-      const { data, error } = await (supabase
-        .from('posts')
-        .select('*, profiles:creator_id(username, avatar_url)')
-        .eq('creator_id', user.id)
-        .eq('is_short', true)
-        .order('created_at', { ascending: false }) as any);
-
-      if (error) throw error;
-      
-      if (data) {
-        const formattedShorts = data.map((p: any) => ({
-          id: p.id,
-          thumbnail: p.image_url,
-          views: p.views || 0,
-          likes: p.likes || 0,
-          comments: p.comments || 0,
-          prompt: p.prompt || '',
-          creator: {
-            username: p.profiles?.username || profile?.username || 'User',
-            avatar: p.profiles?.avatar_url || profile?.avatar_url || '',
-          }
-        }));
-        setMyShorts(formattedShorts);
-      }
-    } catch (error) {
-      console.error('Error fetching shorts:', error);
-      setMyShorts([]);
-    }
-  };
-
   const fetchMyPosts = async () => {
-    if (!user || isPlaceholder) return;
+    if (!user) return;
     try {
       const { data, error } = await supabase
         .from('posts')
@@ -161,6 +184,9 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           const formatted = simpleData.map((p: any) => ({
             ...p,
             imageUrl: p.image_url,
+            videoUrl: p.video_url,
+            type: p.type,
+            isShort: p.is_short,
             creator: {
                id: user.id,
                name: profile?.display_name || 'You',
@@ -177,6 +203,8 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           id: p.id,
           title: p.title || 'Untitled',
           imageUrl: p.image_url,
+          videoUrl: p.video_url,
+          type: p.type,
           creator: {
             id: p.creator_id || user?.id || '',
             name: p.profiles?.display_name || profile?.display_name || 'Unknown',
@@ -196,7 +224,8 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           category: p.category,
           style: p.style,
           aspectRatio: p.aspect_ratio,
-          creator_id: p.creator_id
+          creator_id: p.creator_id,
+          isShort: p.is_short
         }));
         setMyPosts(formattedPosts);
       } else {
@@ -209,7 +238,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   };
 
   const fetchFollowerCount = async () => {
-    if (!user || isPlaceholder) return;
+    if (!user) return;
     const { count, error } = await supabase
       .from('follows')
       .select('*', { count: 'exact', head: true })
@@ -222,7 +251,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
   };
 
   const fetchMyPrompts = async () => {
-    if (!user || isPlaceholder) return;
+    if (!user) return;
     const { data, error } = await supabase
       .from('marketplace_prompts')
       .select('id, title, preview_image, price, rating, sales_count, model_type, category')
@@ -274,6 +303,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
     { id: 'posts' as const, icon: Grid3X3, label: 'Posts' },
     { id: 'shorts' as const, icon: PlaySquare, label: 'Shorts' },
     { id: 'prompts' as const, icon: ShoppingBag, label: 'Prompt Store' },
+    { id: 'drafts' as const, icon: FileText, label: 'Drafts' },
     { id: 'about' as const, icon: Info, label: 'About' },
   ];
 
@@ -304,7 +334,7 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           style={{ height: 200, marginTop: headerHeight }}
         >
           <img
-            src={profile?.cover_url || 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80'}
+            src={(profile?.cover_url ? `${profile.cover_url}${profile.cover_url.includes('?') ? '&' : '?'}t=${Date.now()}` : 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80')}
             alt="Cover"
             className="w-full h-full object-cover"
           />
@@ -313,17 +343,23 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         {/* Profile Hero */}
         <div className="px-4 pb-2 -mt-12 relative z-10">
           <div className="flex flex-col items-center">
-            <div className="relative">
-              <div className="w-[96px] h-[96px] rounded-full p-[3px] bg-background">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center">
-                    <span className="text-3xl font-bold text-secondary-foreground">{initial}</span>
+                <div className="w-[96px] h-[96px] rounded-full p-[3px] bg-background">
+                  <div className="w-full h-full rounded-full bg-secondary flex items-center justify-center overflow-hidden">
+                    {profile?.avatar_url ? (
+                      <img 
+                        src={`${profile.avatar_url}${profile.avatar_url.includes('?') ? '&' : '?'}t=${Date.now()}`} 
+                        alt="" 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <span className="text-3xl font-bold text-secondary-foreground">{initial}</span>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
 
             <h2 className="text-lg font-bold text-foreground mt-2 flex items-center gap-1">
               {displayName}
@@ -401,6 +437,51 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           </div>
         )}
 
+        {/* Uploading Status Overlay */}
+        <AnimatePresence>
+          {uploadingPost && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="px-4 mb-4"
+            >
+              <div className={cn(
+                "p-4 rounded-2xl border transition-all shadow-sm",
+                uploadingPost.status === 'error' ? "bg-red-500/10 border-red-500/20" : "bg-primary/5 border-primary/20"
+              )}>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0">
+                    <img src={uploadingPost.thumbnailUrl || uploadingPost.previewUrl || ''} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      {uploadingPost.status === 'uploading' && <Loader2 size={16} className="text-white animate-spin" />}
+                      {uploadingPost.status === 'success' && <CheckCircle2 size={16} className="text-green-400" />}
+                      {uploadingPost.status === 'error' && <AlertCircle size={16} className="text-red-400" />}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase">{uploadingPost.status === 'uploading' ? 'Publishing...' : uploadingPost.status}</p>
+                    <h3 className="text-sm font-bold text-foreground truncate">{uploadingPost.title}</h3>
+                    <div className="mt-1 h-1 w-full bg-secondary rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${uploadingPost.progress}%` }}
+                        className="h-full bg-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    {uploadingPost.status === 'error' && (
+                       <button onClick={retryUpload} className="p-2 rounded-lg bg-red-500/20 text-red-500"><RotateCcw size={14}/></button>
+                    )}
+                    <button onClick={clearUpload} className="p-2 rounded-lg hover:bg-secondary"><X size={14} /></button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Tabs */}
         <div className="flex border-b border-border mt-1">
           {tabs.map(t => (
@@ -420,9 +501,9 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         {/* Tab Content */}
         <div className="pb-safe-nav">
           {activeTab === 'posts' && (
-            myPosts.length > 0 ? (
+            userPosts.length > 0 ? (
               <div className="grid grid-cols-3 gap-0.5">
-                {myPosts.map(p => (
+                {userPosts.map(p => (
                   <button key={p.id} onClick={() => onPostTap?.(p)} className="relative aspect-square overflow-hidden group active:opacity-80 transition-opacity">
                     <img src={p.imageUrl || '/placeholder.svg'} alt={p.prompt} className="w-full h-full object-cover" />
                   </button>
@@ -440,19 +521,23 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
           )}
 
           {activeTab === 'shorts' && (
-            myShorts.length > 0 ? (
+            userShorts.length > 0 ? (
               <div className="grid grid-cols-3 gap-0.5">
-                {myShorts.map(s => (
-                  <button key={s.id} className="relative aspect-[9/16] overflow-hidden group active:opacity-80 transition-opacity bg-secondary">
+                {userShorts.map(s => (
+                  <button 
+                    key={s.id} 
+                    onClick={() => onPostTap?.(s)}
+                    className="relative aspect-[9/16] overflow-hidden group active:opacity-80 transition-opacity bg-secondary"
+                  >
                     <video 
-                      src={s.video_url} 
+                      src={s.videoUrl || s.imageUrl} 
                       className="w-full h-full object-cover"
                       onMouseOver={e => (e.target as HTMLVideoElement).play()}
                       onMouseOut={e => (e.target as HTMLVideoElement).pause()}
                       muted
                       loop
                     />
-                    <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
+                    <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded-md backdrop-blur-sm">
                       <PlaySquare size={10} className="text-white fill-white" />
                       <span className="text-[10px] font-bold text-white">{s.views || 0}</span>
                     </div>
@@ -527,6 +612,33 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
             )
           )}
 
+          {activeTab === 'drafts' && (
+            drafts.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3 p-4">
+                {drafts.map(d => (
+                  <div key={d.id} className="bg-card border border-border rounded-xl overflow-hidden">
+                    <div className="aspect-square relative group">
+                      <img src={d.thumbnail || d.preview} className="w-full h-full object-cover opacity-50" />
+                      <div className="absolute inset-0 flex items-center justify-center gap-2">
+                        <button className="p-2 rounded-full bg-primary text-white"><Edit3 size={16} /></button>
+                        <button onClick={() => deleteDraft(d.id)} className="p-2 rounded-full bg-black/40 text-white"><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                    <div className="p-2">
+                      <p className="text-xs font-bold truncate">{d.title}</p>
+                      <p className="text-[9px] text-muted-foreground">{new Date(d.id).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <FileText size={32} className="text-muted-foreground/30 mb-2" />
+                  <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">No Drafts</p>
+                </div>
+            )
+          )}
+
           {activeTab === 'about' && (
             <div className="space-y-3 p-4">
               <div className="bg-card border border-border rounded-xl p-4">
@@ -590,6 +702,8 @@ export default function ProfileScreen({ scrollRef, onOpenSettings, onOpenAuth, o
         onOpenChange={setShowDashboard}
         earnings={earnings}
         promptCount={myPrompts.length}
+        activities={recentActivity}
+        postEngagement={postEngagement}
       />
     </>
   );

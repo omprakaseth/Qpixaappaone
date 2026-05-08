@@ -12,6 +12,11 @@ export default function AdminScreen({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (isPlaceholder) {
+        setStats({ users: 500, posts: 1200, reports: 3 });
+        setLoading(false);
+        return;
+      }
       try {
         const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
         const { count: postCount } = await supabase.from('posts').select('*', { count: 'exact', head: true });

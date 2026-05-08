@@ -134,18 +134,18 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isPlaceholder) {
-      supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20)
-        .then(({ data }) => { if (data) setNotifications(data); });
+    if (isPlaceholder) {
+      setNotifications([]);
+      setPrompts(MOCK_MARKETPLACE_PROMPTS);
+      setLoading(false);
+      return;
     }
+
+    supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20)
+      .then(({ data }) => { if (data) setNotifications(data); });
 
     // Fetch marketplace prompts
     const fetchPrompts = async () => {
-      if (isPlaceholder) {
-        setPrompts(MOCK_MARKETPLACE_PROMPTS);
-        setLoading(false);
-        return;
-      }
       setLoading(true);
       try {
         const { data, error } = await supabase
@@ -181,15 +181,11 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
             created_at: p.created_at,
           }));
           
-          if (formattedPrompts.length === 0) {
-            setPrompts(MOCK_MARKETPLACE_PROMPTS);
-          } else {
-            setPrompts(formattedPrompts);
-          }
+          setPrompts(formattedPrompts);
         }
       } catch (err) {
         console.error('Error fetching prompts:', err);
-        setPrompts(MOCK_MARKETPLACE_PROMPTS);
+        setPrompts([]);
       } finally {
         setLoading(false);
       }
@@ -203,24 +199,9 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   }, []);
 
   useEffect(() => {
-    const el = scrollRef?.current;
-    if (!el) return;
-
-    const handleScroll = () => {
-      const currentScrollY = el.scrollTop;
-      if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
-
-      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        setShowTopHeader(false);
-      } else {
-        setShowTopHeader(true);
-      }
-      lastScrollY.current = currentScrollY;
-    };
-
-    el.addEventListener('scroll', handleScroll);
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [scrollRef]);
+    // Sync local showTopHeader with navVisible prop
+    setShowTopHeader(navVisible);
+  }, [navVisible]);
 
   useEffect(() => {
     if (!topHeaderRef.current || !stickySectionRef.current) return;
@@ -268,6 +249,11 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
       return;
     }
     if (purchasedIds.has(prompt.id)) return;
+    if (isPlaceholder) {
+      setPurchasedIds(prev => new Set(prev).add(prompt.id));
+      toast.success('Purchase successful! (Simulation)');
+      return;
+    }
     if (prompt.price > 0 && credits < prompt.price) {
       toast.error('Insufficient credits');
       return;
@@ -294,12 +280,10 @@ export default function MarketplaceScreen({ scrollRef, onUsePrompt, onOpenAuth, 
   };
 
   const handleUsePrompt = async (prompt: MarketplacePrompt) => {
-    // If it's a mock prompt, just return a mock text
-    if (prompt.id.startsWith('mock-') || import.meta.env.VITE_SUPABASE_URL === 'https://placeholder-project.supabase.co' || !import.meta.env.VITE_SUPABASE_URL) {
-      onUsePrompt?.(`A detailed prompt for ${prompt.title}, featuring high quality elements and cinematic lighting.`);
+    if (isPlaceholder || prompt.id.startsWith('mock-')) {
+      onUsePrompt?.(prompt.prompt_text);
       return;
     }
-
     // Fetch prompt text securely via RPC
     const { data, error } = await supabase.rpc('get_marketplace_prompt_text', { p_prompt_id: prompt.id });
     if (error) {

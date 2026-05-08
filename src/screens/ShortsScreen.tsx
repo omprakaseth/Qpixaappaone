@@ -17,13 +17,26 @@ import {
   Video,
   ArrowLeft,
   Play,
-  Pause
+  Pause,
+  Trash2,
+  Edit2
 } from 'lucide-react';
 import { Drawer } from 'vaul';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase, isPlaceholder } from '@/integrations/supabase/client';
 import { LogoLoader } from '@/components/LogoLoader';
+import { useAppState } from '@/context/AppContext';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Reel {
   id: string;
@@ -77,37 +90,76 @@ const MOCK_REELS: Reel[] = [
 interface ShortsScreenProps {
   onBack?: () => void;
   onCreatorTap?: (username: string) => void;
+  initialPostId?: string;
 }
 
-export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps) {
+export default function ShortsScreen({ onBack, onCreatorTap, initialPostId }: ShortsScreenProps) {
+  const { profile, user, deletePost } = useAppState();
   const [viewMode, setViewMode] = useState<'Shorts' | 'Following'>('Shorts');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [reels, setReels] = useState<Reel[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // Handle initial scroll and changes to initialPostId
+  useEffect(() => {
+    if (!loading && reels.length > 0 && initialPostId) {
+      const index = reels.findIndex(r => r.id === initialPostId);
+      if (index !== -1) {
+        setActiveIndex(index);
+        // Delay slightly to ensure layout is ready
+        setTimeout(() => {
+          if (containerRef.current) {
+            containerRef.current.scrollTo({
+              top: index * containerRef.current.clientHeight,
+              behavior: 'smooth'
+            });
+          }
+        }, 100);
+      }
+    }
+  }, [loading, reels.length, initialPostId]);
   const [showComments, setShowComments] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (isPlaceholder) {
+      setReels(MOCK_REELS);
+      setLoading(false);
+      return;
+    }
+    
     fetchReels();
+
+    const channel = supabase
+      .channel('shorts-updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts', filter: 'is_short=eq.true' }, payload => {
+        const updated = payload.new;
+        setReels(prev => prev.map(r => r.id === updated.id ? {
+          ...r,
+          likes: updated.likes?.toString() || '0',
+          comments: updated.comments?.toString() || '0',
+          views: updated.views?.toString() || '0'
+        } as Reel : r));
+      })
+      .subscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchReels = async () => {
     try {
       setLoading(true);
       
-      // Skip fetch if using placeholder supabase URL
-      if (isPlaceholder) {
-        setReels(MOCK_REELS);
-        setLoading(false);
-        return;
-      }
-
-      // @ts-ignore - Deep type instantiation issue in this environment
+      // Fetch both explicit shorts and video posts
       const { data, error } = await (supabase
         .from('posts')
         .select('*, profiles(username, avatar_url)')
-        .eq('is_short', true)
+        .or('is_short.eq.true,type.eq.video')
         .order('created_at', { ascending: false }) as any);
 
       if (error) throw error;
@@ -115,30 +167,24 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
       if (data) {
         const formattedReels: Reel[] = data.map((item: any) => ({
           id: item.id,
-          videoUrl: item.image_url,
+          videoUrl: item.video_url || item.image_url, // Support both fields
           username: item.profiles?.username || 'anonymous',
           profilePic: item.profiles?.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.id}`,
           description: item.title || '',
           likes: item.likes?.toString() || '0',
           comments: item.comments?.toString() || '0',
           shares: '0',
-          audio: 'Original Audio',
+          audio: item.audio_title || 'Original Audio',
           prompt: item.prompt || 'AI Generated Content',
           isFollowing: false,
           isLiked: false,
           isSaved: false,
         }));
         
-        // Show real shorts first, then mock shorts if needed
-        let finalReels = formattedReels;
-        if (formattedReels.length < 5) {
-          finalReels = [...formattedReels, ...MOCK_REELS];
-        }
-        setReels(finalReels);
+        setReels(formattedReels);
       }
     } catch (error) {
-      // Suppress the console error to avoid cluttering when falling back to mock data
-      setReels(MOCK_REELS);
+      setReels([]);
     } finally {
       setLoading(false);
     }
@@ -152,8 +198,47 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
     }
   }, [activeIndex]);
 
+  const handleDeleteReel = async () => {
+    if (!reels[activeIndex]) return;
+    const reelId = reels[activeIndex].id;
+    setIsDeleting(true);
+    try {
+      await deletePost(reelId);
+      setReels(prev => prev.filter(r => r.id !== reelId));
+      setActiveIndex(prev => Math.max(0, prev - 1));
+      toast.success('Short removed');
+    } catch (err) {
+      console.error('Delete error:', err);
+      toast.error('Failed to delete short');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   return (
     <div className="h-full w-full bg-black relative overflow-hidden flex flex-col pb-16">
+      {/* Deletion Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-zinc-900 border-white/10 rounded-3xl text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold">Delete this short?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              Are you sure you want to permanently remove this video from Qpixa?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-white/10 text-white rounded-xl hover:bg-white/10">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteReel}
+              className="bg-red-600 hover:bg-red-700 text-white rounded-xl border-none font-bold"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Top Navigation - Glass Pill Style */}
       <motion.div 
         initial={{ y: 0, opacity: 1 }}
@@ -240,6 +325,8 @@ export default function ShortsScreen({ onBack, onCreatorTap }: ShortsScreenProps
               onShowComments={() => setShowComments(true)}
               onCreatorTap={onCreatorTap}
               onBack={onBack}
+              onDelete={() => setShowDeleteConfirm(true)}
+              isOwner={Boolean(user && reel && (reel.username === profile?.username || reel.username === profile?.display_name))}
             />
           ))
         ) : (
@@ -298,9 +385,11 @@ interface VideoItemProps {
   onShowComments: () => void;
   onCreatorTap?: (username: string) => void;
   onBack?: () => void;
+  onDelete?: () => void;
+  isOwner?: boolean;
 }
 
-const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onShowComments, onCreatorTap, onBack }) => {
+const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onShowComments, onCreatorTap, onBack, onDelete, isOwner }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState(0);
   const [isLiked, setIsLiked] = useState(reel.isLiked);
@@ -353,7 +442,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
         setIsLiked(true);
         onUpdateReel({ ...reel, isLiked: true });
         // Background sync
-        if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+        if (!reel.id.startsWith('mock-')) {
           (async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
@@ -426,7 +515,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
           <motion.video
             ref={videoRef}
             src={reel.videoUrl}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             loop
             playsInline
             onTimeUpdate={handleTimeUpdate}
@@ -520,7 +609,7 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
                       onUpdateReel({ ...reel, isLiked: newLikedState });
                       
                       // Background sync
-                      if (!reel.id.startsWith('mock-') && import.meta.env.VITE_SUPABASE_URL !== 'https://placeholder-project.supabase.co') {
+                      if (!reel.id.startsWith('mock-')) {
                         (async () => {
                           const { data: { user } } = await supabase.auth.getUser();
                           if (user) {
@@ -674,6 +763,29 @@ const VideoItem: React.FC<VideoItemProps> = ({ reel, isActive, onUpdateReel, onS
             <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-white/20 my-4" />
             <div className="p-4 pt-0 overflow-y-auto">
               <div className="grid grid-cols-1 gap-1">
+                {isOwner && (
+                  <>
+                    <button 
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        toast.info('Editing feature coming soon');
+                      }}
+                      className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-white transition-colors"
+                    >
+                      <Edit2 className="w-6 h-6 text-blue-400" />
+                      <span className="font-bold">Edit Description</span>
+                    </button>
+                    <button 
+                      onClick={() => onDelete?.()}
+                      className="flex items-center gap-4 w-full p-4 rounded-2xl hover:bg-white/5 text-red-400 transition-colors"
+                    >
+                      <Trash2 className="w-6 h-6" />
+                      <span className="font-bold">Delete Short</span>
+                    </button>
+                    <div className="h-px bg-white/5 my-2 mx-4" />
+                  </>
+                )}
+                
                 <button 
                   onClick={() => {
                     setIsSaved(!isSaved);

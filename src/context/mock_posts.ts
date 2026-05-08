@@ -25,7 +25,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 45200, likes: 12500, saves: 3400, comments: 890,
     createdAt: new Date(Date.now() - 1000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-2',
@@ -39,7 +39,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 21000, likes: 8900, saves: 1200, comments: 340,
     createdAt: new Date(Date.now() - 2000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-3',
@@ -53,7 +53,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 34000, likes: 12000, saves: 3400, comments: 560,
     createdAt: new Date(Date.now() - 3000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-4',
@@ -67,7 +67,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 15000, likes: 6700, saves: 900, comments: 220,
     createdAt: new Date(Date.now() - 4000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-5',
@@ -81,7 +81,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 45000, likes: 21000, saves: 5600, comments: 890,
     createdAt: new Date(Date.now() - 5000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-6',
@@ -95,7 +95,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 9800, likes: 3200, saves: 450, comments: 80,
     createdAt: new Date(Date.now() - 6000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-7',
@@ -109,7 +109,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 28000, likes: 11000, saves: 2300, comments: 450,
     createdAt: new Date(Date.now() - 7000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-8',
@@ -123,7 +123,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 15000, likes: 5800, saves: 1100, comments: 180,
     createdAt: new Date(Date.now() - 8000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-9',
@@ -137,7 +137,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 11000, likes: 4200, saves: 750, comments: 140,
     createdAt: new Date(Date.now() - 9000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-10',
@@ -151,7 +151,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 32000, likes: 14000, saves: 3800, comments: 670,
     createdAt: new Date(Date.now() - 10000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-11',
@@ -165,7 +165,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 18000, likes: 7500, saves: 1200, comments: 280,
     createdAt: new Date(Date.now() - 11000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-12',
@@ -179,7 +179,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 25000, likes: 9800, saves: 2100, comments: 350,
     createdAt: new Date(Date.now() - 12000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-13',
@@ -193,7 +193,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 31000, likes: 13000, saves: 2900, comments: 420,
     createdAt: new Date(Date.now() - 13000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-14',
@@ -207,7 +207,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 22000, likes: 8500, saves: 1800, comments: 250,
     createdAt: new Date(Date.now() - 14000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-15',
@@ -221,7 +221,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 29000, likes: 11500, saves: 2600, comments: 510,
     createdAt: new Date(Date.now() - 15000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-16',
@@ -235,7 +235,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 38000, likes: 16000, saves: 4200, comments: 730,
     createdAt: new Date(Date.now() - 16000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-17',
@@ -249,7 +249,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 41000, likes: 18000, saves: 5100, comments: 880,
     createdAt: new Date(Date.now() - 17000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-18',
@@ -263,7 +263,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 26000, likes: 10500, saves: 2400, comments: 390,
     createdAt: new Date(Date.now() - 18000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-19',
@@ -277,7 +277,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 19000, likes: 7800, saves: 1400, comments: 220,
     createdAt: new Date(Date.now() - 19000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-20',
@@ -291,7 +291,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 35000, likes: 15000, saves: 3900, comments: 810,
     createdAt: new Date(Date.now() - 20000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-21',
@@ -305,7 +305,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 33000, likes: 13500, saves: 3100, comments: 580,
     createdAt: new Date(Date.now() - 21000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-22',
@@ -319,7 +319,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 42000, likes: 18500, saves: 5300, comments: 920,
     createdAt: new Date(Date.now() - 22000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-23',
@@ -333,7 +333,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 16000, likes: 6200, saves: 1150, comments: 190,
     createdAt: new Date(Date.now() - 23000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-24',
@@ -347,7 +347,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 21000, likes: 8800, saves: 1900, comments: 310,
     createdAt: new Date(Date.now() - 24000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-25',
@@ -361,7 +361,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 36000, likes: 15500, saves: 4100, comments: 660,
     createdAt: new Date(Date.now() - 25000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-26',
@@ -375,7 +375,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 24000, likes: 9500, saves: 2000, comments: 370,
     createdAt: new Date(Date.now() - 26000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-27',
@@ -389,7 +389,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 39000, likes: 17000, saves: 4800, comments: 840,
     createdAt: new Date(Date.now() - 27000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-28',
@@ -403,7 +403,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 20000, likes: 8200, saves: 1600, comments: 290,
     createdAt: new Date(Date.now() - 28000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-29',
@@ -417,7 +417,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 14000, likes: 5500, saves: 950, comments: 150,
     createdAt: new Date(Date.now() - 29000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-30',
@@ -431,7 +431,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 18500, likes: 6200, saves: 1100, comments: 210,
     createdAt: new Date(Date.now() - 30000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-31',
@@ -445,7 +445,7 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 22500, likes: 8900, saves: 1500, comments: 320,
     createdAt: new Date(Date.now() - 31000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   },
   {
     id: 'mock-32',
@@ -459,6 +459,6 @@ export const MOCK_POSTS: Post[] = [
     aspectRatio: '4:5',
     views: 52000, likes: 24000, saves: 6100, comments: 1100,
     createdAt: new Date(Date.now() - 32000000).toISOString(),
-    isLiked: false, isSaved: false, isShort: false, isMock: true
+    isLiked: false, isSaved: false, isShort: false, type: 'image'
   }
 ];

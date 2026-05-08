@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus } from 'lucide-react';
+import { Menu, Send, Zap, PenLine, MoreVertical, Download, Share2, Bookmark, RotateCcw, Clock, Trash2, Settings, Paperclip, X, ImageIcon, Upload, Sparkles, Flag, MessageSquare, Search, Filter, Wand2, Maximize, Layout, SlidersHorizontal, Square, Plus, FileText } from 'lucide-react';
 import { ImageViewer } from '@/components/ImageViewer';
+import { VideoTrimmer } from '@/components/VideoTrimmer';
 import { motion, AnimatePresence } from 'motion/react';
 import WatermarkedImage from '@/components/WatermarkedImage';
 import AILoader from '@/components/AILoader';
+import PostDetailsSheet from '@/components/studio/PostDetailsSheet';
 import { useAppState } from '@/context/AppContext';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -83,9 +85,10 @@ interface StudioScreenProps {
   initialPrompt?: string;
   onClearInitialPrompt?: () => void;
   onPublish?: (imageUrl: string, prompt: string) => void;
+  navVisible?: boolean;
 }
 
-function AiMessageBubble({ msg, isPro, onOpenViewer, onDelete }: any) {
+function AiMessageBubble({ msg, isPro, onOpenViewer, onDelete, onPublish }: any) {
   if (msg.status === 'pending') {
     return (
       <div className="flex justify-start items-center gap-4">
@@ -130,16 +133,45 @@ function AiMessageBubble({ msg, isPro, onOpenViewer, onDelete }: any) {
               />
             </button>
             
-            {/* Delete Button for individual images */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.(msg.id);
-              }}
-              className="absolute top-2 right-2 p-1.5 bg-black/40 backdrop-blur-md rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
-            >
-              <Trash2 size={14} />
-            </button>
+            {/* Top Action Overlay */}
+            <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Share/Publish Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPublish?.(msg.imageUrl!, msg.text || '');
+                }}
+                className="p-1.5 bg-primary text-primary-foreground rounded-full shadow-lg hover:scale-110 active:scale-95 transition-all"
+                title="Upload to Feed"
+              >
+                <Upload size={14} />
+              </button>
+
+              {/* Delete Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(msg.id);
+                }}
+                className="p-1.5 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-red-500/80 transition-all font-bold"
+                title="Delete from history"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+
+            {/* Bottom publish hint */}
+            <div className="absolute bottom-2 left-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex justify-center">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPublish?.(msg.imageUrl!, msg.text || '');
+                }}
+                className="px-3 py-1 bg-black/60 backdrop-blur-md text-[10px] font-bold text-white rounded-full flex items-center gap-1.5 hover:bg-primary transition-colors"
+              >
+                <Sparkles size={10} /> Upload to Feed
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -147,8 +179,8 @@ function AiMessageBubble({ msg, isPro, onOpenViewer, onDelete }: any) {
   );
 }
 
-export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPublish }: StudioScreenProps) {
-  const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user, profile } = useAppState();
+export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPublish, navVisible = true }: StudioScreenProps) {
+  const { credits, setCredits, isPro, isLoggedIn, refreshProfile, user, profile, uploadingPost, clearUpload, retryUpload, startUpload } = useAppState();
   const [prompt, setPrompt] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('flux');
@@ -300,7 +332,11 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
   const { height: vpHeight, offsetTop: vpOffsetTop, isKeyboardVisible } = useVisualViewport();
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [trimmingVideo, setTrimmingVideo] = useState<{ file: File } | null>(null);
+  const [uploadMode, setUploadMode] = useState<'ai' | 'gallery'>('ai');
   const [viewerData, setViewerData] = useState<{ url: string; prompt: string; id?: string } | null>(null);
+  const [publishingShort, setPublishingShort] = useState<{ file: Blob | File; thumbnail: string } | null>(null);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [longPressSession, setLongPressSession] = useState<ChatSession | null>(null);
   const [showSessionActions, setShowSessionActions] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -333,7 +369,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
           parsed = JSON.parse(savedSessions);
         }
 
-        // If logged in, also fetch from DB to ensure we have history
+        // If logged in and NOT placeholder, also fetch from DB to ensure we have history
         if (user && !isPlaceholder) {
           const { data: dbGenerations } = await supabase
             .from('generations')
@@ -445,7 +481,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       // Note: We check if messageId is a UUID to distinguish from temporary session IDs
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageId);
       
-      if (user && !isPlaceholder && isUUID) {
+      if (user && isUUID && !isPlaceholder) {
         const { error } = await supabase
           .from('generations')
           .delete()
@@ -536,8 +572,18 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (file.type.startsWith('video/')) {
+        if (file.size > 100 * 1024 * 1024) {
+          toast.error('Video must be under 100MB');
+          return;
+        }
+        setTrimmingVideo({ file });
+        setUploadMode('gallery');
+        return;
+    }
+
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+      toast.error('Please select an image or video file');
       return;
     }
 
@@ -551,6 +597,13 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
     try {
       if (!user) throw new Error('Please login to upload images');
+      if (isPlaceholder) {
+        // Just use a local blob URL for placeholders
+        setAttachedImage(URL.createObjectURL(file));
+        setIsUploadingAttachment(false);
+        toast.success('Image attached (Simulation)');
+        return;
+      }
       
       const fileName = `attachment-${Date.now()}-${file.name}`;
       const filePath = `${user.id}/${fileName}`;
@@ -582,6 +635,61 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
     setAttachedPreview(null);
   };
 
+  const handleSaveDraft = () => {
+    if (!attachedPreview) {
+        toast.error('Nothing to save as draft');
+        return;
+    }
+    const draft = {
+      id: Date.now().toString(),
+      title: prompt || "Untitled Draft",
+      preview: attachedPreview,
+      thumbnail: attachedPreview,
+      prompt: prompt,
+      negativePrompt,
+      style: selectedStyle,
+      ratio: selectedRatio,
+      type: uploadMode === 'gallery' ? 'video' : 'image'
+    };
+    const savedDrafts = JSON.parse(localStorage.getItem('qpixa_drafts') || '[]');
+    savedDrafts.unshift(draft);
+    localStorage.setItem('qpixa_drafts', JSON.stringify(savedDrafts.slice(0, 50))); // Keep last 50
+    localStorage.setItem('qpixa_drafts', JSON.stringify(savedDrafts));
+    toast.success('Saved to drafts');
+    removeAttachment();
+    setPrompt('');
+  };
+
+  const handleTrimConfirm = async (blob: Blob, start: number, end: number, thumbnail: string) => {
+    setTrimmingVideo(null);
+    setPublishingShort({ file: blob, thumbnail });
+  };
+
+  const handleFinalPublish = async (details: { title: string; description: string; tags: string }) => {
+    if (!user || !publishingShort) return;
+    
+    setIsPublishing(true);
+    try {
+      await startUpload({
+        file: publishingShort.file as File,
+        previewUrl: URL.createObjectURL(publishingShort.file), 
+        thumbnailUrl: publishingShort.thumbnail,
+        title: details.title,
+        prompt: details.description || `Short: ${details.title}`,
+        tags: details.tags,
+        type: 'video'
+      });
+      
+      toast.success('Upload started! You can see progress on your profile');
+      setPublishingShort(null);
+    } catch (err) {
+      console.error('Publish error:', err);
+      toast.error('Failed to start upload');
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim() || generating) return;
 
@@ -589,6 +697,8 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       toast.error('Please sign in to generate images.');
       return;
     }
+
+    const negativeTerms = "deformed, bad anatomy, disfigured, poorly drawn face, mutation, mutated, extra limb, ugly, poorly drawn hands, missing limb, floating limbs, disconnected limbs, malformed hands, blurry, watermark, oversaturated, censored, extra fingers, six fingers, fused fingers, too many fingers, long neck, cross-eyed, mutilated, bad proportions, gross proportions, missing arms, missing legs, extra arms, extra legs, fused legs, fused arms, lowres, bad quality, draft, amateur, jpeg artifacts, signature, text, error, cropped, worst quality, low quality, normal quality, duplicate, morbid, horror, deformed face, asymmetrical face, bad eyes, uneven eyes, extra eyes, poorly drawn eyes, bad lips, bad teeth, bad nose, distorted face, wax skin, plastic skin, fake looking skin, overexposed, underexposed, bad skin, cloned face, wrong anatomy, body out of frame, cut off, low contrast, bad art, beginner, bad perspective, grainy, noisy, unfinished, extra digits, fused digits, mutilated hands, broken fingers, twisted fingers, cartoon, 3d render, painting, illustration, drawing, anime, sketch, artificial, cgi, render, digital art, out of focus, bokeh on face, motion blur, chromatic aberration, lens flare, film grain, compression artifacts, pixelated, aliased, overprocessed, plastic, doll, mannequin";
 
     const userPrompt = prompt.trim();
     
@@ -677,6 +787,9 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
         }
       }
 
+      // Inject standard negative prompt to ensure quality - Always at the end
+      finalPrompt = `${finalPrompt}. NEGATIVE_PROMPT: ${negativeTerms}`;
+
       if (negativePrompt.trim()) {
         finalPrompt += `. Avoid: ${negativePrompt.trim()}`;
       }
@@ -707,7 +820,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       updateSessionMessages(activeSessionId, finalMessages);
 
       // Deduct credit (skip for verified/pro creators if applicable)
-      if (user && !profile?.is_verified) {
+      if (user && !profile?.is_verified && !isPlaceholder) {
         await supabase.from('profiles').update({ credits: credits - 1 }).eq('id', user.id);
         setCredits(prev => prev - 1);
       }
@@ -1006,11 +1119,38 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
 
   const containerStyle: React.CSSProperties = isKeyboardVisible
     ? { position: 'fixed', top: `${vpOffsetTop}px`, left: 0, right: 0, height: `${vpHeight}px`, zIndex: 30 }
-    : { position: 'fixed', top: 0, left: 0, right: 0, bottom: '56px', zIndex: 30 };
+    : { position: 'absolute', top: 0, left: 0, right: 0, bottom: navVisible ? 'calc(64px + env(safe-area-inset-bottom, 0px))' : 0, zIndex: 30 };
 
   return (
     <>
-    <div style={containerStyle} className="flex flex-col overflow-hidden bg-background">
+    <div style={containerStyle} className="flex flex-col bg-background relative overflow-hidden">
+      <AnimatePresence>
+        {trimmingVideo && (
+            <motion.div 
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
+                className="fixed inset-0 z-[100] bg-background"
+            >
+                <VideoTrimmer 
+                    file={trimmingVideo.file}
+                    onTrim={handleTrimConfirm}
+                    onCancel={() => setTrimmingVideo(null)}
+                />
+            </motion.div>
+        )}
+
+        {publishingShort && (
+          <PostDetailsSheet
+            file={publishingShort.file}
+            thumbnail={publishingShort.thumbnail}
+            onCancel={() => setPublishingShort(null)}
+            onPublish={handleFinalPublish}
+            isUploading={isPublishing}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex-shrink-0 flex items-center justify-between px-3 pt-2 pb-3 bg-background/95 backdrop-blur-sm border-b border-border z-20" style={{ paddingTop: 'max(env(safe-area-inset-top), 0.5rem)' }}>
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -1252,6 +1392,7 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
                   isPro={isPro} 
                   onOpenViewer={(url: string, prompt: string, id: string) => setViewerData({ url, prompt, id })} 
                   onDelete={() => currentSessionId && handleDeleteMessage(currentSessionId, msg.id)}
+                  onPublish={onPublish}
                 />
               )
             ))}
@@ -1264,13 +1405,13 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         onChange={handleFileSelect}
         className="hidden"
       />
 
       {/* Input bar */}
-      <div className="flex-shrink-0 bg-background border-t border-border px-3 py-2 z-20 mb-[2%]">
+      <div className="flex-shrink-0 bg-background border-t border-border px-3 py-2 z-20">
         {showAdvanced && (
           <div className="mb-3">
             <div className="bg-secondary/30 rounded-xl p-2.5 border border-border/50 space-y-3">
@@ -1361,19 +1502,27 @@ export default function StudioScreen({ initialPrompt, onClearInitialPrompt, onPu
             <div className="flex-1 min-w-0 pr-8">
               <div className="flex items-center gap-1.5 mb-0.5">
                 <Sparkles size={10} className="text-primary" />
-                <p className="text-[10px] font-bold text-primary uppercase tracking-wider">Identity Locked</p>
+                <p className="text-[10px] font-bold text-primary uppercase tracking-wider">{uploadMode === 'gallery' ? 'Gallery Video' : 'Identity Locked'}</p>
               </div>
               <p className="text-[11px] text-muted-foreground truncate font-medium">
-                {isUploadingAttachment ? 'Uploading your identity...' : 'Recreating this subject in new setting...'}
+                {uploadMode === 'gallery' ? 'Video ready for publishing' : 'Style & features will follow this theme'}
               </p>
             </div>
             {!isUploadingAttachment && (
-              <button 
-                onClick={removeAttachment}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-secondary hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full transition-all active:scale-90"
-              >
-                <X size={14} />
-              </button>
+              <div className="flex items-center gap-2 pr-2">
+                <button 
+                  onClick={handleSaveDraft}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary hover:bg-secondary/80 text-[10px] font-bold text-foreground transition-all active:scale-95 border border-border"
+                >
+                  <FileText size={10} /> DRAFT
+                </button>
+                <button 
+                  onClick={removeAttachment}
+                  className="p-2 bg-secondary hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-full transition-all active:scale-90"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             )}
           </div>
         )}

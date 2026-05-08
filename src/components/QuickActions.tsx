@@ -1,13 +1,14 @@
-import { Save, Share2, Copy, Flag } from 'lucide-react';
+import { Save, Share2, Copy, Flag, Trash2 } from 'lucide-react';
 import { useSwipeDismiss } from '@/hooks/useSwipeDismiss';
 
 interface QuickActionsProps {
   open: boolean;
   onClose: () => void;
-  onAction: (action: 'save' | 'share' | 'copy' | 'report') => void;
+  onAction: (action: 'save' | 'share' | 'copy' | 'report' | 'delete') => void;
+  isOwner?: boolean;
 }
 
-export default function QuickActions({ open, onClose, onAction }: QuickActionsProps) {
+export default function QuickActions({ open, onClose, onAction, isOwner }: QuickActionsProps) {
   const { dragHandleProps, style: swipeStyle, opacity: backdropOpacity } = useSwipeDismiss({ onDismiss: onClose });
 
   if (!open) return null;
@@ -16,6 +17,7 @@ export default function QuickActions({ open, onClose, onAction }: QuickActionsPr
     { id: 'save' as const, label: 'Save', icon: Save },
     { id: 'share' as const, label: 'Share', icon: Share2 },
     { id: 'copy' as const, label: 'Copy Prompt', icon: Copy },
+    ...(isOwner ? [{ id: 'delete' as const, label: 'Delete Post', icon: Trash2 }] : []),
     { id: 'report' as const, label: 'Report', icon: Flag },
   ];
 
@@ -35,9 +37,12 @@ export default function QuickActions({ open, onClose, onAction }: QuickActionsPr
           <button
             key={id}
             onClick={() => { onAction(id); onClose(); }}
-            className="flex items-center gap-3 w-full py-3 px-2 text-foreground hover:bg-secondary rounded-lg transition-colors"
+            className={cn(
+              "flex items-center gap-3 w-full py-3 px-2 rounded-lg transition-colors",
+              id === 'delete' ? "text-destructive hover:bg-destructive/10" : "text-foreground hover:bg-secondary"
+            )}
           >
-            <Icon size={20} className="text-muted-foreground" />
+            <Icon size={20} className={id === 'delete' ? "text-destructive" : "text-muted-foreground"} />
             <span className="text-sm font-medium">{label}</span>
           </button>
         ))}
@@ -45,3 +50,6 @@ export default function QuickActions({ open, onClose, onAction }: QuickActionsPr
     </div>
   );
 }
+
+// Add cn helper import if missing or just use template literals
+import { cn } from '@/lib/utils';

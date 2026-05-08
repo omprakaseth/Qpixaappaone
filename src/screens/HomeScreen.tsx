@@ -15,7 +15,7 @@ import { useAppState } from '@/context/AppContext';
 import { Post } from '@/context/AppContext';
 import { useFollows } from '@/hooks/useFollows';
 
-const categories = ['Trending', 'Following', 'IPL 2026', 'Summer', '90s Retro', 'Professions', 'Fantasy', 'Luxury'];
+const categories = ['Trending', 'Shorts', 'Following', 'IPL 2026', 'Summer', '90s Retro', 'Professions', 'Fantasy', 'Luxury'];
 
 interface HomeScreenProps {
   scrollRef: React.RefObject<HTMLDivElement>;
@@ -36,7 +36,7 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPro, onCreatorTap, adSettings, isPro, navVisible = true }: HomeScreenProps) {
-  const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user, initialLoading, uploadingPost, retryUpload, clearUpload } = useAppState();
+  const { posts, setPosts, toggleLike, toggleSave, fetchPosts, user, initialLoading, uploadingPost, retryUpload, clearUpload, deletePost } = useAppState();
   console.log('HomeScreen: posts length', posts.length);
   const { followingIds } = useFollows();
   const [activeCategory, setActiveCategory] = useState('Trending');
@@ -60,51 +60,23 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
     setVisibleCount(10);
   }, [activeCategory, searchQuery, filters]);
 
-  const hasMockPosts = useMemo(() => posts.some(p => p.isMock), [posts]);
+  const hasMockPosts = false;
   
   const notificationsList = useMemo(() => {
-    const base = [
+    return [
       { id: '1', title: 'Welcome to Qpixa!', message: 'Start creating amazing AI art today.', created_at: new Date().toISOString() },
       { id: '2', title: 'New Feature', message: 'Check out the new Shorts feed!', created_at: new Date().toISOString() },
     ];
-    
-    if (hasMockPosts) {
-      base.unshift({
-        id: 'mock-info',
-        title: 'Sample Data Active',
-        message: 'We\'ve added some sample prompts to help you get started. Real user posts will always appear at the top!',
-        created_at: new Date().toISOString()
-      });
-    }
-    return base;
-  }, [hasMockPosts]);
+  }, []);
 
   useEffect(() => {
     fetchPosts();
   }, []);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const handleScroll = () => {
-      const currentScrollY = el.scrollTop;
-      // Threshold to avoid flickering
-      if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
-
-      // Hide top header on scroll down, show on scroll up
-      if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
-        setShowTopHeader(false);
-      } else {
-        setShowTopHeader(true);
-      }
-      
-      lastScrollY.current = currentScrollY;
-    };
-
-    el.addEventListener('scroll', handleScroll);
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [scrollRef]);
+    // Sync local showTopHeader with navVisible prop for unified experience
+    setShowTopHeader(navVisible);
+  }, [navVisible]);
 
   const filteredPosts = useMemo(() => {
     console.log(`HomeScreen: Filtering ${posts.length} posts. ActiveCategory: ${activeCategory}, Search: ${searchQuery}, Filters:`, filters);
@@ -112,16 +84,17 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       // 1. Handle "Following" tab
       if (activeCategory === 'Following') {
         const creatorId = (p as any).creator_id;
-        // Mock posts don't have a real creator_id that we follow, so we hide them in Following tab
-        if (p.isMock) return false;
         if (!creatorId || (!followingIds.has(creatorId) && creatorId !== user?.id)) return false;
       } 
       // 2. Handle "Trending" (Default) - Show everything!
       else if (activeCategory === 'Trending') {
         // No category filter for Trending
       } 
-      // 3. Handle specific category tabs with Smart Logic (Match category OR tags)
+      // 3. Handle specific category tabs with Smart Logic (Match category OR tags OR isShort flag for Shorts tab)
       else {
+        if (activeCategory === 'Shorts') {
+          return p.isShort || p.type === 'video' || p.video_url || p.videoUrl;
+        }
         const matchesCategory = p.category === activeCategory;
         const matchesTags = p.tags?.some(tag => tag.toLowerCase() === activeCategory.toLowerCase());
         if (!matchesCategory && !matchesTags) return false;
@@ -304,7 +277,7 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
             {categories.map(cat => (
               <button
                 key={cat}
-                onClick={() => cat === 'Shorts' ? navigate('/shorts') : setActiveCategory(cat)}
+                onClick={() => setActiveCategory(cat)}
                 className={cn(
                   "flex-shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all active:scale-95",
                   activeCategory === cat
@@ -332,38 +305,74 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
           isMounted && "transition-all duration-300"
         )}
       >
-        {hasMockPosts && (
-          <div className="mb-4 p-3 bg-primary/5 border border-primary/10 rounded-2xl flex items-start gap-3">
-            <Sparkles size={18} className="text-primary shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-bold text-foreground">Sample Data Active</p>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">
-                We've added some sample prompts to help you get started. Real user posts will always appear at the top!
-              </p>
-            </div>
-          </div>
-        )}
-
         {activeCategory === 'Trending' && topThisMonth.length > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp size={16} className="text-primary" />
-              <h2 className="text-xs font-bold">Top This Month</h2>
-            </div>
-            <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
-              {topThisMonth.map(post => (
-                <div key={post.id} className="w-[170px] flex-shrink-0">
-                  <ImageCard
-                    post={post}
-                    onTap={() => onPostTap(post)}
-                    onDoubleTap={() => toggleLike(post.id)}
-                    onLongPress={() => setQuickActionsPost(post)}
-                    onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
-                  />
+          <>
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <TrendingUp size={18} className="text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold">Smart Discovery</h2>
+                    <p className="text-[10px] text-muted-foreground">Trending & recommended for you</p>
+                  </div>
                 </div>
-              ))}
+                <button className="text-[10px] font-bold text-primary uppercase tracking-wider">See All</button>
+              </div>
+              <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
+                {topThisMonth.map(post => (
+                  <div key={post.id} className="w-[170px] flex-shrink-0">
+                    <ImageCard
+                      post={post}
+                      onTap={() => onPostTap(post)}
+                      onDoubleTap={() => toggleLike(post.id)}
+                      onLongPress={() => setQuickActionsPost(post)}
+                      onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+
+            {/* Top Creators Competition Section */}
+            <div className="mb-8 p-4 rounded-2xl bg-gradient-to-br from-primary/5 via-background to-secondary/30 border border-primary/10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={18} className="text-yellow-500" />
+                  <h2 className="text-sm font-bold italic">Top Creators</h2>
+                </div>
+                <div className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-[9px] font-bold text-yellow-600 uppercase">
+                  Weekly League
+                </div>
+              </div>
+              <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                {Array.from(new Set(posts.map(p => p.creator.id))).slice(0, 5).map((creatorId, idx) => {
+                  const post = posts.find(p => p.creator.id === creatorId);
+                  if (!post) return null;
+                  return (
+                    <button 
+                      key={creatorId}
+                      onClick={() => onCreatorTap?.(post.creator.name, creatorId)}
+                      className="flex flex-col items-center gap-2 shrink-0 group"
+                    >
+                      <div className="relative">
+                        <div className="w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-500 via-primary to-purple-500 animate-gradient-xy">
+                          <div className="w-full h-full rounded-full border-2 border-background overflow-hidden relative">
+                            <img src={post.creator.avatar} alt={post.creator.name} className="w-full h-full object-cover" />
+                          </div>
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center text-[10px] font-bold border-2 border-background">
+                          {idx + 1}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold truncate w-14 text-center group-active:scale-95 transition-transform">{post.creator.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
 
         {activeCategory === 'Following' && filteredPosts.length === 0 ? (
@@ -415,7 +424,14 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
                     <React.Fragment key={post.id}>
                       <ImageCard
                         post={post}
-                        onTap={() => onPostTap(post)}
+                        onTap={() => {
+                          if (post.type === 'video' || post.isShort || post.videoUrl) {
+                            // Direct play to shorts feed for video posts
+                            navigate(`/shorts/prompt/${post.id}`);
+                          } else {
+                            onPostTap(post);
+                          }
+                        }}
                         onDoubleTap={() => toggleLike(post.id)}
                         onLongPress={() => setQuickActionsPost(post)}
                         onCreatorTap={() => onCreatorTap?.(post.creator.name, post.creator.id)}
@@ -442,10 +458,17 @@ export default function HomeScreen({ scrollRef, onPostTap, onCreatePost, onGetPr
       <QuickActions
         open={!!quickActionsPost}
         onClose={() => setQuickActionsPost(null)}
-        onAction={(action) => {
+        isOwner={quickActionsPost?.creator.id === user?.id}
+        onAction={async (action) => {
           if (!quickActionsPost) return;
           if (action === 'save') toggleSave(quickActionsPost.id);
           if (action === 'copy') navigator.clipboard?.writeText(quickActionsPost.prompt);
+          if (action === 'delete') {
+            const confirmed = window.confirm('Are you sure you want to delete this post?');
+            if (confirmed) {
+              await deletePost(quickActionsPost.id);
+            }
+          }
         }}
       />
       <ScrollToTop scrollRef={scrollRef} />

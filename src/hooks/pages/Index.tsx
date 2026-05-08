@@ -228,9 +228,14 @@ function AppShell() {
 
   // Push history when overlays open
   const openPost = useCallback((post: Post) => {
+    if (post.isShort || post.type === 'video' || post.videoUrl) {
+      // If it's a short or video, navigate to the shorts tab and target this specific post
+      navigate(`/shorts/prompt/${post.id}`);
+      return;
+    }
     pushHistory('post', getSubPath('prompt', post.id));
     setSelectedPost(post);
-  }, [pushHistory, getSubPath]);
+  }, [pushHistory, getSubPath, navigate]);
 
   const openCreatePost = useCallback(() => {
     pushHistory('createPost');
@@ -314,7 +319,7 @@ function AppShell() {
   }, [selectedPost, viewingCreator, showAuth, showCreatePost, showSettings, showSubscription]);
 
   const smartScrollEnabled = activeTab === 'home' || activeTab === 'discover' || activeTab === 'favorites' || activeTab === 'profile';
-  const { visible: navVisible, scrollRef } = useSmartScroll(smartScrollEnabled);
+  const { visible: navVisible, scrollRef, setVisible: setNavVisible } = useSmartScroll(smartScrollEnabled, activeTab);
 
   const seoMeta = useMemo(() => {
     if (selectedPost) {
@@ -373,79 +378,90 @@ function AppShell() {
         keywords={seoMeta.keywords}
       />
       <div className="flex-1 relative overflow-hidden">
-        <div className="absolute inset-0">
-          {activeTab === 'home' && (
-            <HomeScreen
-              scrollRef={scrollRef}
-              onPostTap={openPost}
-              onCreatePost={openCreatePost}
-              onGetPro={openSubscription}
-              onCreatorTap={openCreator}
-              adSettings={adSettings}
-              isPro={isPro}
+        {/* Render all tabs but hide inactive ones to preserve scroll position */}
+        <div className={cn("absolute inset-0", activeTab === 'home' ? "z-10" : "opacity-0 z-0 pointer-events-none")}>
+          <HomeScreen
+            scrollRef={activeTab === 'home' ? scrollRef : { current: null }}
+            onPostTap={openPost}
+            onCreatePost={openCreatePost}
+            onGetPro={openSubscription}
+            onCreatorTap={openCreator}
+            adSettings={adSettings}
+            isPro={isPro}
+            navVisible={navVisible}
+          />
+        </div>
+
+        <div className={cn("absolute inset-0", activeTab === 'discover' ? "z-10" : "opacity-0 z-0 pointer-events-none")}>
+          <MarketplaceScreen
+            scrollRef={activeTab === 'discover' ? scrollRef : { current: null }}
+            onUsePrompt={handleUsePrompt}
+            onOpenAuth={openAuth}
+            onCreatorTap={openCreator}
+            navVisible={navVisible}
+            onBack={() => handleTabChange('home')}
+          />
+        </div>
+
+        <div className={cn("absolute inset-0", activeTab === 'shorts' ? "z-10" : "opacity-0 z-0 pointer-events-none")}>
+          <ShortsScreen 
+            onBack={() => handleTabChange('home')} 
+            onCreatorTap={openCreator}
+            initialPostId={location.pathname.includes('/shorts/prompt/') ? id : undefined}
+          />
+        </div>
+
+        <div className={cn("absolute inset-0", activeTab === 'studio' ? "z-10" : "opacity-0 z-0 pointer-events-none")}>
+          {isLoggedIn ? (
+            <StudioScreen
+              initialPrompt={studioPrompt}
+              onClearInitialPrompt={() => setStudioPrompt('')}
               navVisible={navVisible}
+              onPublish={(imageUrl, prompt) => {
+                setCreatePostData({ imageUrl, prompt });
+                openCreatePost();
+              }}
             />
-          )}
-          {activeTab === 'discover' && (
-            <MarketplaceScreen
-              scrollRef={scrollRef}
-              onUsePrompt={handleUsePrompt}
-              onOpenAuth={openAuth}
-              onCreatorTap={openCreator}
-              navVisible={navVisible}
-              onBack={() => handleTabChange('home')}
-            />
-          )}
-          {activeTab === 'shorts' && (
-            <ShortsScreen 
-              onBack={() => handleTabChange('home')} 
-              onCreatorTap={openCreator}
-            />
-          )}
-          {activeTab === 'studio' && (
-            isLoggedIn ? (
-              <StudioScreen
-                initialPrompt={studioPrompt}
-                onClearInitialPrompt={() => setStudioPrompt('')}
-                onPublish={(imageUrl, prompt) => {
-                  setCreatePostData({ imageUrl, prompt });
-                  openCreatePost();
-                }}
-              />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-                </div>
-                <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
-                <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
-                <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                  Sign In
-                </button>
-                <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
-                  Create Account
-                </button>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
               </div>
-            )
+              <h2 className="text-lg font-bold text-foreground mb-2">Sign in to use Studio</h2>
+              <p className="text-sm text-muted-foreground text-center mb-6">Create amazing AI images by signing in to your account</p>
+              <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                Sign In
+              </button>
+              <button onClick={() => openAuth('signup')} className="mt-3 text-sm text-primary font-medium">
+                Create Account
+              </button>
+            </div>
           )}
-          {activeTab === 'notifications' && (
-            isLoggedIn ? (
-              <NotificationScreen />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Bell size={36} className="text-primary" />
-                </div>
-                <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
-                <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
-                <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
-                  Sign In
-                </button>
+        </div>
+
+        <div className={cn("absolute inset-0", activeTab === 'notifications' ? "z-10" : "opacity-0 z-0 pointer-events-none")}>
+          {isLoggedIn ? (
+            <NotificationScreen />
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center px-6 bg-background">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <Bell size={36} className="text-primary" />
               </div>
-            )
+              <h2 className="text-lg font-bold text-foreground mb-2">Sign in to see Alerts</h2>
+              <p className="text-sm text-muted-foreground text-center mb-6">Stay updated with likes, comments and followers</p>
+              <button onClick={() => openAuth('login')} className="px-8 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold">
+                Sign In
+              </button>
+            </div>
           )}
-          {activeTab === 'favorites' && <FavoritesScreen scrollRef={scrollRef} onOpenAuth={openAuth} navVisible={navVisible} />}
-          {activeTab === 'profile' && <ProfileScreen scrollRef={scrollRef} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />}
+        </div>
+
+        <div className={cn("absolute inset-0", activeTab === 'favorites' ? "z-10" : "opacity-0 z-0 pointer-events-none")}>
+          <FavoritesScreen scrollRef={activeTab === 'favorites' ? scrollRef : { current: null }} onOpenAuth={openAuth} navVisible={navVisible} />
+        </div>
+
+        <div className={cn("absolute inset-0", activeTab === 'profile' ? "z-10" : "opacity-0 z-0 pointer-events-none")}>
+          <ProfileScreen scrollRef={activeTab === 'profile' ? scrollRef : { current: null }} onOpenSettings={openSettings} onOpenAuth={openAuth} onPostTap={openPost} navVisible={navVisible} />
         </div>
       </div>
 

@@ -13,7 +13,7 @@ interface CreatePostProps {
   initialPrompt?: string;
 }
 
-type PostType = 'post' | 'short';
+type PostType = 'image' | 'video' | 'short' | 'post';
 
 export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: CreatePostProps) {
   const { user, startUpload } = useAppState();
@@ -81,7 +81,7 @@ export default function CreatePost({ onBack, initialImageUrl, initialPrompt }: C
         title,
         prompt,
         tags,
-        type,
+        type: type === 'post' ? 'image' : type,
         file: selectedFile,
         previewUrl: type === 'short' ? videoPreview : imagePreview
       });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export function useSmartScroll(enabled = true) {
+export function useSmartScroll(enabled = true, activeTab?: string) {
   const [visible, setVisibleState] = useState(true);
   const visibleRef = useRef(true);
 
@@ -14,11 +14,12 @@ export function useSmartScroll(enabled = true) {
   const lastScrollY = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleScroll = useCallback((e: Event) => {
+    const handleScroll = useCallback((e: Event | { target: { scrollTop: number } }) => {
     if (!enabled) return;
     
-    const target = e.target as HTMLElement;
-    const current = target.scrollTop;
+    // Support both native events and manual calls
+    const scrollTop = 'target' in e ? (e.target as HTMLElement).scrollTop : (e as any).scrollTop;
+    const current = scrollTop;
     
     if (current <= 0) {
       setVisible(true);
@@ -28,11 +29,11 @@ export function useSmartScroll(enabled = true) {
 
     const delta = current - lastScrollY.current;
     
-    // Scroll down -> hide (be more sensitive)
-    if (delta > 5 && current > 50) {
+    // Scroll down -> hide (threshold 5px)
+    if (delta > 5 && current > 60) {
       setVisible(false);
     } 
-    // Scroll up -> show
+    // Scroll up -> show (threshold -5px)
     else if (delta < -5 || current < 5) {
       setVisible(true);
     }
@@ -41,19 +42,24 @@ export function useSmartScroll(enabled = true) {
   }, [enabled, setVisible]);
 
   useEffect(() => {
-    const node = scrollRef.current;
-    if (!node || !enabled) return;
-    node.addEventListener('scroll', handleScroll, { passive: true });
-    return () => node.removeEventListener('scroll', handleScroll);
-  }, [enabled, handleScroll]);
+    const timer = setTimeout(() => {
+      const node = scrollRef.current;
+      if (!node || !enabled) return;
+      node.addEventListener('scroll', handleScroll, { passive: true });
+    }, 100);
 
-  // Reset visibility when tab changes (enabled toggles)
+    return () => {
+      const node = scrollRef.current;
+      if (node) node.removeEventListener('scroll', handleScroll);
+    };
+  }, [enabled, handleScroll, activeTab]);
+
   useEffect(() => {
     if (enabled) {
       setVisible(true);
       lastScrollY.current = 0;
     }
-  }, [enabled, setVisible]);
+  }, [enabled, setVisible, activeTab]);
 
-  return { visible: enabled ? visible : true, scrollRef };
+  return { visible: enabled ? visible : true, setVisible, scrollRef, handleScroll };
 }

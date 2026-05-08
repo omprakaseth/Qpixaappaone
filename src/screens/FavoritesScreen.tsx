@@ -32,7 +32,7 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
   }, [isLoggedIn, user]);
 
   const fetchFavorites = async () => {
-    if (!user || isPlaceholder) return;
+    if (!user) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -51,7 +51,7 @@ export default function FavoritesScreen({ scrollRef, onOpenAuth, navVisible = tr
   };
 
   const fetchGenerations = async () => {
-    if (!user || isPlaceholder) return;
+    if (!user) return;
     try {
       const { data, error } = await supabase
         .from('generations')

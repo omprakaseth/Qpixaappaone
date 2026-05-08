@@ -89,6 +89,7 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
   const [reviews, setReviews] = useState<Comment[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(true);
   const [showReportConfirm, setShowReportConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteTimer, setDeleteTimer] = useState<number | null>(null);
   const [isPromptExpanded, setIsPromptExpanded] = useState(false);
@@ -108,10 +109,13 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
     setScrollY(e.currentTarget.scrollTop);
   };
 
-  const initiateDelete = () => {
+  const handleDeleteImmediate = async () => {
+    setShowDeleteConfirm(false);
     setIsDeleting(true);
-    setDeleteTimer(5);
+    setDeleteTimer(3);
     
+    // We still give a 3s window to undo even after confirmation, 
+    // but the dialog makes it feel final (Standard UX)
     const countdown = setInterval(() => {
       setDeleteTimer(prev => (prev !== null && prev > 0 ? prev - 1 : 0));
     }, 1000);
@@ -120,8 +124,12 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
       clearInterval(countdown);
       await deletePost(post.id);
       onBack();
-      toast.success('Post deleted permanently');
-    }, 5000);
+      toast.success('Post removed from feed');
+    }, 3000);
+  };
+
+  const initiateDelete = () => {
+    setShowDeleteConfirm(true);
   };
 
   const cancelDelete = () => {
@@ -354,6 +362,27 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
         )}
       </AnimatePresence>
 
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-card border-border rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold">Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This will permanently remove your AI masterpiece from the feed and your profile. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-0">
+            <AlertDialogCancel className="rounded-xl border-border bg-secondary/50">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteImmediate}
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-none font-bold"
+            >
+              Confirm Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Report Confirmation */}
       <AlertDialog open={showReportConfirm} onOpenChange={setShowReportConfirm}>
         <AlertDialogContent>
@@ -406,21 +435,35 @@ export default function PostDetail({ post, onBack, onUsePrompt, onCreatorTap }: 
                 <MoreVertical size={20} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border">
-              {isOwner && (
+            <DropdownMenuContent align="end" className="bg-zinc-900/95 backdrop-blur-xl border-white/10 text-white min-w-[180px] p-1.5 rounded-2xl shadow-2xl">
+              {isOwner ? (
                 <>
-                  <DropdownMenuItem onClick={() => setIsEditing(true)} className="gap-2">
-                    <Edit2 size={16} /> Edit Details
+                  <DropdownMenuItem onClick={() => setIsEditing(true)} className="gap-3 py-3 px-4 rounded-xl cursor-pointer focus:bg-white/10 transition-colors">
+                    <Edit2 size={18} className="text-blue-400" /> 
+                    <span className="font-medium">Edit Details</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={initiateDelete} className="gap-2 text-destructive">
-                    <Trash2 size={16} /> Delete Post
+                  <div className="h-[1px] bg-white/5 my-1" />
+                  <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)} className="gap-3 py-3 px-4 rounded-xl cursor-pointer focus:bg-red-500/10 text-red-400 transition-colors">
+                    <Trash2 size={18} /> 
+                    <span className="font-bold">Delete Post</span>
                   </DropdownMenuItem>
                 </>
-              )}
-              {!isOwner && (
-                <DropdownMenuItem onClick={() => setShowReportConfirm(true)} className="gap-2 text-destructive">
-                  <ShieldAlert size={16} /> Report
-                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={handleShare} className="gap-3 py-3 px-4 rounded-xl cursor-pointer focus:bg-white/10 transition-colors">
+                    <Share2 size={18} className="text-green-400" /> 
+                    <span className="font-medium">Share Link</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownload} className="gap-3 py-3 px-4 rounded-xl cursor-pointer focus:bg-white/10 transition-colors">
+                    <Download size={18} className="text-orange-400" /> 
+                    <span className="font-medium">Download HD</span>
+                  </DropdownMenuItem>
+                  <div className="h-[1px] bg-white/5 my-1" />
+                  <DropdownMenuItem onClick={() => setShowReportConfirm(true)} className="gap-3 py-3 px-4 rounded-xl cursor-pointer focus:bg-red-500/10 text-red-500 transition-colors">
+                    <ShieldAlert size={18} /> 
+                    <span className="font-bold">Report Content</span>
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
